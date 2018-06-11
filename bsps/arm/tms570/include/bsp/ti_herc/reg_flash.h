@@ -41,6 +41,60 @@
 
 #include <bsp/utility.h>
 
+#ifdef TMS570_LC43X
+typedef struct{
+ uint32_t	FRDCNTL;	// Flash Read Control Register Section 7.10.1
+ uint32_t	FSPRD;		// Read Margin Control Register Section 7.10.2
+ uint32_t	EE_FEDACCTRL1;	// EEPROM Error Correction Control Register 1 Section 7.10.3
+ uint32_t 	NOTUSED_5[2];
+ uint32_t	FEDAC_PASTATUS;	// Flash Port A Error and Status Register Section 7.10.4
+ uint32_t	FEDAC_PBSTATUS;	// Flash Port B Error and Status Register Section 7.10.5
+ uint32_t	FEDAC_GBLSTATUS;// Flash Global Error and Status Register Section 7.10.6
+ uint32_t 	NOTUSED_9;
+ uint32_t	FEDACSDIS;	// Flash Error Detection and Correction Sector Disable
+ uint32_t	FPRIM_ADD_TAG;	// Flash Primary Address Tag Register Section 7.10.8
+ uint32_t	FDUP_ADD_TAG;	// Flash Duplicate Address Tag Register Section 7.10.9
+ uint32_t	FBPROT;		// Flash Bank Protection Register Section 7.10.10
+ uint32_t	FBSE;		// Flash Bank Sector Enable Register Section 7.10.11
+ uint32_t	FBBUSY;		// Flash Bank Busy Register Section 7.10.12
+ uint32_t	FBAC;		// Flash Bank Access Control Register Section 7.10.13
+ uint32_t	FBPWRMODE;	// Flash Bank Power Mode Register Section 7.10.14
+ uint32_t	FBPRDY;		// Bank/Pump Ready Register Section 7.10.15
+ uint32_t	FPAC1;		// Flash Pump Access Control Register 1 Section 7.10.16
+ uint32_t 	NOTUSED_20;
+ uint32_t	FMAC;		// Flash Module Access Control Register Section 7.10.17
+ uint32_t	FMSTAT;		// Flash Module Status Register Section 7.10.18
+ uint32_t	FEMU_DMSW;	// EEPROM Emulation Data MSW Register Section 7.10.19
+ uint32_t	FEMU_DLSW;	// EEPROM Emulation Data LSW Register Section 7.10.20
+ uint32_t	FEMU_ECC;	// EEPROM Emulation Address Register Section 7.10.21
+ uint32_t	FLOCK;		// Flash Lock Register Section 7.10.22
+ uint32_t 	NOTUSED_27;
+ uint32_t	FDIAGCTRL;	// Diagnostic Control Register Section 7.10.23
+ uint32_t 	NOTUSED_29;
+ uint32_t	FRAW_ADDR;	// Raw Address Section 7.10.24
+ uint32_t 	NOTUSED_31;
+ uint32_t	FPAR_OVR;	// Parity Override Register Section 7.10.25
+ uint32_t 	NOTUSED_45[13];
+ uint32_t	RCR_VALID;	// Reset Configuration Valid Register Section 7.10.26
+ uint32_t	ACC_THRESHOLD;	// Crossbar Access Time Threshold Register Section 7.10.27
+ uint32_t 	NOTUSED_48;
+ uint32_t	FEDACSDIS2;	// Flash Error Detection and Correction Sector Disable
+ uint32_t 	NOTUSED_52[3];
+ uint32_t	RCR_VALUE0;	// Lower Word of the Reset Configuration Read Register Section 7.10.29
+ uint32_t	RCR_VALUE1;	// Upper Word of the Reset Configuration Read Register Section 7.10.30
+ uint32_t 	NOTUSED_53[108];
+ uint32_t	FSM_WR_ENA;	// FSM Register Write Enable Register Section 7.10.31
+ uint32_t 	NOTUSED_46[11];
+ uint32_t	EEPROM_CONFIG;	// EEPROM Emulation Configuration Register Section 7.10.32
+ uint32_t 	NOTUSED_48;
+ uint32_t	FSM_SECTOR1;	// FSM Sector Register 1 Section 7.10.33
+ uint32_t	FSM_SECTOR2;	// FSM Sector Register 2 Section 7.10.34
+ uint32_t 	NOTUSED_49[78];
+ uint32_t	FCFG_BANK;	//Flash Bank Configuration Register	Section 7.10.35
+} tms570_flash_t;
+
+#else
+
 typedef struct{
   uint32_t FRDCNTL;           /*Flash Option Control Register*/
   uint8_t reserved1 [4];
@@ -94,6 +148,7 @@ typedef struct{
   uint32_t FCFGBANK;          /*Flash Bank Configuration Register*/
 } tms570_flash_t;
 
+#endif
 
 /*--------------------TMS570_FLASH_FRDCNTL--------------------*/
 /* field: RWAIT - Random/data Read Wait State */
