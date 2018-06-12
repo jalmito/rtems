@@ -41,7 +41,7 @@
 
 #include <bsp/utility.h>
 
-#ifdef TMS570_LC43X
+#ifdef TMS570_LC43X /* Code added to support the LC43X Family*/
 typedef struct{
  uint32_t	FRDCNTL;	// Flash Read Control Register Section 7.10.1
  uint32_t	FSPRD;		// Read Margin Control Register Section 7.10.2
@@ -152,15 +152,19 @@ typedef struct{
 
 /*--------------------TMS570_FLASH_FRDCNTL--------------------*/
 /* field: RWAIT - Random/data Read Wait State */
+
 #define TMS570_FLASH_FRDCNTL_RWAIT(val) BSP_FLD32(val,8, 11)
 #define TMS570_FLASH_FRDCNTL_RWAIT_GET(reg) BSP_FLD32GET(reg,8, 11)
 #define TMS570_FLASH_FRDCNTL_RWAIT_SET(reg,val) BSP_FLD32SET(reg, val,8, 11)
-
-/* field: ASWSTEN - Address Setup Wait State Enable */
-#define TMS570_FLASH_FRDCNTL_ASWSTEN BSP_BIT32(4)
-
+#ifdef TMS570_LC43X
+#define TMS570_FLASH_FRDCNTL_PFUENB BSP_BIT32(1)
+#define TMS570_FLASH_FRDCNTL_PFUENA BSP_BIT32(1)
+#else
 /* field: ENPIPE - Enable Pipeline Mode */
 #define TMS570_FLASH_FRDCNTL_ENPIPE BSP_BIT32(0)
+/* field: ASWSTEN - Address Setup Wait State Enable */
+#define TMS570_FLASH_FRDCNTL_ASWSTEN BSP_BIT32(4)
+#endif
 
 
 /*-------------------TMS570_FLASH_FEDACTRL1-------------------*/
@@ -168,15 +172,32 @@ typedef struct{
 #define TMS570_FLASH_FEDACTRL1_SUSP_IGNR BSP_BIT32(24)
 
 /* field: EDACMODE - Error Correction Mode. */
+#ifdef TMS570_LC43X
+#define TMS570_FLASH_EE_FEDACTRL1_EZCV BSP_BIT32(4)	/*Allow the condition of all data bits and ECC bits to be 0*/
+#define TMS570_FLASH_EE_FEDACTRL1_EOCV BSP_BIT32(5)	/*Allow the condition of all data bits and ECC bits to be 1*/
+#else
 #define TMS570_FLASH_FEDACTRL1_EDACMODE(val) BSP_FLD32(val,16, 19)
 #define TMS570_FLASH_FEDACTRL1_EDACMODE_GET(reg) BSP_FLD32GET(reg,16, 19)
 #define TMS570_FLASH_FEDACTRL1_EDACMODE_SET(reg,val) BSP_FLD32SET(reg, val,16, 19)
+#endif
+#ifdef TMS570_LC43X
 
+/*Read Margin Control Register (FSPRD) Field Descriptions*/
+
+#define TMS570_FLASH_FSPRD_RM1 BSP_BIT32(1)  /* Read Margin 1 Mode is enabled.*/
+#define TMS570_FLASH_FSPRD_RM0 BSP_BIT32(0)  /* Read Margin 0 Mode is enabled.*/
+
+
+#define TMS570_FLASH_FSPRD_RMBSEL(val) BSP_FLD32(val,8, 15)			/*       Read Margin Bank Select. Each bit corresponds to a Flash bank 				  */                	 
+#define TMS570_FLASH_FSPRD_RMBSEL_GET(reg) BSP_FLD32GET(reg,8, 15)		/*RMBSEL is only decoded if either the RM1 or RM0 bit is set. When either RM1 or RM0 is set, the  */
+#define TMS570_FLASH_FSPRD_RMBSEL_SET(reg,val) BSP_FLD32SET(reg, val,8, 15)	/*RMBSEL bit corresponding to a bank forces the selected bank(s) to be read in the selected margin*/
+                                                                                /*mode. The unselected bank(s) are still read in normal mode.					  */
+
+#else
 /* field: EOFEN - Event on Ones Fail Enable */
-#define TMS570_FLASH_FEDACTRL1_EOFEN BSP_BIT32(10)
-
+#define TMS570_FLASH_FEDACTRL1_EOFEN BSP_BIT32(10)	/*Event on One's Fail Enable - An ESM error event is generated on a single-bit error where a 1 reads as a 0 when reading from the OTP or ECC memory locations.*/
 /* field: EZFEN - Event on Zeros Fail Enable */
-#define TMS570_FLASH_FEDACTRL1_EZFEN BSP_BIT32(9)
+#define TMS570_FLASH_FEDACTRL1_EZFEN BSP_BIT32(9)	/*Event on Zero's Fail Enable - An ESM error event is generated on a single-bit error where a 0 reads as a 1 when reading from the OTP or ECC memory locations.*/
 
 /* field: EPEN - Error Profiling Enable. */
 #define TMS570_FLASH_FEDACTRL1_EPEN BSP_BIT32(8)
@@ -192,6 +213,7 @@ typedef struct{
 #define TMS570_FLASH_FEDACTRL2_SEC_THRESHOLD(val) BSP_FLD32(val,0, 15)
 #define TMS570_FLASH_FEDACTRL2_SEC_THRESHOLD_GET(reg) BSP_FLD32GET(reg,0, 15)
 #define TMS570_FLASH_FEDACTRL2_SEC_THRESHOLD_SET(reg,val) BSP_FLD32SET(reg, val,0, 15)
+#endif
 
 
 /*------------------TMS570_FLASH_FCORERRCNT------------------*/
