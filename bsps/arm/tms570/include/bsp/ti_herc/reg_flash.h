@@ -158,7 +158,7 @@ typedef struct{
 #define TMS570_FLASH_FRDCNTL_RWAIT_SET(reg,val) BSP_FLD32SET(reg, val,8, 11)
 
 #define TMS570_LC43X_FLASH_FRDCNTL_PFUENB BSP_BIT32(1)
-#define TMS570_LC43X_FLASH_FRDCNTL_PFUENA BSP_BIT32(1)
+#define TMS570_LC43X_FLASH_FRDCNTL_PFUENA BSP_BIT32(0)
 
 /* field: ENPIPE - Enable Pipeline Mode */
 #define TMS570_FLASH_FRDCNTL_ENPIPE BSP_BIT32(0)
@@ -568,7 +568,6 @@ typedef struct{
 #define TMS570_LC43X_FLASH_FBPRDY_BANKRDY_GET(reg) BSP_FLD32GET(reg,0, 1)
 #define TMS570_LC43X_FLASH_FBPRDY_BANKRDY_SET(reg,val) BSP_FLD32SET(reg, val,0,1)
 
-
 /*--------------------TMS570_FLASH_FBPRDY--------------------*/
 /* field: BANKBUSY - Bank busy bits (one bit for each bank) */
 #define TMS570_FLASH_FBPRDY_BANKBUSY(val) BSP_FLD32(val,16, 23)
@@ -767,6 +766,11 @@ typedef struct{
 
 
 /*-------------------TMS570_FLASH_FSMWRENA-------------------*/
+/* LC43X field: WR_ENA - Flash State Machine Write Enable */
+#define TMS570_LC43X_FLASH_FSMWRENA_WR_ENA(val) BSP_FLD32(val,0, 2)
+#define TMS570_LC43X_FLASH_FSMWRENA_WR_ENA_GET(reg) BSP_FLD32GET(reg,0, 2)
+#define TMS570_LC43X_FLASH_FSMWRENA_WR_ENA_SET(reg,val) BSP_FLD32SET(reg, val,0, 2)
+
 /* field: WR_ENA - Flash State Machine Write Enable */
 #define TMS570_FLASH_FSMWRENA_WR_ENA(val) BSP_FLD32(val,0, 2)
 #define TMS570_FLASH_FSMWRENA_WR_ENA_GET(reg) BSP_FLD32GET(reg,0, 2)

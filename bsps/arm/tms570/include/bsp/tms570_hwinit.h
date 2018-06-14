@@ -10,8 +10,8 @@
 /* Ti TMS570 core setup implemented in assembly */
 void _esmCcmErrorsClear_( void );
 void _coreEnableEventBusExport_( void );
-void _errata_CORTEXR4_66_( void );
-void _errata_CORTEXR4_57_( void );
+/*void _errata_CORTEXR4_66_( void );
+void _errata_CORTEXR4_57_( void );*/
 void _coreEnableRamEcc_( void );
 void _coreDisableRamEcc_( void );
 void _mpuInit_( void );

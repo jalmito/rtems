@@ -147,14 +147,13 @@ void tms570_flash_init( void )
 {
   /** - Setup flash read mode, address wait states and data wait states */
   TMS570_FLASH.FRDCNTL = TMS570_FLASH_FRDCNTL_RWAIT( 3 ) |
-                         TMS570_FLASH_FRDCNTL_ASWSTEN |
-                         TMS570_FLASH_FRDCNTL_ENPIPE;
+                         TMS570_LC43X_FLASH_FRDCNTL_PFUENB |
+                         TMS570_LC43X_FLASH_FRDCNTL_PFUENA;
 
   /** - Setup flash access wait states for bank 7 */
-  TMS570_FLASH.FSMWRENA = TMS570_FLASH_FSMWRENA_WR_ENA( 0x5 );
-  TMS570_FLASH.EEPROMCONFIG = TMS570_FLASH_EEPROMCONFIG_EWAIT( 3 ) |
-                              TMS570_FLASH_EEPROMCONFIG_AUTOSUSP_EN * 0 |
-                              TMS570_FLASH_EEPROMCONFIG_AUTOSTART_GRACE( 2 );
+  TMS570_FLASH.FSM_WR_ENA = TMS570_LC43X_FLASH_FSMWRENA_WR_ENA( 0x5 );
+  TMS570_FLASH.EEPROM_CONFIG = TMS570_FLASH_EEPROMCONFIG_EWAIT( 3 );
+                  
 
   /** - Disable write access to flash state machine registers */
   TMS570_FLASH.FSMWRENA = TMS570_FLASH_FSMWRENA_WR_ENA( 0xA );
