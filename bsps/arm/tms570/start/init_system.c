@@ -147,17 +147,38 @@ void tms570_flash_init( void )
 {
   /** - Setup flash read mode, address wait states and data wait states */
   TMS570_FLASH.FRDCNTL = TMS570_FLASH_FRDCNTL_RWAIT( 3 ) |
+#ifdef TMS570_LC43X /* Code added to support the LC43X Family*/
                          TMS570_LC43X_FLASH_FRDCNTL_PFUENB |
                          TMS570_LC43X_FLASH_FRDCNTL_PFUENA;
-
+#else
+                         TMS570_FLASH_FRDCNTL_ASWSTEN |
+                         TMS570_FLASH_FRDCNTL_ENPIPE;
+#endif
   /** - Setup flash access wait states for bank 7 */
-  TMS570_FLASH.FSM_WR_ENA = TMS570_LC43X_FLASH_FSMWRENA_WR_ENA( 0x5 );
-  TMS570_FLASH.EEPROM_CONFIG = TMS570_FLASH_EEPROMCONFIG_EWAIT( 3 );
-                  
-
+#ifdef TMS570_LC43X /* Code added to support the LC43X Family*/
+		TMS570_FLASH.FSM_WR_ENA = TMS570_LC43X_FLASH_FSMWRENA_WR_ENA( 0x5 );
+		TMS570_FLASH.EEPROM_CONFIG = TMS570_FLASH_EEPROMCONFIG_EWAIT( 3 );
   /** - Disable write access to flash state machine registers */
-  TMS570_FLASH.FSMWRENA = TMS570_FLASH_FSMWRENA_WR_ENA( 0xA );
+		TMS570_FLASH.FSM_WR_ENA = TMS570_FLASH_FSMWRENA_WR_ENA( 0xA );
+#else
+		TMS570_FLASH.FSMWRENA = TMS570_FLASH_FSMWRENA_WR_ENA( 0x5 );
+		TMS570_FLASH.EEPROMCONFIG = TMS570_FLASH_EEPROMCONFIG_EWAIT( 3 ) |
+	                              TMS570_FLASH_EEPROMCONFIG_AUTOSUSP_EN * 0 |
+	                              TMS570_FLASH_EEPROMCONFIG_AUTOSTART_GRACE( 2 );
+  /** - Disable write access to flash state machine registers */
 
+  		TMS570_FLASH.FSMWRENA = TMS570_FLASH_FSMWRENA_WR_ENA( 0xA );
+#endif  
+
+#ifdef TMS570_LC43X /* Code added to support the LC43X Family*/
+/** - Setup flash bank power modes */
+
+	TMS570_FLASH.FBPWRMODE = TMS570_FLASH_FBFALLBACK_BANKPWR7(TMS570_FLASH_SYS_ACTIVE ) |
+        	                  TMS570_FLASH_FBFALLBACK_BANKPWR1(TMS570_FLASH_SYS_ACTIVE ) |
+				  TMS570_FLASH_FBFALLBACK_BANKPWR0(TMS570_FLASH_SYS_ACTIVE );
+
+#else
+                
   /** - Setup flash bank power modes */
   TMS570_FLASH.FBFALLBACK = TMS570_FLASH_FBFALLBACK_BANKPWR7(
     TMS570_FLASH_SYS_ACTIVE ) |
@@ -165,6 +186,7 @@ void tms570_flash_init( void )
     TMS570_FLASH_SYS_ACTIVE ) |
                             TMS570_FLASH_FBFALLBACK_BANKPWR0(
     TMS570_FLASH_SYS_ACTIVE );
+#endif  
 }
 
 /**
