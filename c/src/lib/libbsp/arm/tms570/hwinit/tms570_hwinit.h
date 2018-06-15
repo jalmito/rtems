@@ -3,6 +3,7 @@
 
 #ifndef TMS570_LC43X
 #define TMS570_LC43X
+#endif
 
 #define TMS570_TCRAM_START_PTR       ( (void *) ( 0x08000000U ) )
 #define TMS570_TCRAM_WINDOW_END_PTR  ( (void *) ( 0x08080000U ) )

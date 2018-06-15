@@ -38,6 +38,9 @@
 */
 #ifndef LIBBSP_ARM_TMS570_RTP
 #define LIBBSP_ARM_TMS570_RTP
+	#ifndef TMS570_LC43X
+	#define TMS570_LC43X
+	#endif
 
 #include <bsp/utility.h>
 
@@ -49,7 +52,12 @@ typedef struct{
   uint32_t RAM1REG2;          /*RTP RAM 1 Trace Region 2 Register*/
   uint32_t RAM2REG1;          /*RTP RAM 2 Trace Region 1 Register*/
   uint32_t RAM2REG2;          /*RTP RAM 2 Trace Region 2 Register*/
+#ifdef TMS570_LC43X
+  uint32_t RAM3REG1;          /*RTP RAM 3 Trace Region 1 Register*/
+  uint32_t RAM3REG2;          /*RTP RAM 3 Trace Region 2 Register*/
+#else
   uint8_t reserved1 [8];
+#endif
   uint32_t PERREG1;           /*RTP Peripheral Trace Region 1 Register*/
   uint32_t PERREG2;           /*RTP Peripheral Trace Region 2 Register*/
   uint32_t DDMW;              /*RTP Direct Data Mode Write Register*/
@@ -113,6 +121,9 @@ typedef struct{
 /* field: ENA4 - Enable tracing for peripherals. */
 #define TMS570_RTP_TRENA_ENA4 BSP_BIT32(24)
 
+/* LC43X field: ENA4 - Enable tracing for peripherals. */
+#define TMS570_LC43X_RTP_TRENA_ENA4 BSP_BIT32(16)
+
 /* field: ENA2 - Enable tracing for RAM block 2. */
 #define TMS570_RTP_TRENA_ENA2 BSP_BIT32(8)
 
@@ -144,6 +155,11 @@ typedef struct{
 
 
 /*--------------------TMS570_RTP_RAM1REGx--------------------*/
+/* LC43X field: CPU_DMA - CPU and/or other master access. */
+#define TMS570_LC43X_RTP_RAM1REGx_CPU_DMA(val) BSP_FLD32(val,29, 31)
+#define TMS570_LC43X_RTP_RAM1REGx_CPU_DMA_GET(reg) BSP_FLD32GET(reg,29, 31)
+#define TMS570_LC43X_RTP_RAM1REGx_CPU_DMA_SET(reg,val) BSP_FLD32SET(reg, val,29, 31)
+
 /* field: CPU_DMA - CPU and/or other master access. */
 #define TMS570_RTP_RAM1REGx_CPU_DMA(val) BSP_FLD32(val,29, 30)
 #define TMS570_RTP_RAM1REGx_CPU_DMA_GET(reg) BSP_FLD32GET(reg,29, 30)

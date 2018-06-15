@@ -40,7 +40,26 @@
 #define LIBBSP_ARM_TMS570_PMM
 
 #include <bsp/utility.h>
-
+#ifdef TMS570_LC43X
+typedef struct{
+ uint32_t	LOGICPDPWRCTRL[2];	// Logic Power Domain Control Register 0 Section 5.4.1
+ uint32_t	NOTUSED_8[6];
+ uint32_t	PDCLKDIS;	// Power Domain Clock Disable Register Section 5.4.3
+ uint32_t	PDCLKDISSET;	// Power Domain Clock Disable Set Register Section 5.4.4
+ uint32_t	PDCLKDISCLR;	// Power Domain Clock Disable Clear Register Section 5.4.5
+ uint32_t	NOTUSED_16[5];
+ uint32_t	LOGICPDPWRSTAT[5];	// Logic Power Domain PD2 Power Status Register Section 5.4.6
+ uint32_t	NOTUSED_40[19];
+ uint32_t	GLOBALCTRL1;	// Global Control Register 1 Section 5.4.11
+ uint32_t 	NOTUSED_42;
+ uint32_t	GLOBALSTAT;	// Global Status Register Section 5.4.12
+ uint32_t	PRCKEYREG;	// PSCON Diagnostic Compare Key Register Section 5.4.13
+ uint32_t	LPDDCSTAT1;	// LogicPD PSCON Diagnostic Compare Status Register 1 Section 5.4.14
+ uint32_t	LPDDCSTAT2;	// LogicPD PSCON Diagnostic Compare Status Register 2 Section 5.4.15
+ uint32_t 	NOTUSED_48[2];
+ uint32_t	ISODIAGSTAT;	// Isolation Diagnostic Status Register Section 5.4.16
+} tms570_pmm_t;
+#else
 typedef struct{
   uint32_t LOGICPDPWRCTRL0;   /*Logic Power Domain Control Register 0*/
   uint8_t reserved1 [12];
@@ -64,7 +83,7 @@ typedef struct{
   uint32_t MPDDCSTAT2;        /*Memory PD PSCON Diagnostic Compare Status Register 2*/
   uint32_t ISODIAGSTAT;       /*Isolation Diagnostic Status Register*/
 } tms570_pmm_t;
-
+#endif
 
 /*-----------------TMS570_PMM_LOGICPDPWRCTRL0-----------------*/
 /* field: LOGICPDON0 - Read in User and Privileged Mode. Write in Privileged Mode only. */
@@ -106,6 +125,8 @@ typedef struct{
 
 
 /*-------------------TMS570_PMM_PDCLKDISREG-------------------*/
+/* field: PDCLK_DIS_4 - Read in User and Privileged Mode returns the current value of PDCLK_DIS[3]. */
+#define TMS570_LC43X_PMM_PDCLKDISREG_PDCLK_DIS_3 BSP_BIT32(4)
 /* field: PDCLK_DIS_3 - Read in User and Privileged Mode returns the current value of PDCLK_DIS[3]. */
 #define TMS570_PMM_PDCLKDISREG_PDCLK_DIS_3 BSP_BIT32(3)
 
@@ -121,6 +142,7 @@ typedef struct{
 
 /*-----------------TMS570_PMM_PDCLKDISSETREG-----------------*/
 /* field: PDCLK_DISSET_3 - Read in User and Privileged Mode returns the current value of PDCLK_DISSET[3]. */
+#define TMS570_LC43X_PMM_PDCLKDISSETREG_PDCLK_DISSET_3 BSP_BIT32(4)
 #define TMS570_PMM_PDCLKDISSETREG_PDCLK_DISSET_3 BSP_BIT32(3)
 
 /* field: PDCLK_DISSET_2 - Privileged Mode only. */
@@ -135,6 +157,7 @@ typedef struct{
 
 /*-----------------TMS570_PMM_PDCLKDISCLRREG-----------------*/
 /* field: PDCLK_DISCLR_3 - PDCLK_DISCLR[3] */
+#define TMS570_LC43X_PMM_PDCLKDISCLRREG_PDCLK_DISCLR_3 BSP_BIT32(4)
 #define TMS570_PMM_PDCLKDISCLRREG_PDCLK_DISCLR_3 BSP_BIT32(3)
 
 /* field: PDCLK_DISCLR_2 - Read in User and Privileged Mode returns the current value of PDCLK_DIS[2]. */
@@ -200,6 +223,16 @@ typedef struct{
 
 
 /*-------------------TMS570_PMM_LPDDCSTAT1-------------------*/
+/* LC43X field: LCMPE - Logic Power Domain Compare Error */
+#define TMS570_LC43X_PMM_LPDDCSTAT1_LCMPE(val) BSP_FLD32(val,16, 20)
+#define TMS570_LC43X_PMM_LPDDCSTAT1_LCMPE_GET(reg) BSP_FLD32GET(reg,16, 20)
+#define TMS570_LC43X_PMM_LPDDCSTAT1_LCMPE_SET(reg,val) BSP_FLD32SET(reg, val,16, 20)
+
+/* LC43X field: LSTC - Logic Power Domain Self-test Complete */
+#define TMS570_LC43X_PMM_LPDDCSTAT1_LSTC(val) BSP_FLD32(val,0, 4)
+#define TMS570_LC43X_PMM_LPDDCSTAT1_LSTC_GET(reg) BSP_FLD32GET(reg,0, 4)
+#define TMS570_LC43X_PMM_LPDDCSTAT1_LSTC_SET(reg,val) BSP_FLD32SET(reg, val,0, 4)
+
 /* field: LCMPE - Logic Power Domain Compare Error */
 #define TMS570_PMM_LPDDCSTAT1_LCMPE(val) BSP_FLD32(val,16, 19)
 #define TMS570_PMM_LPDDCSTAT1_LCMPE_GET(reg) BSP_FLD32GET(reg,16, 19)
@@ -212,6 +245,16 @@ typedef struct{
 
 
 /*-------------------TMS570_PMM_LPDDCSTAT2-------------------*/
+/* field: LSTET - Logic Power Domain Self-test Error Type */
+#define TMS570_LC43X_PMM_LPDDCSTAT2_LSTET(val) BSP_FLD32(val,16, 20)
+#define TMS570_LC43X_PMM_LPDDCSTAT2_LSTET_GET(reg) BSP_FLD32GET(reg,16, 20)
+#define TMS570_LC43X_PMM_LPDDCSTAT2_LSTET_SET(reg,val) BSP_FLD32SET(reg, val,16, 20)
+
+/* field: LSTE - Logic Power Domain Self-test Error */
+#define TMS570_LC43X_PMM_LPDDCSTAT2_LSTE(val) BSP_FLD32(val,0, 4)
+#define TMS570_LC43X_PMM_LPDDCSTAT2_LSTE_GET(reg) BSP_FLD32GET(reg,0, 4)
+#define TMS570_LC43X_PMM_LPDDCSTAT2_LSTE_SET(reg,val) BSP_FLD32SET(reg, val,0, 4)
+
 /* field: LSTET - Logic Power Domain Self-test Error Type */
 #define TMS570_PMM_LPDDCSTAT2_LSTET(val) BSP_FLD32(val,16, 19)
 #define TMS570_PMM_LPDDCSTAT2_LSTET_GET(reg) BSP_FLD32GET(reg,16, 19)
@@ -248,6 +291,11 @@ typedef struct{
 
 
 /*-------------------TMS570_PMM_ISODIAGSTAT-------------------*/
+/* field: ISO_DIAG - Isolation Diagnostic */
+#define TMS570_LC43X_PMM_ISODIAGSTAT_ISO_DIAG(val) BSP_FLD32(val,0, 4)
+#define TMS570_LC43X_PMM_ISODIAGSTAT_ISO_DIAG_GET(reg) BSP_FLD32GET(reg,0, 4)
+#define TMS570_LC43X_PMM_ISODIAGSTAT_ISO_DIAG_SET(reg,val) BSP_FLD32SET(reg, val,0, 4)
+
 /* field: ISO_DIAG - Isolation Diagnostic */
 #define TMS570_PMM_ISODIAGSTAT_ISO_DIAG(val) BSP_FLD32(val,0, 3)
 #define TMS570_PMM_ISODIAGSTAT_ISO_DIAG_GET(reg) BSP_FLD32GET(reg,0, 3)

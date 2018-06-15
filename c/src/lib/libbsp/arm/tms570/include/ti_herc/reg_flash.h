@@ -39,8 +39,9 @@
 #ifndef LIBBSP_ARM_TMS570_FLASH
 #define LIBBSP_ARM_TMS570_FLASH
 
-#ifndef TMS570_LC43X
-#define TMS570_LC43X
+	#ifndef TMS570_LC43X
+	#define TMS570_LC43X
+	#endif
 
 #include <bsp/utility.h>
 
