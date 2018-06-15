@@ -41,6 +41,60 @@
 
 #include <bsp/utility.h>
 
+#ifdef TMS570_LC43X /* Code added to support the LC43X Family*/
+typedef struct{
+ uint32_t	FRDCNTL;	// Flash Read Control Register Section 7.10.1
+ uint32_t	FSPRD;		// Read Margin Control Register Section 7.10.2
+ uint32_t	EE_FEDACCTRL1;	// EEPROM Error Correction Control Register 1 Section 7.10.3
+ uint32_t 	NOTUSED_5[2];
+ uint32_t	FEDAC_PASTATUS;	// Flash Port A Error and Status Register Section 7.10.4
+ uint32_t	FEDAC_PBSTATUS;	// Flash Port B Error and Status Register Section 7.10.5
+ uint32_t	FEDAC_GBLSTATUS;// Flash Global Error and Status Register Section 7.10.6
+ uint32_t 	NOTUSED_9;
+ uint32_t	FEDACSDIS;	// Flash Error Detection and Correction Sector Disable
+ uint32_t	FPRIM_ADD_TAG;	// Flash Primary Address Tag Register Section 7.10.8
+ uint32_t	FDUP_ADD_TAG;	// Flash Duplicate Address Tag Register Section 7.10.9
+ uint32_t	FBPROT;		// Flash Bank Protection Register Section 7.10.10
+ uint32_t	FBSE;		// Flash Bank Sector Enable Register Section 7.10.11
+ uint32_t	FBBUSY;		// Flash Bank Busy Register Section 7.10.12
+ uint32_t	FBAC;		// Flash Bank Access Control Register Section 7.10.13
+ uint32_t	FBPWRMODE;	// Flash Bank Power Mode Register Section 7.10.14
+ uint32_t	FBPRDY;		// Bank/Pump Ready Register Section 7.10.15
+ uint32_t	FPAC1;		// Flash Pump Access Control Register 1 Section 7.10.16
+ uint32_t 	NOTUSED_20;
+ uint32_t	FMAC;		// Flash Module Access Control Register Section 7.10.17
+ uint32_t	FMSTAT;		// Flash Module Status Register Section 7.10.18
+ uint32_t	FEMU_DMSW;	// EEPROM Emulation Data MSW Register Section 7.10.19
+ uint32_t	FEMU_DLSW;	// EEPROM Emulation Data LSW Register Section 7.10.20
+ uint32_t	FEMU_ECC;	// EEPROM Emulation Address Register Section 7.10.21
+ uint32_t	FLOCK;		// Flash Lock Register Section 7.10.22
+ uint32_t 	NOTUSED_27;
+ uint32_t	FDIAGCTRL;	// Diagnostic Control Register Section 7.10.23
+ uint32_t 	NOTUSED_29;
+ uint32_t	FRAW_ADDR;	// Raw Address Section 7.10.24
+ uint32_t 	NOTUSED_31;
+ uint32_t	FPAR_OVR;	// Parity Override Register Section 7.10.25
+ uint32_t 	NOTUSED_45[13];
+ uint32_t	RCR_VALID;	// Reset Configuration Valid Register Section 7.10.26
+ uint32_t	ACC_THRESHOLD;	// Crossbar Access Time Threshold Register Section 7.10.27
+ uint32_t 	NOTUSED_48;
+ uint32_t	FEDACSDIS2;	// Flash Error Detection and Correction Sector Disable
+ uint32_t 	NOTUSED_52[3];
+ uint32_t	RCR_VALUE0;	// Lower Word of the Reset Configuration Read Register Section 7.10.29
+ uint32_t	RCR_VALUE1;	// Upper Word of the Reset Configuration Read Register Section 7.10.30
+ uint32_t 	NOTUSED_53[108];
+ uint32_t	FSM_WR_ENA;	// FSM Register Write Enable Register Section 7.10.31
+ uint32_t 	NOTUSED_46[11];
+ uint32_t	EEPROM_CONFIG;	// EEPROM Emulation Configuration Register Section 7.10.32
+ uint32_t 	NOTUSED_48;
+ uint32_t	FSM_SECTOR1;	// FSM Sector Register 1 Section 7.10.33
+ uint32_t	FSM_SECTOR2;	// FSM Sector Register 2 Section 7.10.34
+ uint32_t 	NOTUSED_49[78];
+ uint32_t	FCFG_BANK;	//Flash Bank Configuration Register	Section 7.10.35
+} tms570_flash_t;
+
+#else
+
 typedef struct{
   uint32_t FRDCNTL;           /*Flash Option Control Register*/
   uint8_t reserved1 [4];
@@ -94,21 +148,29 @@ typedef struct{
   uint32_t FCFGBANK;          /*Flash Bank Configuration Register*/
 } tms570_flash_t;
 
+#endif
 
 /*--------------------TMS570_FLASH_FRDCNTL--------------------*/
 /* field: RWAIT - Random/data Read Wait State */
+
 #define TMS570_FLASH_FRDCNTL_RWAIT(val) BSP_FLD32(val,8, 11)
 #define TMS570_FLASH_FRDCNTL_RWAIT_GET(reg) BSP_FLD32GET(reg,8, 11)
 #define TMS570_FLASH_FRDCNTL_RWAIT_SET(reg,val) BSP_FLD32SET(reg, val,8, 11)
 
-/* field: ASWSTEN - Address Setup Wait State Enable */
-#define TMS570_FLASH_FRDCNTL_ASWSTEN BSP_BIT32(4)
+#define TMS570_LC43X_FLASH_FRDCNTL_PFUENB BSP_BIT32(1)
+#define TMS570_LC43X_FLASH_FRDCNTL_PFUENA BSP_BIT32(0)
 
 /* field: ENPIPE - Enable Pipeline Mode */
 #define TMS570_FLASH_FRDCNTL_ENPIPE BSP_BIT32(0)
+/* field: ASWSTEN - Address Setup Wait State Enable */
+#define TMS570_FLASH_FRDCNTL_ASWSTEN BSP_BIT32(4)
 
 
 /*-------------------TMS570_FLASH_FEDACTRL1-------------------*/
+
+#define TMS570_LC43X_FLASH_EE_FEDACTRL1_EZCV BSP_BIT32(4)	/*Allow the condition of all data bits and ECC bits to be 0*/
+#define TMS570_LC43X_FLASH_EE_FEDACTRL1_EOCV BSP_BIT32(5)	/*Allow the condition of all data bits and ECC bits to be 1*/
+
 /* field: SUSP_IGNR - Suspend Ignore. */
 #define TMS570_FLASH_FEDACTRL1_SUSP_IGNR BSP_BIT32(24)
 
@@ -117,11 +179,68 @@ typedef struct{
 #define TMS570_FLASH_FEDACTRL1_EDACMODE_GET(reg) BSP_FLD32GET(reg,16, 19)
 #define TMS570_FLASH_FEDACTRL1_EDACMODE_SET(reg,val) BSP_FLD32SET(reg, val,16, 19)
 
-/* field: EOFEN - Event on Ones Fail Enable */
-#define TMS570_FLASH_FEDACTRL1_EOFEN BSP_BIT32(10)
 
+/*Read Margin Control Register (FSPRD) Field Descriptions*/
+#define TMS570_LC43X_FLASH_FSPRD_RM1 BSP_BIT32(1)  /* Read Margin 1 Mode is enabled.*/
+#define TMS570_LC43X_FLASH_FSPRD_RM0 BSP_BIT32(0)  /* Read Margin 0 Mode is enabled.*/
+
+
+#define TMS570_LC43X_FLASH_FSPRD_RMBSEL(val) BSP_FLD32(val,8, 15)			/*       Read Margin Bank Select. Each bit corresponds to a Flash bank 				  */                	 
+#define TMS570_LC43X_FLASH_FSPRD_RMBSEL_GET(reg) BSP_FLD32GET(reg,8, 15)		/*RMBSEL is only decoded if either the RM1 or RM0 bit is set. When either RM1 or RM0 is set, the  */
+#define TMS570_LC43X_FLASH_FSPRD_RMBSEL_SET(reg,val) BSP_FLD32SET(reg, val,8, 15)	/*RMBSEL bit corresponding to a bank forces the selected bank(s) to be read in the selected margin*/
+                                                                                /*mode. The unselected bank(s) are still read in normal mode.					  */
+
+
+#define TMS570_LC43X_FLASH_FEDAC_PSTATUS_ACCTOUT BSP_BIT32(15)																													   /*	Severe internal switch timeout/parity 		   */
+										/*	error on Port A access.                  	*/
+									 	/*	0 L2FMC internal switch has NOT encountered	*/
+										/*	 a severe error (access timeout or parity	*/				
+									   	/*	1 L2FMC internal switch has encountered a	*/
+										/*	severe error (access timeout or parity). 	*/
+									 	/*	This error is routed to the ESM. Refer   	*/
+										/*	to the device data manual to find the    	*/
+										/*	  group and channel on which it is routed	*/
+#define TMS570_LC43X_FLASH_FEDAC_PSTATUS_MCMD_PAR_ERR BSP_BIT32(14)
+										/*	Parity Error in idle state. This bit is  	*/
+										/*	set when a parity error occurs during    	*/
+										/*	idle state of Port A.                    	*/
+										/*	0 No idle state parity error is detected.	*/ 
+										/*	1 Parity error is detected in idle state.	*/ 
+										/*	This error is routed to the ESM. Refer   	*/ 
+										/*	to the device data manual to find the    	*/
+										/*	group and channel on which it is routed. 	*/
+#define TMS570_LC43X_FLASH_FEDAC_PSTATUS_ADD_TAG_ERR BSP_BIT32(11)			
+							     			/*	Port A Address Tag Register Error Flag. 		*/
+							     			/*	This bit is set if the primary address  		*/ 
+							     			/*	tag has a hit but the duplicate address 		*/ 
+							     			/*	tag does not match the primary addressi.		*/ 
+							     			/*	tag. This bit is functional only when  .		*/ 
+							     			/*	Port A prefetch mode is enabled (PFUENA = 1).      	*/ 
+							     			/*	0 Address Tag Register Error not detected on Port A	*/ 
+                                                             			/*	1 Address Tag Register Error detected on Port A.  	*/ 
+                                                             			/*	This error is routed to the ESM. Refer            	*/
+                                                        			/*	to the device data manual to find the group and 	*/                   
+                                                                                /*	channel on which it is routed.	     			*/ 
+
+#define TMS570_LC43X_FLASH_FEDAC_PSTATUS_ADD_PAR_ERR BSP_BIT32(10)					
+										/*	Address Parity Error Flag.				*/
+										/*	0 No parity error was detected on the incoming		*/
+										/*	access to the L2FMC Port A.				*/
+										/*	1 A parity error was detected on the incoming		*/
+										/*	access to the L2FMC Port A. The address of		*/
+										/*	the erroneous access is not stored in L2FMC.		*/
+										/*	This error is routed to the ESM. Refer to the device	*/
+										/*	data manual to find the specific group			*/
+										/*	and channel on which it is routed.			*/
+
+
+
+
+
+/* field: EOFEN - Event on Ones Fail Enable */
+#define TMS570_FLASH_FEDACTRL1_EOFEN BSP_BIT32(10)	/*Event on One's Fail Enable - An ESM error event is generated on a single-bit error where a 1 reads as a 0 when reading from the OTP or ECC memory locations.*/
 /* field: EZFEN - Event on Zeros Fail Enable */
-#define TMS570_FLASH_FEDACTRL1_EZFEN BSP_BIT32(9)
+#define TMS570_FLASH_FEDACTRL1_EZFEN BSP_BIT32(9)	/*Event on Zero's Fail Enable - An ESM error event is generated on a single-bit error where a 0 reads as a 1 when reading from the OTP or ECC memory locations.*/
 
 /* field: EPEN - Error Profiling Enable. */
 #define TMS570_FLASH_FEDACTRL1_EPEN BSP_BIT32(8)
@@ -174,12 +293,16 @@ typedef struct{
 /*------------------TMS570_FLASH_FEDACSTATUS------------------*/
 /* field: Reserved - Read returns 0. Writes have no effect. */
 #define TMS570_FLASH_FEDACSTATUS_Reserved(val) BSP_FLD32(val,26, 31)
+#define TMS570_LC43X_FLASH_FEDAC_GBLSTATUS_Reserved(val) BSP_FLD32(val,25, 31)
+
 #define TMS570_FLASH_FEDACSTATUS_Reserved_GET(reg) BSP_FLD32GET(reg,26, 31)
+#define TMS570_LC43X_FLASH_FEDAC_GBLSTATUS_Reserved_GET(reg) BSP_FLD32GET(reg,25, 31)
 #define TMS570_FLASH_FEDACSTATUS_Reserved_SET(reg,val) BSP_FLD32SET(reg, val,26, 31)
+#define TMS570_LC43X_FLASH_FEDAC_GBLSTATUS_Reserved_SET(reg,val) BSP_FLD32SET(reg, val,25, 31)
 
 /* field: FSM_DONE - Flash State Machine Done */
 #define TMS570_FLASH_FEDACSTATUS_FSM_DONE BSP_BIT32(24)
-
+#define TMS570_LC43X_FLASH_FEDAC_GBLSTATUS_FSM_DONE  TMS570_FLASH_FEDACSTATUS_FSM_DONE 
 /* field: COMB2_MAL_G - Bus 2 Compare Malfunction Flag. */
 #define TMS570_FLASH_FEDACSTATUS_COMB2_MAL_G BSP_BIT32(19)
 
@@ -191,6 +314,10 @@ typedef struct{
 
 /* field: B2_COR_ERR - Bus 2 Correctable Error */
 #define TMS570_FLASH_FEDACSTATUS_B2_COR_ERR BSP_BIT32(16)
+#define TMS570_LC43X_FLASH_FEDAC_GBLSTATUS_RCR_ERR BSP_BIT32(15)		/* Soft error in high integrity bits carrying implicit read data.*/
+#define TMS570_LC43X_FLASH_FEDAC_GBLSTATUS_IMPLICIT_COR_ERR BSP_BIT32(14)	/* Correctable error occurred during implicit reads.  		 */
+#define TMS570_LC43X_FLASH_FEDAC_GBLSTATUS_IMPLICIT_UNC_ERR BSP_BIT32(13)	/* Uncorrectable error occurred during implicit reads.		 */
+
 
 /* field: D_UNC_ERR - Diagnostic Uncorrectable Error */
 #define TMS570_FLASH_FEDACSTATUS_D_UNC_ERR BSP_BIT32(12)
@@ -230,10 +357,21 @@ typedef struct{
 
 
 /*-------------------TMS570_FLASH_FEDACSDIS-------------------*/
+
+#define TMS570_LC43X_FLASH_FEDACSDIS_Reserved(val) BSP_FLD32(val,30, 31)
+#define TMS570_LC43X_FLASH_FEDACSDIS_Reserved_GET(reg) BSP_FLD32GET(reg,30, 31)
+#define TMS570_LC43X_FLASH_FEDACSDIS_Reserved_SET(reg,val) BSP_FLD32SET(reg,val,30, 31)
+
 /* field: BankID1_Inverse - The bank ID inverse bits are used with the bank ID bits to select the bank for which a sector */
 #define TMS570_FLASH_FEDACSDIS_BankID1_Inverse(val) BSP_FLD32(val,29, 31)
 #define TMS570_FLASH_FEDACSDIS_BankID1_Inverse_GET(reg) BSP_FLD32GET(reg,29, 31)
 #define TMS570_FLASH_FEDACSDIS_BankID1_Inverse_SET(reg,val) BSP_FLD32SET(reg, val,29, 31)
+
+/* LC43X The sector ID1 inverse bits are used with the sector ID bits to determine which sector is disabled. */
+#define TMS570_LC43X_FLASH_FEDACSDIS_SectorID1_Inverse(val) BSP_FLD32(val,24, 29)
+#define TMS570_LC43X_FLASH_FEDACSDIS_SectorID1_Inverse_GET(reg) BSP_FLD32GET(reg,24, 29)
+#define TMS570_LC43X_FLASH_FEDACSDIS_SectorID1_Inverse_SET(reg,val) BSP_FLD32SET(reg, val,24, 29)
+
 
 /* field: SectorID1_inverse - The sector ID inverse bits are used with the sector ID bits to determine which sector is */
 #define TMS570_FLASH_FEDACSDIS_SectorID1_inverse(val) BSP_FLD32(val,24, 27)
@@ -245,6 +383,11 @@ typedef struct{
 #define TMS570_FLASH_FEDACSDIS_BankID1_GET(reg) BSP_FLD32GET(reg,21, 23)
 #define TMS570_FLASH_FEDACSDIS_BankID1_SET(reg,val) BSP_FLD32SET(reg, val,21, 23)
 
+/* LC43X The sector ID bits are used with the sector ID inverse bits to determine which sector is disabled. */
+#define TMS570_LC43X_FLASH_FEDACSDIS_SectorID1(val) BSP_FLD32(val,16, 21)
+#define TMS570_LC43X_FLASH_FEDACSDIS_SectorID1_GET(reg) BSP_FLD32GET(reg,16, 21)
+#define TMS570_LC43X_FLASH_FEDACSDIS_SectorID1_SET(reg,val) BSP_FLD32SET(reg, val,16, 21)
+
 /* field: SectorID1 - The sector ID bits are used with the sector ID inverse bits to determine which sector is */
 #define TMS570_FLASH_FEDACSDIS_SectorID1(val) BSP_FLD32(val,16, 19)
 #define TMS570_FLASH_FEDACSDIS_SectorID1_GET(reg) BSP_FLD32GET(reg,16, 19)
@@ -255,6 +398,11 @@ typedef struct{
 #define TMS570_FLASH_FEDACSDIS_BankID0_Inverse_GET(reg) BSP_FLD32GET(reg,13, 15)
 #define TMS570_FLASH_FEDACSDIS_BankID0_Inverse_SET(reg,val) BSP_FLD32SET(reg, val,13, 15)
 
+/* LC43X The sector ID0 inverse bits are used with the sector ID bits to determine which sector is disabled. */
+#define TMS570_LC43X_FLASH_FEDACSDIS_SectorID0_Inverse(val) BSP_FLD32(val,8, 13)
+#define TMS570_LC43X_FLASH_FEDACSDIS_SectorID0_Inverse_GET(reg) BSP_FLD32GET(reg,8, 13)
+#define TMS570_LC43X_FLASH_FEDACSDIS_SectorID0_Inverse_SET(reg,val) BSP_FLD32SET(reg, val,8, 13)
+
 /* field: SectorID0_inverse - The sector ID inverse bits are used with the sector ID bits to determine which sector is */
 #define TMS570_FLASH_FEDACSDIS_SectorID0_inverse(val) BSP_FLD32(val,8, 11)
 #define TMS570_FLASH_FEDACSDIS_SectorID0_inverse_GET(reg) BSP_FLD32GET(reg,8, 11)
@@ -264,6 +412,11 @@ typedef struct{
 #define TMS570_FLASH_FEDACSDIS_BankID0(val) BSP_FLD32(val,5, 7)
 #define TMS570_FLASH_FEDACSDIS_BankID0_GET(reg) BSP_FLD32GET(reg,5, 7)
 #define TMS570_FLASH_FEDACSDIS_BankID0_SET(reg,val) BSP_FLD32SET(reg, val,5, 7)
+
+/* LC43X The sector ID0 bits are used with the sector ID inverse bits to determine which sector is disabled */
+#define TMS570_LC43X_FLASH_FEDACSDIS_SectorID0(val) BSP_FLD32(val,0, 5)
+#define TMS570_LC43X_FLASH_FEDACSDIS_SectorID0_GET(reg) BSP_FLD32GET(reg,0, 5)
+#define TMS570_LC43X_FLASH_FEDACSDIS_SectorID0_SET(reg,val) BSP_FLD32SET(reg, val,0, 5)
 
 /* field: SectorID0 - The sector ID bits are used with the sector ID inverse bits to determine which sector is */
 #define TMS570_FLASH_FEDACSDIS_SectorID0(val) BSP_FLD32(val,0, 3)
@@ -277,13 +430,27 @@ typedef struct{
 #define TMS570_FLASH_FPRIMADDTAG_PRIM_ADD_TAG_GET(reg) BSP_FLD32GET(reg,4, 31)
 #define TMS570_FLASH_FPRIMADDTAG_PRIM_ADD_TAG_SET(reg,val) BSP_FLD32SET(reg, val,4, 31)
 
+/* LC43X Primary Address Tag Register */
+#define TMS570_LC43X_FLASH_FPRIMADDTAG_PRIM_ADD_TAG(val) BSP_FLD32(val,5, 31)
+#define TMS570_LC43X_FLASH_FPRIMADDTAG_PRIM_ADD_TAG_GET(reg) BSP_FLD32GET(reg,5, 31)
+#define TMS570_LC43X_FLASH_FPRIMADDTAG_PRIM_ADD_TAG_SET(reg,val) BSP_FLD32SET(reg, val,5, 31)
+
 /* field: 0 - Always 0000 */
 #define TMS570_FLASH_FPRIMADDTAG_0(val) BSP_FLD32(val,0, 3)
 #define TMS570_FLASH_FPRIMADDTAG_0_GET(reg) BSP_FLD32GET(reg,0, 3)
 #define TMS570_FLASH_FPRIMADDTAG_0_SET(reg,val) BSP_FLD32SET(reg, val,0, 3)
 
+/* LC43X field: 0 - Always 0000 */
+#define TMS570_LC43X_FLASH_FPRIMADDTAG_0(val) BSP_FLD32(val,0, 4)
+#define TMS570_LC43X_FLASH_FPRIMADDTAG_0_GET(reg) BSP_FLD32GET(reg,0, 4)
+#define TMS570_LC43X_FLASH_FPRIMADDTAG_0_SET(reg,val) BSP_FLD32SET(reg, val,0, 4)
 
 /*------------------TMS570_FLASH_FDUPADDTAG------------------*/
+/* LC43X field: DUP_ADD_TAG - Primary Address Tag Register */
+#define TMS570_LC43X_FLASH_FDUPADDTAG_DUP_ADD_TAG(val) BSP_FLD32(val,5, 31)
+#define TMS570_LC43X_FLASH_FDUPADDTAG_DUP_ADD_TAG_GET(reg) BSP_FLD32GET(reg,5, 31)
+#define TMS570_LC43X_FLASH_FDUPADDTAG_DUP_ADD_TAG_SET(reg,val) BSP_FLD32SET(reg, val,5, 31)
+
 /* field: DUP_ADD_TAG - Primary Address Tag Register */
 #define TMS570_FLASH_FDUPADDTAG_DUP_ADD_TAG(val) BSP_FLD32(val,4, 31)
 #define TMS570_FLASH_FDUPADDTAG_DUP_ADD_TAG_GET(reg) BSP_FLD32GET(reg,4, 31)
@@ -291,11 +458,19 @@ typedef struct{
 
 
 /*--------------------TMS570_FLASH_FBPROT--------------------*/
+/* LC43X field: PROTL1DIS - PROTL1DIS: Level 1 Protection Disabled */
+#define TMS570_LC43X_FLASH_FBPROT_PROTL1DIS BSP_BIT32(0)
+
 /* field: PROTL1DIS - PROTL1DIS: Level 1 Protection Disabled */
 #define TMS570_FLASH_FBPROT_PROTL1DIS BSP_BIT32(0)
 
 
 /*---------------------TMS570_FLASH_FBSE---------------------*/
+/* LC43X field: BSE - Bank Sector Enable */
+#define TMS570_LC43X_FLASH_FBSE_BSE(val) BSP_FLD32(val,0, 15)
+#define TMS570_LC43X_FLASH_FBSE_BSE_GET(reg) BSP_FLD32GET(reg,0, 15)
+#define TMS570_LC43X_FLASH_FBSE_BSE_SET(reg,val) BSP_FLD32SET(reg, val,0, 15)
+
 /* field: BSE - Bank Sector Enable */
 #define TMS570_FLASH_FBSE_BSE(val) BSP_FLD32(val,0, 15)
 #define TMS570_FLASH_FBSE_BSE_GET(reg) BSP_FLD32GET(reg,0, 15)
@@ -303,6 +478,11 @@ typedef struct{
 
 
 /*--------------------TMS570_FLASH_FBBUSY--------------------*/
+/* LC43X field: BUSY - Bank Busy */
+#define TMS570_LC43X_FLASH_FBBUSY_BUSY(val) BSP_FLD32(val,0, 7)
+#define TMS570_LC43X_FLASH_FBBUSY_BUSY_GET(reg) BSP_FLD32GET(reg,0, 7)
+#define TMS570_LC43X_FLASH_FBBUSY_BUSY_SET(reg,val) BSP_FLD32SET(reg, val,0, 7)
+
 /* field: BUSY - Bank Busy */
 #define TMS570_FLASH_FBBUSY_BUSY(val) BSP_FLD32(val,0, 7)
 #define TMS570_FLASH_FBBUSY_BUSY_GET(reg) BSP_FLD32GET(reg,0, 7)
@@ -310,6 +490,11 @@ typedef struct{
 
 
 /*---------------------TMS570_FLASH_FBAC---------------------*/
+/*  LC43X field: OTPPROTDIS - OTP Sector Protection Disable. */
+#define TMS570_LC43X_FLASH_FBAC_OTPPROTDIS(val) BSP_FLD32(val,16, 23)
+#define TMS570_LC43X_FLASH_FBAC_OTPPROTDIS_GET(reg) BSP_FLD32GET(reg,16, 23)
+#define TMS570_LC43X_FLASH_FBAC_OTPPROTDIS_SET(reg,val) BSP_FLD32SET(reg, val,16, 23)
+
 /* field: OTPPROTDIS - OTP Sector Protection Disable. */
 #define TMS570_FLASH_FBAC_OTPPROTDIS(val) BSP_FLD32(val,16, 23)
 #define TMS570_FLASH_FBAC_OTPPROTDIS_GET(reg) BSP_FLD32GET(reg,16, 23)
@@ -320,11 +505,32 @@ typedef struct{
 #define TMS570_FLASH_FBAC_15_8_GET(reg) BSP_FLD32GET(reg,8, 15)
 #define TMS570_FLASH_FBAC_15_8_SET(reg,val) BSP_FLD32SET(reg, val,8, 15)
 
+/* LC43X field: VREADST - VREAD Setup. */
+#define TMS570_LC43X_FLASH_FBAC_VREADST(val) BSP_FLD32(val,0, 7)
+#define TMS570_LC43X_FLASH_FBAC_VREADST_GET(reg) BSP_FLD32GET(reg,0, 7)
+#define TMS570_LC43X_FLASH_FBAC_VREADST_SET(reg,val) BSP_FLD32SET(reg, val,0, 7)
+
 /* field: VREADST - VREAD Setup. */
 #define TMS570_FLASH_FBAC_VREADST(val) BSP_FLD32(val,0, 7)
 #define TMS570_FLASH_FBAC_VREADST_GET(reg) BSP_FLD32GET(reg,0, 7)
 #define TMS570_FLASH_FBAC_VREADST_SET(reg,val) BSP_FLD32SET(reg, val,0, 7)
 
+
+/*------------------TMS570LC43X_FLASH_FBPWRMODE- (ls31 -> FBFALLBACK)-----------------*/
+/* LC43X field: BANKPWR7 - Bank 7 Fallback Power Mode */
+//#define TMS570_LC43X_FLASH_FBPWRMODE_BANKPWR7(val) BSP_FLD32(val,14, 15)
+//#define TMS570_LC43X_FLASH_FBPWRMODE_BANKPWR7_GET(reg) BSP_FLD32GET(reg,14, 15)
+//#define TMS570_LC43X_FLASH_FBPWRMODE_BANKPWR7_SET(reg,val) BSP_FLD32SET(reg, val,14, 15)
+
+/* LC43X field: BANKPWR1 - Bank 1 Fallback Power Mode */
+//#define TMS570_LC43X_FLASH_FBPWRMODE_BANKPWR1(val) BSP_FLD32(val,2, 3)
+//#define TMS570_LC43X_FLASH_FBPWRMODE_BANKPWR1_GET(reg) BSP_FLD32GET(reg,2, 3)
+//#define TMS570_LC43X_FLASH_FBPWRMODE_BANKPWR1_SET(reg,val) BSP_FLD32SET(reg, val,2, 3)
+
+/* LC43X field: BANKPWR0 - Bank 0 Fallback Power Mode */
+//#define TMS570_LC43X_FLASH_FBPWRMODE_BANKPWR0(val) BSP_FLD32(val,0, 1)
+//#define TMS570_LC43X_FLASH_FBPWRMODE_BANKPWR0_GET(reg) BSP_FLD32GET(reg,0, 1)
+//#define TMS570_LC43X_FLASH_FBPWRMODE_BANKPWR0_SET(reg,val) BSP_FLD32SET(reg, val,0, 1)
 
 /*------------------TMS570_FLASH_FBFALLBACK------------------*/
 /* field: BANKPWR7 - Bank 7 Fallback Power Mode */
@@ -342,6 +548,25 @@ typedef struct{
 #define TMS570_FLASH_FBFALLBACK_BANKPWR0_GET(reg) BSP_FLD32GET(reg,0, 1)
 #define TMS570_FLASH_FBFALLBACK_BANKPWR0_SET(reg,val) BSP_FLD32SET(reg, val,0, 1)
 
+/*------------------TMS570LC43X_FLASH_FBPRDY-----------------*/
+/* LC43X field: BANKBUSY[7] - Bank 7 Busy Status */
+#define TMS570_LC43X_FLASH_FBPRDY_BANKBUSY7 BSP_BIT32(23)
+
+/* LC43X field: BANKBUSY - Bank busy bits (one bit for each bank) */			
+#define TMS570_LC43X_FLASH_FBPRDY_BANKBUSY(val) BSP_FLD32(val,16, 17)			
+#define TMS570_LC43X_FLASH_FBPRDY_BANKBUSY_GET(reg) BSP_FLD32GET(reg,16, 17)
+#define TMS570_LC43X_FLASH_FBPRDY_BANKBUSY_SET(reg,val) BSP_FLD32SET(reg, val,16,17)
+
+/* LC43X field: PUMPRDY - Flash pump ready flag */
+#define TMS570_LC43X_FLASH_FBPRDY_PUMPRDY BSP_BIT32(15)
+
+/* LC43X field: BANKRDY[7] - Bank 7 Ready Status */
+#define TMS570_LC43X_FLASH_FBPRDY_BANKRDY7 BSP_BIT32(7)
+
+/* LC43X field: BANKRDY - Bank ready bits (one bit for each bank) */			
+#define TMS570_LC43X_FLASH_FBPRDY_BANKRDY(val) BSP_FLD32(val,0, 1)			
+#define TMS570_LC43X_FLASH_FBPRDY_BANKRDY_GET(reg) BSP_FLD32GET(reg,0, 1)
+#define TMS570_LC43X_FLASH_FBPRDY_BANKRDY_SET(reg,val) BSP_FLD32SET(reg, val,0,1)
 
 /*--------------------TMS570_FLASH_FBPRDY--------------------*/
 /* field: BANKBUSY - Bank busy bits (one bit for each bank) */
@@ -540,7 +765,6 @@ typedef struct{
 #define TMS570_FLASH_FEDACSDIS2_SectorID2_SET(reg,val) BSP_FLD32SET(reg, val,0, 3)
 
 
-/*-------------------TMS570_FLASH_FSMWRENA-------------------*/
 /* field: WR_ENA - Flash State Machine Write Enable */
 #define TMS570_FLASH_FSMWRENA_WR_ENA(val) BSP_FLD32(val,0, 2)
 #define TMS570_FLASH_FSMWRENA_WR_ENA_GET(reg) BSP_FLD32GET(reg,0, 2)

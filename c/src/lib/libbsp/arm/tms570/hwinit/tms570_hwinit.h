@@ -10,8 +10,15 @@
 /* Ti TMS570 core setup implemented in assembly */
 void _esmCcmErrorsClear_( void );
 void _coreEnableEventBusExport_( void );
+#ifdef TMS570_LC43X /* Code added to support the LC43X Family*/
 void _errata_CORTEXR4_66_( void );
 void _errata_CORTEXR4_57_( void );
+#else
+void _cacheEnable_( void );
+void _cacheDisable_( void );
+void _dCacheInvalidate_( void );
+void _iCacheInvalidate_( void );
+#endif
 void _coreEnableRamEcc_( void );
 void _coreDisableRamEcc_( void );
 void _mpuInit_( void );
