@@ -28,9 +28,9 @@ rtems_status_code rtems_task_wake_when(
   rtems_time_of_day *time_buffer
 )
 {
-  Watchdog_Interval   seconds;
-  Thread_Control     *executing;
-  Per_CPU_Control    *cpu_self;
+  uint32_t         seconds;
+  Thread_Control  *executing;
+  Per_CPU_Control *cpu_self;
 
   if ( !_TOD_Is_set() )
     return RTEMS_NOT_DEFINED;
@@ -49,19 +49,15 @@ rtems_status_code rtems_task_wake_when(
     return RTEMS_INVALID_CLOCK;
 
   cpu_self = _Thread_Dispatch_disable();
-    executing = _Thread_Executing;
+    executing = _Per_CPU_Get_executing( cpu_self );
     _Thread_Set_state( executing, STATES_WAITING_FOR_TIME );
     _Thread_Wait_flags_set( executing, THREAD_WAIT_STATE_BLOCKED );
-    _Watchdog_Initialize(
-      &executing->Timer,
+    _Thread_Timer_insert_realtime(
+      executing,
+      cpu_self,
       _Thread_Timeout,
-      0,
-      executing
+      _Watchdog_Ticks_from_seconds( seconds )
     );
-    _Watchdog_Insert_seconds(
-      &executing->Timer,
-      seconds - _TOD_Seconds_since_epoch()
-    );
-  _Thread_Dispatch_enable( cpu_self );
+  _Thread_Dispatch_direct( cpu_self );
   return RTEMS_SUCCESSFUL;
 }

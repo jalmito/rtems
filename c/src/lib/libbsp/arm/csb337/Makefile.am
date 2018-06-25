@@ -1,14 +1,12 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
+include $(top_srcdir)/../../bsp.am
 
-include_bspdir = $(includedir)/bsp
+dist_project_lib_DATA = ../../../../../../bsps/arm/csb337/start/bsp_specs
 
-dist_project_lib_DATA = bsp_specs
-
-include_HEADERS = include/bsp.h
-include_HEADERS += ../../shared/include/tm27.h
 if ENABLE_LCD
+<<<<<<< HEAD
 include_HEADERS += include/sed1356.h
 endif
 
@@ -23,94 +21,83 @@ include_umon_HEADERS += ../../shared/umon/tfs.h
 
 include_rtemsdir = $(includedir)/rtems
 include_rtems_HEADERS  = ../../shared/umon/umon.h
+=======
+>>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 endif
 
-nodist_include_HEADERS = include/bspopts.h
-nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
-DISTCLEANFILES = include/bspopts.h
 noinst_PROGRAMS =
 
-nodist_include_HEADERS += ../../shared/include/coverhd.h
 
 if ENABLE_LCD
-nodist_include_HEADERS += console/sed1356_16bit.h
-nodist_include_HEADERS += console/font8x16.h
 endif
 
-noinst_LIBRARIES = libbspstart.a
-
-libbspstart_a_SOURCES = start/start.S
+start.$(OBJEXT): ../../../../../../bsps/arm/csb337/start/start.S
+	$(CPPASCOMPILE) -o $@ -c $<
 project_lib_DATA = start.$(OBJEXT)
 
-project_lib_DATA += startup/linkcmds
-EXTRA_DIST = startup/linkcmds.csb337
-EXTRA_DIST += startup/linkcmds.csb637
-EXTRA_DIST += README
-EXTRA_DIST += README.kit637_v6
+project_lib_DATA += linkcmds
+dist_project_lib_DATA += ../../../../../../bsps/arm/csb337/start/linkcmds.csb337
+dist_project_lib_DATA += ../../../../../../bsps/arm/csb337/start/linkcmds.csb637
 
-noinst_LIBRARIES += libbsp.a
+
+project_lib_LIBRARIES = librtemsbsp.a
+librtemsbsp_a_SOURCES =
 
 # startup
-libbsp_a_SOURCES = ../../shared/bsplibc.c ../../shared/bsppost.c \
-    ../../shared/bsppredriverhook.c ../../shared/bspgetworkarea.c \
-    ../../shared/bsppretaskinghook.c startup/bspstart.c \
-    ../../shared/bspclean.c startup/bspreset.c \
-    startup/memmap.c ../../shared/bootcard.c ../../shared/sbrk.c \
-    ../../shared/gnatinstallhandler.c
-libbsp_a_SOURCES += ../../shared/cpucounterread.c
-libbsp_a_SOURCES += ../../shared/cpucounterdiff.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/csb337/start/bspstart.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/csb337/start/bspreset.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/csb337/start/memmap.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/cpucounter/cpucounterread.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/cpucounter/cpucounterdiff.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/csb337/start/pmc.c
+librtemsbsp_a_SOURCES +=../../../../../../bsps/arm/csb337/clock/clock.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/csb337/btimer/btimer.c
 # console
-libbsp_a_SOURCES += ../../shared/console.c console/uarts.c \
-    ../../shared/console_select.c  ../../shared/console_control.c \
-    ../../shared/console_read.c ../../shared/console_write.c 
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console-control.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console-select.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/csb337/console/uarts.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/csb337/console/dbgu.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/csb337/console/usart.c
 # IRQ
-include_bsp_HEADERS += ../../shared/include/irq-generic.h \
-	../../shared/include/irq-info.h
-libbsp_a_SOURCES += ../../shared/src/irq-default-handler.c
-libbsp_a_SOURCES += ../../shared/src/irq-generic.c
-libbsp_a_SOURCES += ../../shared/src/irq-info.c
-libbsp_a_SOURCES += ../../shared/src/irq-legacy.c
-libbsp_a_SOURCES += ../../shared/src/irq-server.c
-libbsp_a_SOURCES += ../../shared/src/irq-shell.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/irq/irq-default-handler.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/csb337/irq/irq.c
 if ENABLE_LCD
-libbsp_a_SOURCES += console/sed1356.c console/fbcons.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/csb337/console/sed1356.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/csb337/console/fbcons.c
 endif
-# abort
-libbsp_a_SOURCES += ../shared/abort/abort.c
 # umon
 if ENABLE_UMON
-libbsp_a_SOURCES += ../../shared/umon/umonrtemsglue.c  \
-    ../../shared/umon/monlib.c ../../shared/umon/tfsDriver.c \
-    ../../shared/umon/umoncons.c startup/umonsupp.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/csb337/umon/monlib.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/csb337/umon/tfsDriver.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/csb337/umon/umonrtemsglue.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/csb337/start/umonsupp.c
 endif
 if ENABLE_UMON_CONSOLE
-libbsp_a_SOURCES += ../../shared/umon/umoncons.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/csb337/umon/umoncons.c
 endif
 
 # Cache
+<<<<<<< HEAD
 libbsp_a_SOURCES += ../../../libcpu/shared/src/cache_manager.c
 libbsp_a_SOURCES += ../shared/include/arm-cache-l1.h
 libbsp_a_SOURCES += ../shared/armv467ar-basic-cache/cache_.h
 libbsp_a_CPPFLAGS += -I$(srcdir)/../shared/armv467ar-basic-cache
+=======
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/cache/cache-cp15.c
+>>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 
 if HAS_NETWORKING
-network_CPPFLAGS = -D__INSIDE_RTEMS_BSD_TCPIP_STACK__
-noinst_PROGRAMS += network.rel
-network_rel_SOURCES = network/network.c
-network_rel_CPPFLAGS = $(AM_CPPFLAGS) $(network_CPPFLAGS)
-network_rel_LDFLAGS = $(RTEMS_RELLDFLAGS)
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/csb337/net/network.c
 endif
 
-libbsp_a_LIBADD = ../../../libcpu/@RTEMS_CPU@/shared/arm920.rel \
-    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/clock.rel \
-    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/dbgu.rel \
-    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/usart.rel \
-    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/timer.rel \
-    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/pmc.rel \
-    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/irq.rel
-if HAS_NETWORKING
-libbsp_a_LIBADD += network.rel
-endif
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/cp15/arm920-mmu.c
 
-include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
+include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
+include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
+include $(srcdir)/../../../../../../bsps/arm/csb337/headers.am

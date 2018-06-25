@@ -1,51 +1,46 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
+include $(top_srcdir)/../../bsp.am
 
-include_bspdir = $(includedir)/bsp
+dist_project_lib_DATA = ../../../../../../bsps/m68k/mcf52235/start/bsp_specs
 
-dist_project_lib_DATA = bsp_specs
-
-include_HEADERS = include/bsp.h
-include_HEADERS += include/tm27.h
-
-nodist_include_HEADERS = include/bspopts.h
-nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
-DISTCLEANFILES = include/bspopts.h
 noinst_PROGRAMS =
 
-include_HEADERS += ../../shared/include/coverhd.h
 
-noinst_LIBRARIES = libbspstart.a
-libbspstart_a_SOURCES = start/start.S
+start.$(OBJEXT): ../../../../../../bsps/m68k/mcf52235/start/start.S
+	$(CPPASCOMPILE) -o $@ -c $<
 project_lib_DATA = start.$(OBJEXT)
 
-dist_project_lib_DATA += startup/linkcmds
+project_lib_DATA += linkcmds
 
-noinst_LIBRARIES += libbsp.a
-libbsp_a_SOURCES =
+project_lib_LIBRARIES = librtemsbsp.a
+librtemsbsp_a_SOURCES =
 
 # startup
-libbsp_a_SOURCES += ../../shared/bspclean.c ../../shared/bsppredriverhook.c \
-    ../../shared/bsplibc.c ../../shared/bsppost.c ../../shared/bspreset_loop.c \
-    ../../shared/bsppretaskinghook.c ../../shared/bspgetworkarea.c \
-    startup/init52235.c ../../shared/bspstart.c startup/cfinit.c \
-    startup/bspgetcpuclockspeed.c ../../shared/bootcard.c \
-    ../../shared/sbrk.c ../../shared/setvec.c \
-    ../../shared/gnatinstallhandler.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-loop.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf52235/start/init52235.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspstart-empty.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf52235/start/cfinit.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf52235/start/bspgetcpuclockspeed.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/setvec.c
 # clock
-libbsp_a_SOURCES += clock/clock.c ../../../shared/clockdrv_shell.h
+librtemsbsp_a_SOURCES +=../../../../../../bsps/m68k/mcf52235/clock/clock.c
 # console
-libbsp_a_SOURCES += console/console.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf52235/console/console.c
 # debugio
-libbsp_a_SOURCES += console/debugio.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf52235/console/debugio.c
 # timer
-libbsp_a_SOURCES += timer/timer.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf52235/btimer/btimer.c
 
-libbsp_a_LIBADD = \
-    ../../../libcpu/@RTEMS_CPU@/shared/cache.rel \
-    ../../../libcpu/@RTEMS_CPU@/mcf5223x/cachepd.rel \
-    ../../../libcpu/@RTEMS_CPU@/shared/misc.rel
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/shared/cache/cache-mcf5223x.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/shared/m68kidle.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/shared/memProbe.c
 
-include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
+include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
+include $(srcdir)/../../../../../../bsps/m68k/mcf52235/headers.am

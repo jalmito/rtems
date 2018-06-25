@@ -96,13 +96,20 @@ static int do_open(
     }
   }
 
-  iop->flags |= rtems_libio_fcntl_flags( oflag );
   rtems_filesystem_eval_path_extract_currentloc( &ctx, &iop->pathinfo );
   rtems_filesystem_eval_path_cleanup( &ctx );
+
+  _Atomic_Store_uint(
+    &iop->flags,
+    rtems_libio_fcntl_flags( oflag ),
+    ATOMIC_ORDER_RELAXED
+  );
 
   rv = (*iop->pathinfo.handlers->open_h)( iop, path, oflag, mode );
 
   if ( rv == 0 ) {
+    rtems_libio_iop_flags_set( iop, LIBIO_FLAGS_OPEN );
+
     if ( truncate ) {
       rv = ftruncate( fd, 0 );
       if ( rv != 0 ) {
@@ -161,7 +168,7 @@ int open( const char *path, int oflag, ... )
  *  This is the Newlib dependent reentrant version of open().
  */
 int _open_r(
-  struct _reent *ptr __attribute__((unused)),
+  struct _reent *ptr RTEMS_UNUSED,
   const char    *buf,
   int            oflag,
   int            mode

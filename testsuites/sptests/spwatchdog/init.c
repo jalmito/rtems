@@ -26,72 +26,59 @@
 
 const char rtems_test_name[] = "SPWATCHDOG";
 
-static void test_watchdog_routine( Objects_Id id, void *arg )
-{
-  (void) id;
-  (void) arg;
+typedef struct {
+  Watchdog_Control Base;
+  int counter;
+} test_watchdog;
 
-  rtems_test_assert( 0 );
+static void test_watchdog_routine( Watchdog_Control *base )
+{
+  test_watchdog *watchdog = (test_watchdog *) base;
+
+  ++watchdog->counter;
 }
 
+<<<<<<< HEAD
 static void init_watchdogs(
   Watchdog_Header *header,
   Watchdog_Control watchdogs[4]
 )
+=======
+static void test_watchdog_static_init( void )
+>>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 {
-  Watchdog_Control *a = &watchdogs[0];
-  Watchdog_Control *b = &watchdogs[1];
-  Watchdog_Control *c = &watchdogs[2];
-  Watchdog_Control *d = &watchdogs[3];
+  static Watchdog_Control a = WATCHDOG_INITIALIZER(
+    test_watchdog_routine
+  );
+  Watchdog_Control b;
 
-  _Watchdog_Header_initialize( header );
-  rtems_test_assert( _Watchdog_Is_empty( header ) );
-  rtems_test_assert( _Chain_Is_empty( &header->Iterators ) );
+  memset( &b, 0, sizeof( b ) );
+  _Watchdog_Preinitialize( &b, _Per_CPU_Get_by_index( 0 ) );
+  _Watchdog_Initialize(
+    &b,
+    test_watchdog_routine
+  );
 
-  _Watchdog_Preinitialize( c );
-  c->initial = 6;
-  _Watchdog_Insert( header, c );
-  rtems_test_assert( c->delta_interval == 6 );
-
-  rtems_test_assert( !_Watchdog_Is_empty( header ) );
-  rtems_test_assert( _Chain_Is_empty( &header->Iterators ) );
-
-  _Watchdog_Preinitialize( a );
-  a->initial = 2;
-  _Watchdog_Insert( header, a );
-  rtems_test_assert( a->delta_interval == 2 );
-  rtems_test_assert( c->delta_interval == 4 );
-
-  _Watchdog_Preinitialize( b );
-  b->initial = 4;
-  _Watchdog_Insert( header, b );
-  rtems_test_assert( a->delta_interval == 2 );
-  rtems_test_assert( b->delta_interval == 2 );
-  rtems_test_assert( c->delta_interval == 2 );
-
-  _Watchdog_Preinitialize( d );
+  rtems_test_assert( memcmp( &a, &b, sizeof( a ) ) == 0 );
 }
 
-static void destroy_watchdogs(
-  Watchdog_Header *header
-)
+static void test_watchdog_config( void )
 {
-  _ISR_lock_Destroy( &header->Lock );
+  rtems_test_assert( _Watchdog_Nanoseconds_per_tick == 10000000 );
+  rtems_test_assert( _Watchdog_Ticks_per_second == 100 );
+  rtems_test_assert( rtems_clock_get_ticks_per_second() == 100 );
+  #undef rtems_clock_get_ticks_per_second
+  rtems_test_assert( rtems_clock_get_ticks_per_second() == 100 );
 }
 
-static void add_iterator(
-  Watchdog_Header *header,
-  Watchdog_Iterator *i,
-  Watchdog_Control *w
-)
+static bool test_watchdog_is_inactive( test_watchdog *watchdog )
 {
-  _Chain_Append_unprotected( &header->Iterators, &i->Node );
-  i->delta_interval = 2;
-  i->current = &w->Node;
+  return _Watchdog_Get_state( &watchdog->Base ) == WATCHDOG_INACTIVE;
 }
 
-static void test_watchdog_insert_and_remove( void )
+static void test_watchdog_init( test_watchdog *watchdog, int counter )
 {
+<<<<<<< HEAD
   Watchdog_Header header;
   Watchdog_Control watchdogs[4];
   Watchdog_Control *a = &watchdogs[0];
@@ -238,29 +225,166 @@ static void test_watchdog_insert_with_iterator( void )
 }
 
 static void test_watchdog_static_init( void )
+=======
+  _Watchdog_Preinitialize( &watchdog->Base, _Per_CPU_Get_snapshot() );
+  _Watchdog_Initialize( &watchdog->Base, test_watchdog_routine );
+  rtems_test_assert( test_watchdog_is_inactive( watchdog ) ) ;
+  watchdog->counter = counter;
+}
+
+static uint64_t test_watchdog_tick( Watchdog_Header *header, uint64_t now )
+>>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 {
-  #if defined(RTEMS_USE_16_BIT_OBJECT)
-    #define JUNK_ID 0x1234
-  #else
-    #define JUNK_ID 0x12345678
-  #endif
+  ISR_LOCK_DEFINE( , lock, "Test" )
+  ISR_lock_Context lock_context;
+  Watchdog_Control *first;
 
-  static Watchdog_Control a = WATCHDOG_INITIALIZER(
-    test_watchdog_routine,
-    JUNK_ID,
-    (void *) 0xdeadbeef
-  );
-  Watchdog_Control b;
+  _ISR_lock_ISR_disable_and_acquire( &lock, &lock_context );
 
-  memset( &b, 0, sizeof( b ) );
-  _Watchdog_Initialize(
-    &b,
-    test_watchdog_routine,
-    JUNK_ID,
-    (void *) 0xdeadbeef
-  );
+  ++now;
+  first = _Watchdog_Header_first( header );
 
-  rtems_test_assert( memcmp( &a, &b, sizeof( a ) ) == 0 );
+  if ( first != NULL ) {
+    _Watchdog_Tickle( header, first, now, &lock, &lock_context );
+  }
+
+  _ISR_lock_Release_and_ISR_enable( &lock, &lock_context );
+  _ISR_lock_Destroy( &lock );
+
+  return now;
+}
+
+static void test_watchdog_operations( void )
+{
+  Watchdog_Header header;
+  uint64_t now;
+  test_watchdog a;
+  test_watchdog b;
+  test_watchdog c;
+
+  _Watchdog_Header_initialize( &header );
+  rtems_test_assert( _RBTree_Is_empty( &header.Watchdogs ) );
+  rtems_test_assert( header.first == NULL );
+
+  test_watchdog_init( &a, 10 );
+  test_watchdog_init( &b, 20 );
+  test_watchdog_init( &c, 30 );
+
+  now = 0;
+  now = test_watchdog_tick( &header, now );
+
+  _Watchdog_Insert( &header, &a.Base, now + 1 );
+  rtems_test_assert( header.first == &a.Base.Node.RBTree );
+  rtems_test_assert( !test_watchdog_is_inactive( &a ) ) ;
+  rtems_test_assert( a.Base.expire == 2 );
+  rtems_test_assert( a.counter == 10 );
+
+  _Watchdog_Remove( &header, &a.Base );
+  rtems_test_assert( header.first == NULL );
+  rtems_test_assert( test_watchdog_is_inactive( &a ) ) ;
+  rtems_test_assert( a.Base.expire == 2 );
+  rtems_test_assert( a.counter == 10 );
+
+  _Watchdog_Remove( &header, &a.Base );
+  rtems_test_assert( header.first == NULL );
+  rtems_test_assert( test_watchdog_is_inactive( &a ) ) ;
+  rtems_test_assert( a.Base.expire == 2 );
+  rtems_test_assert( a.counter == 10 );
+
+  _Watchdog_Insert( &header, &a.Base, now + 1 );
+  rtems_test_assert( header.first == &a.Base.Node.RBTree );
+  rtems_test_assert( !test_watchdog_is_inactive( &a ) ) ;
+  rtems_test_assert( a.Base.expire == 2 );
+  rtems_test_assert( a.counter == 10 );
+
+  _Watchdog_Insert( &header, &b.Base, now + 1 );
+  rtems_test_assert( header.first == &a.Base.Node.RBTree );
+  rtems_test_assert( !test_watchdog_is_inactive( &b ) ) ;
+  rtems_test_assert( b.Base.expire == 2 );
+  rtems_test_assert( b.counter == 20 );
+
+  _Watchdog_Insert( &header, &c.Base, now + 2 );
+  rtems_test_assert( header.first == &a.Base.Node.RBTree );
+  rtems_test_assert( !test_watchdog_is_inactive( &c ) ) ;
+  rtems_test_assert( c.Base.expire == 3 );
+  rtems_test_assert( c.counter == 30 );
+
+  _Watchdog_Remove( &header, &a.Base );
+  rtems_test_assert( header.first == &b.Base.Node.RBTree );
+  rtems_test_assert( test_watchdog_is_inactive( &a ) ) ;
+  rtems_test_assert( a.Base.expire == 2 );
+  rtems_test_assert( a.counter == 10 );
+
+  _Watchdog_Remove( &header, &b.Base );
+  rtems_test_assert( header.first == &c.Base.Node.RBTree );
+  rtems_test_assert( test_watchdog_is_inactive( &b ) ) ;
+  rtems_test_assert( b.Base.expire == 2 );
+  rtems_test_assert( b.counter == 20 );
+
+  _Watchdog_Remove( &header, &c.Base );
+  rtems_test_assert( header.first == NULL );
+  rtems_test_assert( test_watchdog_is_inactive( &c ) ) ;
+  rtems_test_assert( c.Base.expire == 3 );
+  rtems_test_assert( c.counter == 30 );
+
+  _Watchdog_Insert( &header, &a.Base, now + 2 );
+  rtems_test_assert( header.first == &a.Base.Node.RBTree );
+  rtems_test_assert( !test_watchdog_is_inactive( &a ) ) ;
+  rtems_test_assert( a.Base.expire == 3 );
+  rtems_test_assert( a.counter == 10 );
+
+  _Watchdog_Insert( &header, &b.Base, now + 2 );
+  rtems_test_assert( header.first == &a.Base.Node.RBTree );
+  rtems_test_assert( !test_watchdog_is_inactive( &b ) ) ;
+  rtems_test_assert( b.Base.expire == 3 );
+  rtems_test_assert( b.counter == 20 );
+
+  _Watchdog_Insert( &header, &c.Base, now + 3 );
+  rtems_test_assert( header.first == &a.Base.Node.RBTree );
+  rtems_test_assert( !test_watchdog_is_inactive( &c ) ) ;
+  rtems_test_assert( c.Base.expire == 4 );
+  rtems_test_assert( c.counter == 30 );
+
+  now = test_watchdog_tick( &header, now );
+  rtems_test_assert( !_RBTree_Is_empty( &header.Watchdogs ) );
+  rtems_test_assert( header.first == &a.Base.Node.RBTree );
+  rtems_test_assert( !test_watchdog_is_inactive( &a ) ) ;
+  rtems_test_assert( a.Base.expire == 3 );
+  rtems_test_assert( a.counter == 10 );
+  rtems_test_assert( !test_watchdog_is_inactive( &b ) ) ;
+  rtems_test_assert( b.Base.expire == 3 );
+  rtems_test_assert( b.counter == 20 );
+  rtems_test_assert( !test_watchdog_is_inactive( &c ) ) ;
+  rtems_test_assert( c.Base.expire == 4 );
+  rtems_test_assert( c.counter == 30 );
+
+  now = test_watchdog_tick( &header, now );
+  rtems_test_assert( !_RBTree_Is_empty( &header.Watchdogs ) );
+  rtems_test_assert( header.first == &c.Base.Node.RBTree );
+  rtems_test_assert( test_watchdog_is_inactive( &a ) ) ;
+  rtems_test_assert( a.Base.expire == 3 );
+  rtems_test_assert( a.counter == 11 );
+  rtems_test_assert( test_watchdog_is_inactive( &b ) ) ;
+  rtems_test_assert( b.Base.expire == 3 );
+  rtems_test_assert( b.counter == 21 );
+  rtems_test_assert( !test_watchdog_is_inactive( &c ) ) ;
+  rtems_test_assert( c.Base.expire == 4 );
+  rtems_test_assert( c.counter == 30 );
+
+  now = test_watchdog_tick( &header, now );
+  rtems_test_assert( _RBTree_Is_empty( &header.Watchdogs ) );
+  rtems_test_assert( header.first == NULL );
+  rtems_test_assert( test_watchdog_is_inactive( &a ) ) ;
+  rtems_test_assert( a.Base.expire == 3 );
+  rtems_test_assert( a.counter == 11 );
+  rtems_test_assert( test_watchdog_is_inactive( &b ) ) ;
+  rtems_test_assert( b.Base.expire == 3 );
+  rtems_test_assert( b.counter == 21 );
+  rtems_test_assert( test_watchdog_is_inactive( &c ) ) ;
+  rtems_test_assert( c.Base.expire == 4 );
+  rtems_test_assert( c.counter == 31 );
+
+  _Watchdog_Header_destroy( &header );
 }
 
 rtems_task Init(
@@ -272,10 +396,15 @@ rtems_task Init(
 
   TEST_BEGIN();
 
+  test_watchdog_operations();
   test_watchdog_static_init();
+<<<<<<< HEAD
   test_watchdog_insert_and_remove();
   test_watchdog_remove_second_and_insert_first();
   test_watchdog_insert_with_iterator();
+=======
+  test_watchdog_config();
+>>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 
   build_time( &time, 12, 31, 1988, 9, 0, 0, 0 );
 

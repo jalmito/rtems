@@ -27,10 +27,9 @@
 #include <rtems/score/thread.h>
 #include <rtems/seterr.h>
 #include <rtems/posix/priorityimpl.h>
-#include <rtems/posix/time.h>
 
 int sched_getscheduler(
-  pid_t                     pid __attribute__((unused))
+  pid_t                     pid RTEMS_UNUSED
 )
 {
   rtems_set_errno_and_return_minus_one( ENOSYS );

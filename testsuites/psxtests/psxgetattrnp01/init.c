@@ -23,15 +23,75 @@ const char rtems_test_name[] = "PSXGETATTRNP 1";
 /* forward declarations to avoid warnings */
 void *POSIX_Init(void *argument);
 
-#if HAVE_DECL_PTHREAD_GETATTR_NP
-
-
 void *Thread_1(void *argument);
 
 pthread_t           Init_id;
 pthread_t           Thread_id;
 pthread_attr_t      Thread_attr;
 int                 max_priority;
+
+static int attribute_compare(
+  const pthread_attr_t *attr1,
+  const pthread_attr_t *attr2
+)
+{
+  if ( attr1->is_initialized  !=  attr2->is_initialized )
+    return 1;
+
+  if (
+    attr1->stackaddr != NULL &&
+      attr2->stackaddr != NULL &&
+      attr1->stackaddr != attr2->stackaddr )
+    return 1;
+
+  if (
+    attr1->stacksize != 0 &&
+      attr2->stacksize != 0 &&
+       attr1->stacksize != attr2->stacksize )
+    return 1;
+
+  if ( attr1->contentionscope != attr2->contentionscope )
+    return 1;
+
+  if ( attr1->inheritsched != attr2->inheritsched )
+    return 1;
+
+  if ( attr1->schedpolicy != attr2->schedpolicy )
+    return 1;
+
+  if ( attr1->schedparam.sched_priority != attr2->schedparam.sched_priority )
+    return 1;
+
+  if ( attr1->guardsize != attr2->guardsize )
+    return 1;
+
+  #if defined(_POSIX_THREAD_CPUTIME)
+    if ( attr1->cputime_clock_allowed != attr2->cputime_clock_allowed )
+      return 1;
+  #endif
+
+  if ( attr1->detachstate != attr2->detachstate )
+    return 1;
+
+  if ( attr1->affinitysetsize != attr2->affinitysetsize )
+    return 1;
+
+  if (!CPU_EQUAL_S(
+    attr1->affinitysetsize,
+    attr1->affinityset,
+    attr2->affinityset
+  ))
+    return 1;
+
+  if (!CPU_EQUAL_S(
+    attr1->affinitysetsize,
+    &attr1->affinitysetpreallocated,
+    &attr2->affinitysetpreallocated
+  ))
+    return 1;
+
+  return 0;
+}
 
 void *Thread_1(
   void *argument
@@ -41,11 +101,14 @@ void *Thread_1(
   struct sched_param  param;
   int                 sc;
   int                 value;
+  void               *stackaddr;
+  size_t              stacksize;
+  cpu_set_t           set;
 
   puts("Thread - pthread_getattr_np - Verify value");
   sc = pthread_getattr_np( Thread_id, &attr );
   rtems_test_assert( sc == 0 );
-  rtems_test_assert( ! rtems_pthread_attribute_compare(&attr, &Thread_attr) );
+  rtems_test_assert( ! attribute_compare(&attr, &Thread_attr) );
 
   param.sched_priority = max_priority;
 
@@ -61,6 +124,24 @@ void *Thread_1(
   sc = pthread_getattr_np( Thread_id, &attr );
   rtems_test_assert( !sc );
 
+  puts("Thread - Verify get stack");
+  stackaddr = NULL;
+  stacksize = 0;
+  sc = pthread_attr_getstack( &attr, &stackaddr, &stacksize );
+  rtems_test_assert( sc == 0 );
+  rtems_test_assert( stackaddr != NULL );
+  rtems_test_assert( stacksize != 0 );
+
+  puts("Thread - Verify contention scope");
+  sc = pthread_attr_getscope( &attr, &value );
+  rtems_test_assert( sc == 0 );
+  rtems_test_assert( value == PTHREAD_SCOPE_PROCESS );
+
+  puts("Thread - Verify explicit scheduler");
+  sc = pthread_attr_getinheritsched( &attr, &value );
+  rtems_test_assert( sc == 0 );
+  rtems_test_assert( value == PTHREAD_EXPLICIT_SCHED );
+
   puts("Thread - Verify SCHED_FIFO policy");
   sc = pthread_attr_getschedpolicy( &attr, &value );
   rtems_test_assert( !sc );
@@ -73,7 +154,19 @@ void *Thread_1(
 
   puts("Thread - Verify detached");
   sc = pthread_attr_getdetachstate( &attr, &value );
+  rtems_test_assert( sc == 0 );
   rtems_test_assert( value == PTHREAD_CREATE_DETACHED );
+
+  puts("Thread - Verify affinity");
+  CPU_ZERO( &set );
+  sc = pthread_attr_getaffinity_np( &attr, sizeof( set ), &set );
+  rtems_test_assert( sc == 0 );
+  rtems_test_assert( CPU_ISSET( 0, &set ) );
+  rtems_test_assert( !CPU_ISSET( 1, &set ) );
+
+  puts("Thread - Destroy");
+  sc = pthread_attr_destroy( &attr );
+  rtems_test_assert( sc == 0 );
 
   return NULL; /* just so the compiler thinks we returned something */
 }
@@ -88,6 +181,7 @@ void *POSIX_Init(
   size_t              stacksize;
   size_t              guardsize;
   struct sched_param  param;
+  cpu_set_t           set;
 
   TEST_BEGIN();
 
@@ -107,6 +201,12 @@ void *POSIX_Init(
   /* init task attributes */
   puts("Init - pthread_attr_init");
   sc = pthread_attr_init(&Thread_attr);
+  rtems_test_assert(!sc);
+
+  puts("Init - pthread_attr_setaffinity_np");
+  CPU_ZERO( &set );
+  CPU_SET( 0, &set );
+  sc = pthread_attr_setaffinity_np( &Thread_attr, sizeof( set ), &set );
   rtems_test_assert(!sc);
 
   puts("Init - pthread_attr_setinheritsched - PTHREAD_EXPLICIT_SCHED");
@@ -165,22 +265,10 @@ void *POSIX_Init(
   rtems_test_exit(0);
   return NULL; /* just so the compiler thinks we returned something */
 }
-#else
-void *POSIX_Init(
-  void *ignored
-)
-{
-  TEST_BEGIN();
-  puts( "  pthread_getattr_np NOT supported" );
-  TEST_END();
-  rtems_test_exit(0);
-  return NULL; /* just so the compiler thinks we returned something */
-}
 
-#endif
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_POSIX_THREADS  2

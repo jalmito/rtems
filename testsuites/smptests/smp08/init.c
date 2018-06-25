@@ -43,7 +43,7 @@ rtems_task Init(
 {
   rtems_status_code status;
   rtems_time_of_day time;
-  int               i;
+  uint32_t          i;
   char              ch[4];
   rtems_id          id;
 
@@ -78,7 +78,7 @@ rtems_task Init(
 
   for ( i=1; i <= rtems_get_processor_count() *3; i++ ) {
 
-    sprintf(ch, "%02" PRId32, i );
+    sprintf(ch, "%02" PRIu32, i );
     status = rtems_task_create(
       rtems_build_name( 'T', 'A', ch[0], ch[1] ),
       2,
@@ -93,6 +93,5 @@ rtems_task Init(
     directive_failed( status, "task start" );
   }
 
-  /* FIXME: Task deletion currently not supported */
-  (void) rtems_task_suspend( RTEMS_SELF );
+  (void) rtems_task_delete( RTEMS_SELF );
 }

@@ -18,15 +18,33 @@
 #include "config.h"
 #endif
 
-#include <rtems/system.h>
 #include <rtems/posix/priorityimpl.h>
+#include <rtems/score/schedulerimpl.h>
 
-bool _POSIX_Priority_Is_valid(
-  int priority
+Priority_Control _POSIX_Priority_To_core(
+  const Scheduler_Control *scheduler,
+  int                      posix_priority,
+  bool                    *valid
 )
 {
-  return ((priority >= POSIX_SCHEDULER_MINIMUM_PRIORITY) &&
-          (priority <= POSIX_SCHEDULER_MAXIMUM_PRIORITY));
+  Priority_Control core_posix_priority;
+  Priority_Control core_priority;
 
+  core_posix_priority = (Priority_Control) posix_priority;
+  core_priority = scheduler->maximum_priority - core_posix_priority;
+
+  *valid = ( posix_priority >= POSIX_SCHEDULER_MINIMUM_PRIORITY
+    && core_posix_priority < scheduler->maximum_priority );
+
+  return _Scheduler_Map_priority( scheduler, core_priority );
 }
 
+int _POSIX_Priority_From_core(
+  const Scheduler_Control *scheduler,
+  Priority_Control         core_priority
+)
+{
+  core_priority = _Scheduler_Unmap_priority( scheduler, core_priority );
+
+  return (int) ( scheduler->maximum_priority - core_priority );
+}

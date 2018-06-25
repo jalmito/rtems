@@ -15,7 +15,6 @@
 #include <rtems.h>
 #include "system.h"
 #include "fptest.h"
-#include <coverhd.h>
 #include <tmacros.h>
 #include <timesys.h>
 
@@ -30,8 +29,6 @@ const char rtems_test_name[] = "TIME TEST 26";
 
 /* TEST DATA */
 rtems_id Semaphore_id;
-
-Objects_Locations location;   /* uses internal RTEMS type */
 
 Thread_Control *Middle_tcb;   /* uses internal RTEMS type */
 
@@ -94,7 +91,7 @@ static void set_thread_dispatch_necessary( bool dispatch_necessary )
 #if defined( PREVENT_SMP_ASSERT_FAILURES )
   ISR_Level level;
 
-  _ISR_Disable_without_giant( level );
+  _ISR_Local_disable( level );
 #endif
 
   _Thread_Dispatch_necessary = dispatch_necessary;
@@ -104,7 +101,7 @@ static void set_thread_dispatch_necessary( bool dispatch_necessary )
   }
 
 #if defined( PREVENT_SMP_ASSERT_FAILURES )
-  _ISR_Enable_without_giant( level );
+  _ISR_Local_enable( level );
 #endif
 }
 
@@ -113,98 +110,24 @@ static void set_thread_heir( Thread_Control *thread )
 #if defined( PREVENT_SMP_ASSERT_FAILURES )
   ISR_Level level;
 
-  _ISR_Disable_without_giant( level );
+  _ISR_Local_disable( level );
 #endif
 
   _Thread_Heir = thread;
 
 #if defined( PREVENT_SMP_ASSERT_FAILURES )
-  _ISR_Enable_without_giant( level );
+  _ISR_Local_enable( level );
 #endif
 }
 
 static void set_thread_executing( Thread_Control *thread )
 {
-#if defined( PREVENT_SMP_ASSERT_FAILURES )
-  ISR_Level level;
-
-  _ISR_Disable_without_giant( level );
-#endif
-
-  _Thread_Executing = thread;
-
-#if defined( PREVENT_SMP_ASSERT_FAILURES )
-  _ISR_Enable_without_giant( level );
-#endif
-}
-
-static void thread_disable_dispatch( void )
-{
-/* Yes, RTEMS_SMP and not PREVENT_SMP_ASSERT_FAILURES */
-#if defined( RTEMS_SMP )
-  Per_CPU_Control *self_cpu;
-  ISR_Level level;
-
-  _ISR_Disable_without_giant( level );
-  ( void ) level;
-
-  self_cpu = _Per_CPU_Get();
-  self_cpu->thread_dispatch_disable_level = 1;
-#else
-  _Thread_Disable_dispatch();
-#endif
-}
-
-static void thread_set_state( Thread_Control *thread, States_Control state )
-{
-#if defined( PREVENT_SMP_ASSERT_FAILURES )
-  _Thread_Disable_dispatch();
-#endif
-
-  _Thread_Set_state( thread, state );
-
-#if defined( PREVENT_SMP_ASSERT_FAILURES )
-  _Thread_Unnest_dispatch();
-#endif
+  _Per_CPU_Get_snapshot()->executing = thread;
 }
 
 static void thread_resume( Thread_Control *thread )
 {
-#if defined( PREVENT_SMP_ASSERT_FAILURES )
-  _Thread_Disable_dispatch();
-#endif
-
   _Thread_Clear_state( thread, STATES_SUSPENDED );
-
-#if defined( PREVENT_SMP_ASSERT_FAILURES )
-  _Thread_Unnest_dispatch();
-#endif
-}
-
-static void thread_unblock( Thread_Control *thread )
-{
-#if defined( PREVENT_SMP_ASSERT_FAILURES )
-  _Thread_Disable_dispatch();
-#endif
-
-  _Thread_Unblock( thread );
-
-#if defined( PREVENT_SMP_ASSERT_FAILURES )
-  _Thread_Unnest_dispatch();
-#endif
-}
-
-static void thread_ready( Thread_Control *thread )
-{
-#if defined( PREVENT_SMP_ASSERT_FAILURES )
-  _Thread_Disable_dispatch();
-#endif
-
-  _Thread_Ready( thread );
-
-#if defined( PREVENT_SMP_ASSERT_FAILURES )
-  _Thread_Unnest_dispatch();
-#endif
 }
 
 rtems_task null_task(
@@ -221,6 +144,7 @@ rtems_task Init(
   rtems_id          task_id;
   rtems_status_code status;
 
+  rtems_print_printer_fprintf_putc(&rtems_test_printer);
   Print_Warning();
 
   TEST_BEGIN();
@@ -338,7 +262,7 @@ rtems_task High_task(
 {
   rtems_interrupt_level level;
 
-  _Thread_Disable_dispatch();
+  _Thread_Dispatch_disable();
 
   benchmark_timer_initialize();
     rtems_interrupt_local_disable( level );
@@ -357,18 +281,18 @@ rtems_task High_task(
     rtems_interrupt_local_enable( level );
   isr_enable_time = benchmark_timer_read();
 
-  _Thread_Enable_dispatch();
+  _Thread_Dispatch_enable( _Per_CPU_Get() );
 
   benchmark_timer_initialize();
-    _Thread_Disable_dispatch();
+    _Thread_Dispatch_disable();
   thread_disable_dispatch_time = benchmark_timer_read();
 
   benchmark_timer_initialize();
-    _Thread_Enable_dispatch();
+    _Thread_Dispatch_enable( _Per_CPU_Get() );
   thread_enable_dispatch_time = benchmark_timer_read();
 
   benchmark_timer_initialize();
-    thread_set_state( _Thread_Get_executing(), STATES_SUSPENDED );
+    _Thread_Set_state( _Thread_Get_executing(), STATES_SUSPENDED );
   thread_set_state_time = benchmark_timer_read();
 
   set_thread_dispatch_necessary( true );
@@ -382,11 +306,11 @@ rtems_task Middle_task(
 )
 {
   Scheduler_priority_Context *scheduler_context =
-    _Scheduler_priority_Get_context( _Scheduler_Get( _Thread_Get_executing() ) );
+    _Scheduler_priority_Get_context( _Thread_Scheduler_get_home( _Thread_Get_executing() ) );
 
   thread_dispatch_no_fp_time = benchmark_timer_read();
 
-  thread_set_state( _Thread_Get_executing(), STATES_SUSPENDED );
+  _Thread_Set_state( _Thread_Get_executing(), STATES_SUSPENDED );
 
   Middle_tcb   = _Thread_Get_executing();
 
@@ -398,7 +322,7 @@ rtems_task Middle_task(
 
   set_thread_dispatch_necessary( false );
 
-  thread_disable_dispatch();
+  _Thread_Dispatch_disable();
 
   benchmark_timer_initialize();
     _Context_Switch(
@@ -415,7 +339,7 @@ rtems_task Low_task(
 )
 {
   Scheduler_priority_Context *scheduler_context =
-    _Scheduler_priority_Get_context( _Scheduler_Get( _Thread_Get_executing() ) );
+    _Scheduler_priority_Get_context( _Thread_Scheduler_get_home( _Thread_Get_executing() ) );
   Thread_Control             *executing;
 
   context_switch_no_fp_time = benchmark_timer_read();
@@ -441,7 +365,7 @@ rtems_task Low_task(
 
   set_thread_dispatch_necessary( false );
 
-  thread_disable_dispatch();
+  _Thread_Dispatch_disable();
 
   benchmark_timer_initialize();
     _Context_Switch(
@@ -455,7 +379,7 @@ rtems_task Floating_point_task_1(
 )
 {
   Scheduler_priority_Context *scheduler_context =
-    _Scheduler_priority_Get_context( _Scheduler_Get( _Thread_Get_executing() ) );
+    _Scheduler_priority_Get_context( _Thread_Scheduler_get_home( _Thread_Get_executing() ) );
   Thread_Control             *executing;
   FP_DECLARE;
 
@@ -471,7 +395,7 @@ rtems_task Floating_point_task_1(
 
   set_thread_dispatch_necessary( false );
 
-  thread_disable_dispatch();
+  _Thread_Dispatch_disable();
 
   benchmark_timer_initialize();
 #if (CPU_HARDWARE_FP == 1) || (CPU_SOFTWARE_FP == 1)
@@ -511,7 +435,7 @@ rtems_task Floating_point_task_2(
 )
 {
   Scheduler_priority_Context *scheduler_context =
-    _Scheduler_priority_Get_context( _Scheduler_Get( _Thread_Get_executing() ) );
+    _Scheduler_priority_Get_context( _Thread_Scheduler_get_home( _Thread_Get_executing() ) );
   Thread_Control             *executing;
   FP_DECLARE;
 
@@ -543,23 +467,25 @@ rtems_task Floating_point_task_2(
 
 void complete_test( void )
 {
-  uint32_t    index;
-  rtems_id          task_id;
+  uint32_t             index;
+  rtems_id             task_id;
+  ISR_lock_Context     lock_context;
+  Thread_queue_Context queue_context;
 
   benchmark_timer_initialize();
     thread_resume( Middle_tcb );
   thread_resume_time = benchmark_timer_read();
 
-  thread_set_state( Middle_tcb, STATES_WAITING_FOR_MESSAGE );
+  _Thread_Set_state( Middle_tcb, STATES_WAITING_FOR_MESSAGE );
 
   benchmark_timer_initialize();
-    thread_unblock( Middle_tcb );
+    _Thread_Unblock( Middle_tcb );
   thread_unblock_time = benchmark_timer_read();
 
-  thread_set_state( Middle_tcb, STATES_WAITING_FOR_MESSAGE );
+  _Thread_Set_state( Middle_tcb, STATES_WAITING_FOR_MESSAGE );
 
   benchmark_timer_initialize();
-    thread_ready( Middle_tcb );
+    _Thread_Clear_state( Middle_tcb, STATES_WAITING_FOR_MESSAGE );
   thread_ready_time = benchmark_timer_read();
 
   benchmark_timer_initialize();
@@ -570,18 +496,24 @@ void complete_test( void )
   task_id = Middle_tcb->Object.id;
 
   benchmark_timer_initialize();
-    for ( index=1 ; index <= OPERATION_COUNT ; index++ )
-      (void) _Thread_Get( task_id, &location );
+    for ( index=1 ; index <= OPERATION_COUNT ; index++ ) {
+      (void) _Thread_Get( task_id, &lock_context );
+      _ISR_lock_ISR_enable( &lock_context );
+    }
   thread_get_time = benchmark_timer_read();
 
   benchmark_timer_initialize();
-    for ( index=1 ; index <= OPERATION_COUNT ; index++ )
-      (void) _Semaphore_Get( Semaphore_id, &location );
+    for ( index=1 ; index <= OPERATION_COUNT ; index++ ) {
+      (void) _Semaphore_Get( Semaphore_id, &queue_context );
+      _ISR_lock_ISR_enable( &queue_context.Lock_context.Lock_context );
+    }
   semaphore_get_time = benchmark_timer_read();
 
   benchmark_timer_initialize();
-    for ( index=1 ; index <= OPERATION_COUNT ; index++ )
-      (void) _Thread_Get( 0x3, &location );
+    for ( index=1 ; index <= OPERATION_COUNT ; index++ ) {
+      (void) _Thread_Get( 0x3, &lock_context );
+      _ISR_lock_ISR_enable( &lock_context );
+    }
   thread_get_invalid_time = benchmark_timer_read();
 
   /*
@@ -592,16 +524,12 @@ void complete_test( void )
   set_thread_heir( _Thread_Get_executing() );
   set_thread_dispatch_necessary( false );
 
-  for (index = 0; index < 2 * OPERATION_COUNT; ++index) {
-    _Thread_Unnest_dispatch();
-  }
-
   /*
    *  Now dump all the times
    */
 
   put_time(
-    "rtems interrupt: _ISR_Disable",
+    "rtems interrupt: _ISR_Local_disable",
     isr_disable_time,
     1,
     0,
@@ -609,7 +537,7 @@ void complete_test( void )
   );
 
   put_time(
-    "rtems interrupt: _ISR_Flash",
+    "rtems interrupt: _ISR_Local_flash",
     isr_flash_time,
     1,
     0,
@@ -617,7 +545,7 @@ void complete_test( void )
   );
 
   put_time(
-    "rtems interrupt: _ISR_Enable",
+    "rtems interrupt: _ISR_Local_enable",
     isr_enable_time,
     1,
     0,
@@ -625,7 +553,7 @@ void complete_test( void )
   );
 
   put_time(
-    "rtems internal: _Thread_Disable_dispatch",
+    "rtems internal: _Thread_Dispatch_disable",
     thread_disable_dispatch_time,
     1,
     0,
@@ -633,7 +561,7 @@ void complete_test( void )
   );
 
   put_time(
-    "rtems internal: _Thread_Enable_dispatch",
+    "rtems internal: _Thread_Dispatch_enable",
     thread_enable_dispatch_time,
     1,
     0,

@@ -299,7 +299,7 @@ rtems_symbol_name_lookup(
 const void *
 rtems_monitor_symbol_next(
     void                   *object_info,
-    rtems_monitor_symbol_t *canonical __attribute__((unused)),
+    rtems_monitor_symbol_t *canonical RTEMS_UNUSED,
     rtems_id               *next_id
 )
 {
@@ -318,7 +318,7 @@ rtems_monitor_symbol_next(
     if (table->sorted == 0)
         rtems_symbol_sort(table);
 
-    _Thread_Disable_dispatch();
+    _Objects_Allocator_lock();
 
     *next_id += 1;
     return (const void *) (table->addresses + n);
@@ -419,7 +419,7 @@ rtems_monitor_symbol_dump(
 static void
 rtems_monitor_symbol_dump_all(
     rtems_symbol_table_t *table,
-    bool                  verbose __attribute__((unused))
+    bool                  verbose RTEMS_UNUSED
 )
 {
     uint32_t   s;

@@ -93,10 +93,10 @@ void benchmark_mutex_trylock_not_available(void)
 
   benchmark_timer_initialize();
     status = pthread_mutex_trylock( &MutexId );
-    /* 
-     * it has to return a negative value 
-     * because it try to lock a not available mutex    
-     * so the assert call is make with status instead !status 
+    /*
+     * it has to return a negative value
+     * because it try to lock a not available mutex
+     * so the assert call is make with status instead !status
      */
   end_time = benchmark_timer_read();
   rtems_test_assert( status );
@@ -136,7 +136,7 @@ void *POSIX_Init(
   int  status;
 
   TEST_BEGIN();
-  
+
   /*
    * Create the single Mutex used in all the test case
    */
@@ -144,7 +144,7 @@ void *POSIX_Init(
   rtems_test_assert( !status );
 
   /*
-   * Now invoke subroutines to time each test case 
+   * Now invoke subroutines to time each test case
    * get the goal depends of its order
    */
   benchmark_mutex_lock_available();
@@ -154,7 +154,7 @@ void *POSIX_Init(
   benchmark_mutex_unlock_no_threads_waiting();
   benchmark_mutex_timedlock_available();
   benchmark_mutex_unlock_no_threads_waiting();
-  
+
 
   /*
    *  Destroy the mutex used in the tests
@@ -169,11 +169,10 @@ void *POSIX_Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
 
 #define CONFIGURE_MAXIMUM_POSIX_THREADS     1
-#define CONFIGURE_MAXIMUM_POSIX_MUTEXES     1
 #define CONFIGURE_POSIX_INIT_THREAD_TABLE
 
 #define CONFIGURE_INIT

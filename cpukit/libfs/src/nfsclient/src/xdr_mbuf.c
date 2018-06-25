@@ -61,6 +61,7 @@ static char *rcsid = "$FreeBSD: src/lib/libc/xdr/xdr_mem.c,v 1.8 1999/08/28 00:0
 #include "config.h"
 #endif
 
+#include <sys/param.h>
 #include <string.h>
 #include <rpc/types.h>
 #include <rpc/xdr.h>
@@ -98,6 +99,8 @@ my_free(void *p)
 #if DEBUG & DEBUG_VERB || defined(TODO)
 #include <stdio.h>
 #endif
+
+#include "nfsclient-private.h"
 
 static bool_t	xdrmbuf_getlong_aligned(XDR *xdrs, long *lp);
 static bool_t	xdrmbuf_putlong_aligned(XDR *xdrs, const long *lp);

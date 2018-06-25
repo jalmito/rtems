@@ -17,8 +17,6 @@
 
 const char rtems_test_name[] = "SMPAFFINITY 1";
 
-#if defined(__RTEMS_HAVE_SYS_CPUSET_H__)
-
 rtems_id           Init_id;
 rtems_id           Med_id[NUM_CPUS-1];
 rtems_id           Low_id[NUM_CPUS];
@@ -42,9 +40,9 @@ void Validate_setaffinity_errors(void)
   /* Verify rtems_task_set_affinity checks that all cpu's exist. */
   /* Note this check assumes you are running with less than 32 CPUs */
   CPU_FILL(&cpuset);
-  puts( "Init - rtems_task_set_affinity - Invalid cpu - RTEMS_INVALID_NUMBER" );
+  puts( "Init - rtems_task_set_affinity - Lots of cpus - SUCCESS" );
   sc = rtems_task_set_affinity( Init_id, sizeof(cpu_set_t), &cpuset );
-  rtems_test_assert( sc == RTEMS_INVALID_NUMBER );
+  rtems_test_assert( sc == RTEMS_SUCCESSFUL );
 
   /* Verify rtems_task_set_affinity checks that at least one cpu is set */
   CPU_ZERO(&cpuset);
@@ -61,7 +59,7 @@ void Validate_setaffinity_errors(void)
 
   /* Verify rtems_task_set_affinity validates cpusetsize */
   puts( "Init - rtems_task_set_affinity - Invalid cpusetsize - RTEMS_INVALID_NUMBER" );
-  sc = rtems_task_set_affinity( Init_id,  sizeof(cpu_set_t) * 2, &cpuset );
+  sc = rtems_task_set_affinity( Init_id,  1, &cpuset );
   rtems_test_assert( sc == RTEMS_INVALID_NUMBER );
 
   /* Verifyrtems_task_set_affinity validates cpuset */
@@ -86,7 +84,7 @@ void Validate_getaffinity_errors(void)
   puts(
     "Init - rtems_task_get_affinity - Invalid cpusetsize - RTEMS_INVALID_NUMBER"
   );
-  sc = rtems_task_get_affinity( Init_id,  sizeof(cpu_set_t) * 2, &cpuset );
+  sc = rtems_task_get_affinity( Init_id,  1, &cpuset );
   rtems_test_assert( sc == RTEMS_INVALID_NUMBER );
 
   /* Verify rtems_task_get_affinity validates cpuset */
@@ -179,7 +177,7 @@ void Validate_affinity(void )
 
   /* Change the affinity for each low priority task */
   puts("Init - Change affinity on Low priority tasks");
-  CPU_COPY(&cpuset1, &cpuset0);
+  CPU_COPY(&cpuset0, &cpuset1);
   for (i=0; i<cpu_count; i++){
 
     CPU_CLR(i, &cpuset1);
@@ -195,7 +193,7 @@ void Validate_affinity(void )
   }
 
   puts("Init - Validate affinity on Low priority tasks");
-  CPU_COPY(&cpuset1, &cpuset0);
+  CPU_COPY(&cpuset0, &cpuset1);
   for (i=0; i<cpu_count; i++){
     CPU_CLR(i, &cpuset1);
 
@@ -226,29 +224,18 @@ static void Init(rtems_task_argument arg)
   rtems_test_exit(0);
 }
 
-#else
-static void Init(rtems_task_argument arg)
-{
-  TEST_BEGIN();
-  puts( " Affinity NOT Supported");
-  TEST_END();
-  rtems_test_exit(0);
-}
-
-#endif
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
-
-#define CONFIGURE_SMP_APPLICATION
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_SCHEDULER_PRIORITY_AFFINITY_SMP
 
-#define CONFIGURE_SMP_MAXIMUM_PROCESSORS NUM_CPUS
+#define CONFIGURE_MAXIMUM_PROCESSORS NUM_CPUS
 
 #define CONFIGURE_MAXIMUM_TASKS         (NUM_CPUS*2)
 
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
+#define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
 
 #define CONFIGURE_INIT

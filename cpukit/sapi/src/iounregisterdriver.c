@@ -19,9 +19,8 @@
 #include "config.h"
 #endif
 
-#include <rtems/io.h>
+#include <rtems/ioimpl.h>
 #include <rtems/rtems/intr.h>
-#include <rtems/score/threaddispatch.h>
 
 #include <string.h>
 
@@ -33,13 +32,15 @@ rtems_status_code rtems_io_unregister_driver(
     return RTEMS_CALLED_FROM_ISR;
 
   if ( major < _IO_Number_of_drivers ) {
-    _Thread_Disable_dispatch();
+    ISR_lock_Context lock_context;
+
+    _IO_Driver_registration_acquire( &lock_context );
     memset(
       &_IO_Driver_address_table[major],
       0,
       sizeof( rtems_driver_address_table )
     );
-    _Thread_Enable_dispatch();
+    _IO_Driver_registration_release( &lock_context );
 
     return RTEMS_SUCCESSFUL;
   }

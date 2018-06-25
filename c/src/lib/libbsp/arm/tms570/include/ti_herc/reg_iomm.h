@@ -131,12 +131,13 @@ typedef struct{
   uint32_t FAULT_CLEAR_REG;   /*Fault Clear Register*/
   uint8_t reserved5 [16];
 #ifdef TMS570_LC43X
-#else
   tms570_pinmux_t PINMUXOut;     /*Pin Multiplexing Control Registers*/
   uint8_t reserved6 [168];
   tms570_pinmux_20_t PINMUXIn;
   uint8_t reserved7 [240];
   tms570_pinmux_20_t PINMUXSp;
+#else
+  tms570_pinmux_t PINMUX; /*Pin Multiplexing Control Registers*/
 #endif
 } tms570_iomm_t;
 

@@ -14,8 +14,6 @@
 #include <tmacros.h>
 #include <unistd.h>
 
-const char rtems_test_name[] = "SP 65";
-
 /* forward declarations to avoid warnings */
 rtems_task Init(rtems_task_argument argument);
 rtems_task Task_1(rtems_task_argument arg);
@@ -27,6 +25,8 @@ rtems_task Task_1(rtems_task_argument arg);
   #define TEST_NAME                "65"
   #define TASK_PRIORITY            1
 #endif
+
+const char rtems_test_name[] = "SP " TEST_NAME;
 
 static void assert_priority(rtems_task_priority expected)
 {
@@ -135,7 +135,7 @@ rtems_task Task_1(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS         2
@@ -144,6 +144,8 @@ rtems_task Task_1(
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
+
+#define CONFIGURE_DISABLE_SMP_CONFIGURATION
 
 #define CONFIGURE_INIT
 #include <rtems/confdefs.h>

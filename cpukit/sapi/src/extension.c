@@ -21,13 +21,13 @@
 #include "config.h"
 #endif
 
-#include <rtems/system.h>
-#include <rtems/config.h>
-#include <rtems/rtems/support.h>
-#include <rtems/score/thread.h>
 #include <rtems/extensionimpl.h>
+#include <rtems/config.h>
+#include <rtems/sysinit.h>
 
-void _Extension_Manager_initialization(void)
+Objects_Information _Extension_Information;
+
+static void _Extension_Manager_initialization(void)
 {
   _Objects_Initialize_information(
     &_Extension_Information,
@@ -36,11 +36,13 @@ void _Extension_Manager_initialization(void)
     rtems_configuration_get_maximum_extensions(),
     sizeof( Extension_Control ),
     false,                     /* true if the name is a string */
-    RTEMS_MAXIMUM_NAME_LENGTH  /* maximum length of an object name */
-#if defined(RTEMS_MULTIPROCESSING)
-    ,
-    false,                     /* true if this is a global object class */
+    RTEMS_MAXIMUM_NAME_LENGTH, /* maximum length of an object name */
     NULL                       /* Proxy extraction support callout */
-#endif
   );
 }
+
+RTEMS_SYSINIT_ITEM(
+  _Extension_Manager_initialization,
+  RTEMS_SYSINIT_USER_EXTENSIONS,
+  RTEMS_SYSINIT_ORDER_MIDDLE
+);

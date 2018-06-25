@@ -18,6 +18,7 @@
   #include "config.h"
 #endif
 
+#include <string.h>
 #include <unistd.h>
 
 #include <rtems/libio_.h>
@@ -63,15 +64,15 @@ int fchown( int fd, uid_t owner, gid_t group )
   int rv;
   rtems_libio_t *iop;
 
-  rtems_libio_check_fd( fd );
-  iop = rtems_libio_iop( fd );
-  rtems_libio_check_is_open(iop);
+  LIBIO_GET_IOP( fd, iop );
 
   rtems_filesystem_instance_lock( &iop->pathinfo );
 
   rv = rtems_filesystem_chown( &iop->pathinfo, owner, group );
 
   rtems_filesystem_instance_unlock( &iop->pathinfo );
+
+  rtems_libio_iop_drop( iop );
 
   return rv;
 }

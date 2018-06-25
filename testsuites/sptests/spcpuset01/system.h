@@ -10,14 +10,12 @@
 #include "tmacros.h"
 #include "test_support.h"
 
-#if defined(__RTEMS_HAVE_SYS_CPUSET_H__)
 #include <sys/cpuset.h>
 
 /* global variables */
 extern cpu_set_t set1;
 extern cpu_set_t set2;
 extern cpu_set_t set3;
-#endif
 
 /* enable/disable verbose output */
 #ifndef DPRINT
@@ -36,7 +34,7 @@ void cpuset_logic_test(void);
 /* configuration information */
 
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS            1
 #define CONFIGURE_MAXIMUM_SEMAPHORES       1

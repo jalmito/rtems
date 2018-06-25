@@ -7,31 +7,20 @@
  * http://www.rtems.org/license/LICENSE.
  */
 
-#include <rtems.h>
 #include <drvmgr/drvmgr.h>
 #include "drvmgr_internal.h"
+#include <rtems/score/sysstate.h>
 
-void _DRV_Manager_Lock(void)
+void _DRV_Manager_Lock( void )
 {
-	rtems_semaphore_obtain(drvmgr.lock, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
+  if ( !_System_state_Is_before_initialization( _System_state_Get() ) ) {
+    _API_Mutex_Lock( &drvmgr.lock );
+  }
 }
 
 void _DRV_Manager_Unlock(void)
 {
-	rtems_semaphore_release(drvmgr.lock);
-}
-
-int _DRV_Manager_Init_Lock(void)
-{
-	int rc;
-
-	rc = rtems_semaphore_create(
-		rtems_build_name('D', 'R', 'V', 'M'),
-		1,
-		RTEMS_DEFAULT_ATTRIBUTES,
-		0,
-		&drvmgr.lock);
-	if (rc != RTEMS_SUCCESSFUL)
-		return -1;
-	return 0;
+  if ( !_System_state_Is_before_initialization( _System_state_Get() ) ) {
+    _API_Mutex_Unlock( &drvmgr.lock );
+  }
 }

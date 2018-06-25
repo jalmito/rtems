@@ -54,7 +54,7 @@ TEST_EXTERN rtems_name Queue_name[ 4 ];      /* array of queue names */
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS               4
@@ -96,6 +96,8 @@ TEST_EXTERN rtems_name Queue_name[ 4 ];      /* array of queue names */
    /* Q1 */ CONFIGURE_MESSAGE_BUFFERS_FOR_QUEUE( 2,  1030 )
 
 #define CONFIGURE_EXTRA_TASK_STACKS         (3 * RTEMS_MINIMUM_STACK_SIZE)
+
+#define CONFIGURE_DISABLE_SMP_CONFIGURATION
 
 #include <rtems/confdefs.h>
 

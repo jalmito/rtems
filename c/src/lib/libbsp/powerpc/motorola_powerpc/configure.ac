@@ -2,20 +2,17 @@
 
 AC_PREREQ([2.69])
 AC_INIT([rtems-c-src-lib-libbsp-powerpc-motorola_powerpc],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
-AC_CONFIG_SRCDIR([bsp_specs])
 RTEMS_TOP(../../../../../..)
+RTEMS_SOURCE_TOP
+RTEMS_BUILD_TOP
+RTEMS_BSP_LINKCMDS
 
 RTEMS_CANONICAL_TARGET_CPU
 AM_INIT_AUTOMAKE([no-define nostdinc foreign 1.12.2])
 RTEMS_BSP_CONFIGURE
 
-RTEMS_PROG_CC_FOR_TARGET
-RTEMS_CANONICALIZE_TOOLS
 RTEMS_CHECK_TOOL(NM,nm,no)
-RTEMS_PROG_CCAS
 
-RTEMS_CHECK_NETWORKING
-AM_CONDITIONAL(HAS_NETWORKING,test "$HAS_NETWORKING" = "yes")
 
 AS=$CC
 AM_PROG_AS
@@ -50,7 +47,21 @@ RTEMS_BSPOPTS_SET([qemu],[qemuprep*],[1])
 RTEMS_BSPOPTS_SET([qemu],[*],[])
 RTEMS_BSPOPTS_HELP([qemu],[Defined for QEMU BSP -- undefined for others])
 
-RTEMS_BSP_CLEANUP_OPTIONS(0, 0)
+RTEMS_BSPOPTS_SET([mpc750],[mcp750],[1])
+RTEMS_BSPOPTS_SET([mpc750],[*],[])
+RTEMS_BSPOPTS_HELP([mpc750],[Define when mpc750 -- undefined for others])
+
+RTEMS_BSPOPTS_SET([mpc603e],[mtx603e],[1])
+RTEMS_BSPOPTS_SET([mpc603e],[mvme2100],[1])
+RTEMS_BSPOPTS_SET([mpc603e],[*],[])
+RTEMS_BSPOPTS_HELP([mpc603e],[Define when ppc603e -- undefined for others])
+
+RTEMS_BSPOPTS_SET([__ppc_generic],[qemuprep],[1])
+RTEMS_BSPOPTS_SET([__ppc_generic],[qemuprep-altivec],[1])
+RTEMS_BSPOPTS_SET([__ppc_generic],[*],[])
+RTEMS_BSPOPTS_HELP([__ppc_generic],[Define when generic PPC -- undefined for others])
+
+RTEMS_BSP_CLEANUP_OPTIONS
 
 # Explicitly list all Makefiles here
 AC_CONFIG_FILES([Makefile])

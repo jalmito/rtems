@@ -17,7 +17,9 @@
   #include "config.h"
 #endif
 
-#include "imfs.h"
+#include <rtems/imfs.h>
+
+#include <sys/filio.h>
 
 #define JNODE2PIPE(_jnode)  ( ((IMFS_fifo_t *)(_jnode))->pipe )
 
@@ -100,9 +102,9 @@ static int IMFS_fifo_ioctl(
       err = -EFAULT;
     else {
       if (*(int *)buffer)
-        iop->flags |= LIBIO_FLAGS_NO_DELAY;
+        rtems_libio_iop_flags_set( iop, LIBIO_FLAGS_NO_DELAY );
       else
-        iop->flags &= ~LIBIO_FLAGS_NO_DELAY;
+        rtems_libio_iop_flags_clear( iop, LIBIO_FLAGS_NO_DELAY );
       return 0;
     }
   }
@@ -125,6 +127,7 @@ static const rtems_filesystem_file_handlers_r IMFS_fifo_handlers = {
   .fdatasync_h = rtems_filesystem_default_fsync_or_fdatasync,
   .fcntl_h = rtems_filesystem_default_fcntl,
   .kqfilter_h = rtems_filesystem_default_kqfilter,
+  .mmap_h = rtems_filesystem_default_mmap,
   .poll_h = rtems_filesystem_default_poll,
   .readv_h = rtems_filesystem_default_readv,
   .writev_h = rtems_filesystem_default_writev

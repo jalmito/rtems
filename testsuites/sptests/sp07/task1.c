@@ -13,11 +13,6 @@
 
 #include "system.h"
 
-/*
- * We know this is deprecated and don't want a warning on every BSP built.
- */
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-
 rtems_task Task_1(
   rtems_task_argument argument
 )
@@ -25,9 +20,6 @@ rtems_task Task_1(
   rtems_status_code   status;
   rtems_task_priority the_priority;
   rtems_task_priority previous_priority;
-  rtems_id            my_id;
-
-  my_id = rtems_task_self();
 
   rtems_test_pause();
 
@@ -44,14 +36,6 @@ rtems_task Task_1(
   );
 
   while( FOREVER ) {
-    status = rtems_task_get_note( my_id, RTEMS_NOTEPAD_8, &the_priority );
-    directive_failed( status, "rtems_task_get_note" );
-    printf(
-      "TA1 - rtems_task_get_note - get RTEMS_NOTEPAD_8 - "
-         "current priority: %02" PRIdrtems_task_priority "\n",
-      the_priority
-    );
-
     if ( --the_priority == 0 ) {
       puts( "TA1 - rtems_task_suspend - suspend TA2" );
       status = rtems_task_suspend( Task_id[ 2 ] );
@@ -67,14 +51,6 @@ rtems_task Task_1(
       status = rtems_task_delete( RTEMS_SELF );
       directive_failed( status, "rtems_task_delete of RTEMS_SELF" );
     }
-
-    printf(
-      "TA1 - rtems_task_set_note - set TA2's RTEMS_NOTEPAD_8: "
-          "%02" PRIdrtems_task_priority "\n",
-      the_priority
-    );
-    status = rtems_task_set_note( Task_id[ 2 ], RTEMS_NOTEPAD_8, the_priority );
-    directive_failed( status, "rtems_task_set_note" );
 
     printf(
       "TA1 - rtems_task_set_priority - set TA2's priority: "

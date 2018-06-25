@@ -153,12 +153,12 @@ static void test_rofs(void)
 
 static void Init(rtems_task_argument arg)
 {
-  TEST_BEGIN():
+  TEST_BEGIN();
 
   test_create_file_system();
   test_rofs();
 
-  TEST_END():
+  TEST_END();
   rtems_test_exit(0);
 }
 
@@ -169,7 +169,7 @@ rtems_ramdisk_config rtems_ramdisk_configuration [] = {
 size_t rtems_ramdisk_configuration_size = 1;
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_EXTRA_DRIVERS RAMDISK_DRIVER_TABLE_ENTRY
 #define CONFIGURE_APPLICATION_NEEDS_LIBBLOCK
 

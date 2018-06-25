@@ -60,7 +60,7 @@ bool enqueue_next_action(
     return false;
 
   termios_test_driver_set_rx_enqueue_now( true );
-  
+
   termios_test_driver_set_rx( &actions[Mouse_Index], to_enqueue );
   Mouse_Index += to_enqueue;
 
@@ -96,8 +96,7 @@ void printf_uid_message(
 )
 {
   uid_print_message_with_plugin(
-    stdout,
-    (rtems_printk_plugin_t)fprintf,
+    &rtems_test_printer,
     uid
   );
 }
@@ -135,16 +134,16 @@ rtems_task Init(
   TEST_BEGIN();
 
   open_it();
-  register_it(); 
+  register_it();
   do {
     more_data = enqueue_next_action(
       Mouse_Actions,
-      Mouse_Actions_Size, 
+      Mouse_Actions_Size,
       Mouse_Actions_Per_Iteration
     );
     receive_uid_message();
   } while (more_data);
-  close_it(); 
+  close_it();
   TEST_END();
   rtems_test_exit( 0 );
 }
@@ -156,13 +155,10 @@ rtems_task Init(
 
 /* NOTICE: the clock driver is explicitly disabled */
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_EXTRA_DRIVERS \
     TERMIOS_TEST_DRIVER_TABLE_ENTRY, \
     SERIAL_MOUSE_DRIVER_TABLE_ENTRY
-
-/* one for the console and one for the test port */
-#define CONFIGURE_NUMBER_OF_TERMIOS_PORTS 2
 
 /* we need to be able to open the test device and mouse */
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 5
@@ -179,6 +175,9 @@ rtems_task Init(
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
+
+#define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
+
 #define CONFIGURE_INIT
 
 #include <rtems/confdefs.h>

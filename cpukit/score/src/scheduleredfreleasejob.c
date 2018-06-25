@@ -18,30 +18,74 @@
 #include "config.h"
 #endif
 
-#include <rtems/score/scheduleredf.h>
-#include <rtems/score/threadimpl.h>
-#include <rtems/score/watchdogimpl.h>
+#include <rtems/score/scheduleredfimpl.h>
+
+Priority_Control _Scheduler_EDF_Map_priority(
+  const Scheduler_Control *scheduler,
+  Priority_Control         priority
+)
+{
+  return SCHEDULER_EDF_PRIO_MSB | SCHEDULER_PRIORITY_MAP( priority );
+}
+
+Priority_Control _Scheduler_EDF_Unmap_priority(
+  const Scheduler_Control *scheduler,
+  Priority_Control         priority
+)
+{
+  return SCHEDULER_PRIORITY_UNMAP( priority & ~SCHEDULER_EDF_PRIO_MSB );
+}
 
 void _Scheduler_EDF_Release_job(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread,
-  uint32_t                 deadline
+  Priority_Node           *priority_node,
+  uint64_t                 deadline,
+  Thread_queue_Context    *queue_context
 )
 {
-  Priority_Control new_priority;
-  Priority_Control unused;
-
   (void) scheduler;
 
-  if (deadline) {
-    /* Initializing or shifting deadline. */
-    new_priority = (_Watchdog_Ticks_since_boot + deadline)
-                   & ~SCHEDULER_EDF_PRIO_MSB;
-  }
-  else {
-    /* Switch back to background priority. */
-    new_priority = the_thread->Start.initial_priority;
+  _Thread_Wait_acquire_critical( the_thread, queue_context );
+
+  /*
+   * There is no integer overflow problem here due to the
+   * SCHEDULER_PRIORITY_MAP().  The deadline is in clock ticks.  With the
+   * minimum clock tick interval of 1us, the uptime is limited to about 146235
+   * years.
+   */
+  _Priority_Node_set_priority(
+    priority_node,
+    SCHEDULER_PRIORITY_MAP( deadline )
+  );
+
+  if ( _Priority_Node_is_active( priority_node ) ) {
+    _Thread_Priority_changed(
+      the_thread,
+      priority_node,
+      false,
+      queue_context
+    );
+  } else {
+    _Thread_Priority_add( the_thread, priority_node, queue_context );
   }
 
-  _Thread_Set_priority( the_thread, new_priority, &unused, true );
+  _Thread_Wait_release_critical( the_thread, queue_context );
+}
+
+void _Scheduler_EDF_Cancel_job(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *the_thread,
+  Priority_Node           *priority_node,
+  Thread_queue_Context    *queue_context
+)
+{
+  (void) scheduler;
+
+  _Thread_Wait_acquire_critical( the_thread, queue_context );
+
+  _Thread_Priority_remove( the_thread, priority_node, queue_context );
+  _Priority_Node_set_inactive( priority_node );
+
+  _Thread_Wait_release_critical( the_thread, queue_context );
 }

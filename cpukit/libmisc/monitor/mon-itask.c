@@ -35,7 +35,7 @@ rtems_monitor_init_task_canonical(
 
 const void *
 rtems_monitor_init_task_next(
-    void                  *object_info __attribute__((unused)),
+    void                  *object_info RTEMS_UNUSED,
     rtems_monitor_init_task_t *canonical_init_task,
     rtems_id              *next_id
 )
@@ -46,7 +46,7 @@ rtems_monitor_init_task_next(
     if (n >= Configuration_RTEMS_API.number_of_initialization_tasks)
         goto failed;
 
-    _Thread_Disable_dispatch();
+    _Objects_Allocator_lock();
 
     itask = Configuration_RTEMS_API.User_initialization_tasks_table + n;
 
@@ -68,7 +68,7 @@ failed:
 
 void
 rtems_monitor_init_task_dump_header(
-    bool verbose __attribute__((unused))
+    bool verbose RTEMS_UNUSED
 )
 {
     fprintf(stdout,"\

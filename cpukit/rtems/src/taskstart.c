@@ -21,66 +21,38 @@
 #include <rtems/rtems/tasks.h>
 #include <rtems/score/threadimpl.h>
 
-/*
- *  rtems_task_start
- *
- *  This directive readies the thread identified by the "id"
- *  based on its current priorty, to await execution.  A thread
- *  can be started only from the dormant state.
- *
- *  Input parameters:
- *    id          - thread id
- *    entry_point - start execution address of thread
- *    argument    - thread argument
- *
- *  Output parameters:
- *    RTEMS_SUCCESSFUL - if successful
- *    error code        - if unsuccessful
- */
-
 rtems_status_code rtems_task_start(
-  rtems_id         	id,
-  rtems_task_entry 	entry_point,
-  rtems_task_argument	argument
+  rtems_id            id,
+  rtems_task_entry    entry_point,
+  rtems_task_argument argument
 )
 {
-  Thread_Control          *the_thread;
-  Objects_Locations        location;
-  bool                     successfully_started;
-
-  if ( entry_point == NULL )
-    return RTEMS_INVALID_ADDRESS;
-
-  the_thread = _Thread_Get( id, &location );
-  switch ( location ) {
-
-    case OBJECTS_LOCAL:
-      successfully_started = _Thread_Start(
-        the_thread,
-        THREAD_START_NUMERIC,
-        entry_point,
-        NULL,
-        argument,
-        NULL
-      );
-
-      _Objects_Put( &the_thread->Object );
-
-      if ( successfully_started ) {
-        return RTEMS_SUCCESSFUL;
-      } else {
-        return RTEMS_INCORRECT_STATE;
+  Thread_Entry_information entry = {
+    .adaptor = _Thread_Entry_adaptor_numeric,
+    .Kinds = {
+      .Numeric = {
+        .entry = entry_point,
+        .argument = argument
       }
+    }
+  };
+  Thread_Control   *the_thread;
+  ISR_lock_Context  lock_context;
+  bool              ok;
 
+  the_thread = _Thread_Get( id, &lock_context );
+
+  if ( the_thread == NULL ) {
 #if defined(RTEMS_MULTIPROCESSING)
-    case OBJECTS_REMOTE:
-      _Thread_Dispatch();
+    if ( _Thread_MP_Is_remote( id ) ) {
       return RTEMS_ILLEGAL_ON_REMOTE_OBJECT;
+    }
 #endif
 
-    case OBJECTS_ERROR:
-      break;
+    return RTEMS_INVALID_ID;
   }
 
-  return RTEMS_INVALID_ID;
+  ok = _Thread_Start( the_thread, &entry, &lock_context );
+
+  return ok ? RTEMS_SUCCESSFUL : RTEMS_INCORRECT_STATE;
 }

@@ -121,7 +121,7 @@ static void test_report_xml(void)
   sc = rtems_task_wake_after(3);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-  rv = rtems_profiling_report_xml("X", rtems_printf_plugin, NULL, 1, "  ");
+  rv = rtems_profiling_report_xml("X", &rtems_test_printer, 1, "  ");
   printf("characters produced by rtems_profiling_report_xml(): %i\n", rv);
 }
 
@@ -138,7 +138,7 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS 1
 

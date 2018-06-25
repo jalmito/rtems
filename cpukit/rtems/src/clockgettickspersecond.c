@@ -19,11 +19,10 @@
 #endif
 
 #include <rtems/rtems/clock.h>
-#include <rtems/score/todimpl.h>
-#include <rtems/config.h>
+
+#undef rtems_clock_get_ticks_per_second
 
 rtems_interval rtems_clock_get_ticks_per_second(void)
 {
-  return TOD_MICROSECONDS_PER_SECOND /
-    rtems_configuration_get_microseconds_per_tick();
+  return _Watchdog_Ticks_per_second;
 }

@@ -19,42 +19,41 @@
 #endif
 
 #include <rtems/score/corebarrierimpl.h>
-#include <rtems/score/isrlevel.h>
 #include <rtems/score/statesimpl.h>
-#include <rtems/score/threadqimpl.h>
+#include <rtems/score/threadimpl.h>
 
-void _CORE_barrier_Wait(
-  CORE_barrier_Control                *the_barrier,
-  Thread_Control                      *executing,
-  Objects_Id                           id,
-  bool                                 wait,
-  Watchdog_Interval                    timeout,
-  CORE_barrier_API_mp_support_callout  api_barrier_mp_support
+Status_Control _CORE_barrier_Seize(
+  CORE_barrier_Control *the_barrier,
+  Thread_Control       *executing,
+  bool                  wait,
+  Thread_queue_Context *queue_context
 )
 {
-  ISR_lock_Context lock_context;
+  uint32_t number_of_waiting_threads;
 
-  executing->Wait.return_code = CORE_BARRIER_STATUS_SUCCESSFUL;
-  _Thread_queue_Acquire( &the_barrier->Wait_queue, &lock_context );
-  the_barrier->number_of_waiting_threads++;
-  if ( _CORE_barrier_Is_automatic( &the_barrier->Attributes ) ) {
-    if ( the_barrier->number_of_waiting_threads ==
-	 the_barrier->Attributes.maximum_count) {
-      executing->Wait.return_code = CORE_BARRIER_STATUS_AUTOMATICALLY_RELEASED;
-      _Thread_queue_Release( &the_barrier->Wait_queue, &lock_context );
-      _CORE_barrier_Release( the_barrier, id, api_barrier_mp_support );
-      return;
-    }
+  _CORE_barrier_Acquire_critical( the_barrier, queue_context );
+
+  number_of_waiting_threads = the_barrier->number_of_waiting_threads;
+  ++number_of_waiting_threads;
+
+  if (
+    _CORE_barrier_Is_automatic( &the_barrier->Attributes )
+      && number_of_waiting_threads == the_barrier->Attributes.maximum_count
+  ) {
+    _CORE_barrier_Surrender( the_barrier, queue_context );
+    return STATUS_BARRIER_AUTOMATICALLY_RELEASED;
+  } else {
+    the_barrier->number_of_waiting_threads = number_of_waiting_threads;
+    _Thread_queue_Context_set_thread_state(
+      queue_context,
+      STATES_WAITING_FOR_BARRIER
+    );
+    _Thread_queue_Enqueue(
+      &the_barrier->Wait_queue.Queue,
+      CORE_BARRIER_TQ_OPERATIONS,
+      executing,
+      queue_context
+    );
+    return _Thread_Wait_get_status( executing );
   }
-
-  executing->Wait.id = id;
-
-  _Thread_queue_Enqueue_critical(
-    &the_barrier->Wait_queue,
-    executing,
-    STATES_WAITING_FOR_BARRIER,
-    timeout,
-    CORE_BARRIER_TIMEOUT,
-    &lock_context
-  );
 }

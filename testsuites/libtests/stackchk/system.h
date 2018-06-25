@@ -29,7 +29,7 @@ void blow_stack( void );
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define TASK_STACK_SIZE (RTEMS_MINIMUM_STACK_SIZE*3)
@@ -43,7 +43,7 @@ void blow_stack( void );
 
 void Fatal_extension(
   rtems_fatal_source source,
-  bool               is_internal,
+  bool               always_set_to_false,
   rtems_fatal_code   error
 );
 

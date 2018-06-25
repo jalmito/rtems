@@ -38,12 +38,12 @@ rtems_status_code rtems_event_receive(
     RTEMS_API_Control *api;
     Event_Control     *event;
 
-    executing = _Thread_Lock_acquire_default_for_executing( &lock_context );
+    executing = _Thread_Wait_acquire_default_for_executing( &lock_context );
     api = executing->API_Extensions[ THREAD_API_RTEMS ];
     event = &api->Event;
 
     if ( !_Event_sets_Is_empty( event_in ) ) {
-      _Event_Seize(
+      sc = _Event_Seize(
         event_in,
         option_set,
         ticks,
@@ -54,11 +54,9 @@ rtems_status_code rtems_event_receive(
         STATES_WAITING_FOR_EVENT,
         &lock_context
       );
-
-      sc = executing->Wait.return_code;
     } else {
       *event_out = event->pending_events;
-      _Thread_Lock_release_default( executing, &lock_context );
+      _Thread_Wait_release_default( executing, &lock_context );
       sc = RTEMS_SUCCESSFUL;
     }
   } else {

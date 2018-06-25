@@ -42,41 +42,35 @@
 
 #ifdef RTEMS_POSIX_API
   #include <rtems/posix/barrierimpl.h>
-  #include <rtems/posix/condimpl.h>
   #include <rtems/posix/mqueueimpl.h>
   #include <rtems/posix/muteximpl.h>
   #include <rtems/posix/psignal.h>
   #include <rtems/posix/pthreadimpl.h>
-  #include <rtems/posix/rwlockimpl.h>
   #include <rtems/posix/semaphoreimpl.h>
-  #include <rtems/posix/spinlockimpl.h>
   #include <rtems/posix/timerimpl.h>
 #endif
 
-static const Objects_Information *const objects_info_table[] = {
-  &_POSIX_Keys_Information,
-  &_Barrier_Information,
-  &_Extension_Information,
-  &_Message_queue_Information,
-  &_Partition_Information,
-  &_Rate_monotonic_Information,
-  &_Dual_ported_memory_Information,
-  &_Region_Information,
-  &_Semaphore_Information,
-  &_RTEMS_tasks_Information,
-  &_Timer_Information
+static const struct {
+  Objects_APIs api;
+  uint16_t cls;
+} objects_info_table[] = {
+  { OBJECTS_POSIX_API, OBJECTS_POSIX_KEYS },
+  { OBJECTS_CLASSIC_API, OBJECTS_RTEMS_BARRIERS },
+  { OBJECTS_CLASSIC_API, OBJECTS_RTEMS_EXTENSIONS },
+  { OBJECTS_CLASSIC_API, OBJECTS_RTEMS_MESSAGE_QUEUES },
+  { OBJECTS_CLASSIC_API, OBJECTS_RTEMS_PARTITIONS },
+  { OBJECTS_CLASSIC_API, OBJECTS_RTEMS_PERIODS },
+  { OBJECTS_CLASSIC_API, OBJECTS_RTEMS_PORTS },
+  { OBJECTS_CLASSIC_API, OBJECTS_RTEMS_REGIONS },
+  { OBJECTS_CLASSIC_API, OBJECTS_RTEMS_SEMAPHORES },
+  { OBJECTS_CLASSIC_API, OBJECTS_RTEMS_TASKS },
+  { OBJECTS_CLASSIC_API, OBJECTS_RTEMS_TIMERS }
   #ifdef RTEMS_POSIX_API
     ,
-    &_POSIX_Barrier_Information,
-    &_POSIX_Condition_variables_Information,
-    &_POSIX_Message_queue_Information,
-    &_POSIX_Message_queue_Information_fds,
-    &_POSIX_Mutex_Information,
-    &_POSIX_RWLock_Information,
-    &_POSIX_Semaphore_Information,
-    &_POSIX_Spinlock_Information,
-    &_POSIX_Threads_Information,
-    &_POSIX_Timer_Information
+    { OBJECTS_POSIX_API, OBJECTS_POSIX_MESSAGE_QUEUES },
+    { OBJECTS_POSIX_API, OBJECTS_POSIX_SEMAPHORES },
+    { OBJECTS_POSIX_API, OBJECTS_POSIX_THREADS },
+    { OBJECTS_POSIX_API, OBJECTS_POSIX_TIMERS }
   #endif
 };
 
@@ -87,7 +81,7 @@ static int open_files(void)
 
   rtems_libio_lock();
 
-  iop = rtems_libio_iop_freelist;
+  iop = rtems_libio_iop_free_head;
   while (iop != NULL) {
     ++free_count;
 
@@ -105,41 +99,29 @@ static void get_heap_info(Heap_Control *heap, Heap_Information_block *info)
   memset(&info->Stats, 0, sizeof(info->Stats));
 }
 
-static bool count_posix_key_value_pairs(
-  const RBTree_Node *node,
-  RBTree_Direction dir,
-  void *visitor_arg
-)
+static POSIX_Keys_Control *get_next_key(Objects_Id *id)
 {
-  uint32_t *count = visitor_arg;
-
-  (void) node;
-  (void) dir;
-
-  ++(*count);
-
-  return false;
+  return (POSIX_Keys_Control *)
+    _Objects_Get_next(*id, &_POSIX_Keys_Information, id);
 }
 
 static uint32_t get_active_posix_key_value_pairs(void)
 {
   uint32_t count = 0;
+  Objects_Id id = OBJECTS_ID_INITIAL_INDEX;
+  POSIX_Keys_Control *the_key;
 
-  _Thread_Disable_dispatch();
-  _RBTree_Iterate(
-    &_POSIX_Keys_Key_value_lookup_tree,
-    RBT_LEFT,
-    count_posix_key_value_pairs,
-    &count
-  );
-  _Thread_Enable_dispatch();
+  while ((the_key = get_next_key(&id)) != NULL ) {
+    count += _Chain_Node_count_unprotected(&the_key->Key_value_pairs);
+    _Objects_Allocator_unlock();
+  }
 
   return count;
 }
 
 void rtems_resource_snapshot_take(rtems_resource_snapshot *snapshot)
 {
-  uint32_t *active = &snapshot->active_posix_keys;
+  uint32_t *active;
   size_t i;
 
   memset(snapshot, 0, sizeof(*snapshot));
@@ -151,8 +133,19 @@ void rtems_resource_snapshot_take(rtems_resource_snapshot *snapshot)
   get_heap_info(RTEMS_Malloc_Heap, &snapshot->heap_info);
   get_heap_info(&_Workspace_Area, &snapshot->workspace_info);
 
+  active = &snapshot->active_posix_keys;
+
   for (i = 0; i < RTEMS_ARRAY_SIZE(objects_info_table); ++i) {
-    active [i] = _Objects_Active_count(objects_info_table[i]);
+    const Objects_Information *information;
+
+    information = _Objects_Get_information(
+      objects_info_table[i].api,
+      objects_info_table[i].cls
+    );
+
+    if (information != NULL) {
+      active[i] = _Objects_Active_count(information);
+    }
   }
 
   _RTEMS_Unlock_allocator();

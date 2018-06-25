@@ -55,7 +55,7 @@ void benchmark_pthread_setschedparam(void)
 
   status = pthread_getschedparam( pthread_self(), &policy, &param );
   rtems_test_assert( status == 0 );
-  
+
   /* Arbitrary priority, no other threads to preempt us so it doesn't matter. */
   param.sched_priority = 5;
   benchmark_timer_initialize();
@@ -69,7 +69,7 @@ void benchmark_pthread_setschedparam(void)
      1,       /* Only executed once */
      0,
      0
-  ); 
+  );
 }
 
 void *POSIX_Init(
@@ -88,7 +88,7 @@ void *POSIX_Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
 
 #define CONFIGURE_MAXIMUM_POSIX_THREADS     1

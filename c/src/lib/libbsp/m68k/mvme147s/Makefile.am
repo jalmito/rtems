@@ -1,60 +1,55 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
+include $(top_srcdir)/../../bsp.am
 
-include_bspdir = $(includedir)/bsp
+dist_project_lib_DATA = ../../../../../../bsps/m68k/mvme147s/start/bsp_specs
 
-dist_project_lib_DATA = bsp_specs
-
-include_HEADERS = include/bsp.h
-include_HEADERS += include/tm27.h
-
-nodist_include_HEADERS = include/bspopts.h
-nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
-DISTCLEANFILES = include/bspopts.h
 noinst_PROGRAMS =
 
-include_HEADERS += include/coverhd.h
 
 ## Zilog component header files
-include_rtems_zilogdir = $(includedir)/rtems/zilog
-include_rtems_zilog_HEADERS = ../../shared/include/zilog/z8530.h
 
-noinst_LIBRARIES = libbspstart.a
-libbspstart_a_SOURCES = ../../m68k/shared/start/start.S
+start.$(OBJEXT): ../../../../../../bsps/m68k/shared/start/start.S
+	$(CPPASCOMPILE) -o $@ -c $<
 project_lib_DATA = start.$(OBJEXT)
 
-dist_project_lib_DATA += startup/linkcmds
+project_lib_DATA += linkcmds
 
-noinst_LIBRARIES += libbsp.a
-libbsp_a_SOURCES =
+project_lib_LIBRARIES = librtemsbsp.a
+librtemsbsp_a_SOURCES =
 
 # startup
-libbsp_a_SOURCES += ../../shared/bspclean.c ../../shared/bsplibc.c \
-    ../../shared/bsppost.c ../../shared/bsppredriverhook.c \
-    startup/bspstart.c ../../shared/bootcard.c \
-    ../../shared/bsppretaskinghook.c ../../shared/setvec.c \
-    ../../shared/bspgetworkarea.c ../../shared/setvec.c \
-    ../../shared/sbrk.c ../../shared/gnatinstallhandler.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mvme147s/start/bspstart.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/setvec.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/setvec.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-empty.c
 # clock
-libbsp_a_SOURCES += ../mvme147/clock/ckinit.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mvme147/clock/ckinit.c
 # console
-libbsp_a_SOURCES += ../mvme147/console/console.c \
-    ../../shared/dummy_printk_support.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mvme147/console/console.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/printk-dummy.c
 # timer
-libbsp_a_SOURCES += ../mvme147/timer/timer.c ../mvme147/timer/timerisr.S
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mvme147/btimer/btimer.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mvme147/btimer/timerisr.S
 
 if HAS_MP
 # shmsupp
-libbsp_a_SOURCES += shmsupp/addrconv.c shmsupp/getcfg.c shmsupp/lock.c \
-    shmsupp/mpisr.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mvme147s/mpci/addrconv.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mvme147s/mpci/getcfg.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mvme147s/mpci/lock.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mvme147s/mpci/mpisr.c
 endif
 
-libbsp_a_LIBADD = \
-    ../../../libcpu/@RTEMS_CPU@/shared/cache.rel \
-    ../../../libcpu/@RTEMS_CPU@/shared/misc.rel
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/shared/cache/cache.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/shared/m68kidle.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/shared/memProbe.c
 
-EXTRA_DIST = times
 
-include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
+include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
+include $(srcdir)/../../../../../../bsps/m68k/mvme147s/headers.am

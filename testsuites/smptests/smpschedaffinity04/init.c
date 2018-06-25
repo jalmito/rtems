@@ -114,7 +114,7 @@ static void test(void)
   /* 
    * Verify the Init task is running on the max core.
    */ 
-  printf("Verify Init task is on cpu %ld\n",cpu_count-1);
+  printf("Verify Init task is on cpu %" PRIu32 "\n",cpu_count-1);
   cpu = rtems_get_current_processor();
   rtems_test_assert(cpu == (cpu_count-1));
 
@@ -162,13 +162,13 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
-
-#define CONFIGURE_SMP_APPLICATION
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_SCHEDULER_PRIORITY_AFFINITY_SMP
 
-#define CONFIGURE_SMP_MAXIMUM_PROCESSORS NUM_CPUS
+#define CONFIGURE_MAXIMUM_SEMAPHORES 1
+
+#define CONFIGURE_MAXIMUM_PROCESSORS NUM_CPUS
 
 #define CONFIGURE_MAXIMUM_TASKS          TASK_COUNT
 

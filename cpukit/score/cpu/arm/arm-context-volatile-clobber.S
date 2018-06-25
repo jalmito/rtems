@@ -20,7 +20,11 @@
 
 	.section	.text
 
+#ifdef __thumb__
 FUNCTION_THUMB_ENTRY(_CPU_Context_volatile_clobber)
+#else
+FUNCTION_ENTRY(_CPU_Context_volatile_clobber)
+#endif
 
 .macro clobber_register reg
 	sub	r0, r0, #1

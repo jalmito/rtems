@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -96,7 +97,7 @@ rtems_task Init(
   rtems_test_exit(0);
 }
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 6

@@ -16,8 +16,9 @@
   #include "config.h"
 #endif
 
+#include "tmacros.h"
+
 #include <rtems.h>
-#include <rtems/test.h>
 #include <rtems/score/smpimpl.h>
 
 #include <assert.h>
@@ -32,35 +33,37 @@ static void Init(rtems_task_argument arg)
 
 static void fatal_extension(
   rtems_fatal_source source,
-  bool is_internal,
+  bool always_set_to_false,
   rtems_fatal_code code
 )
 {
-  rtems_test_begink();
+  TEST_BEGIN();
 
   if (
     source == RTEMS_FATAL_SOURCE_SMP
-      && !is_internal
+      && !always_set_to_false
       && code == SMP_FATAL_BOOT_PROCESSOR_NOT_ASSIGNED_TO_SCHEDULER
   ) {
-    rtems_test_endk();
+    rtems_status_code sc;
+    rtems_id id;
+
+    sc = rtems_scheduler_ident_by_processor(0, &id);
+    assert(sc == RTEMS_INCORRECT_STATE);
+
+    TEST_END();
   }
 }
 
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_INITIAL_EXTENSIONS \
   { .fatal = fatal_extension }, \
   RTEMS_TEST_INITIAL_EXTENSION
 
-#define CONFIGURE_SMP_APPLICATION
+#define CONFIGURE_SCHEDULER_TABLE_ENTRIES
 
-#define CONFIGURE_SMP_MAXIMUM_PROCESSORS 1
-
-#define CONFIGURE_SCHEDULER_CONTROLS
-
-#define CONFIGURE_SMP_SCHEDULER_ASSIGNMENTS RTEMS_SCHEDULER_ASSIGN_NO_SCHEDULER
+#define CONFIGURE_SCHEDULER_ASSIGNMENTS RTEMS_SCHEDULER_ASSIGN_NO_SCHEDULER
 
 #define CONFIGURE_MAXIMUM_TASKS 1
 

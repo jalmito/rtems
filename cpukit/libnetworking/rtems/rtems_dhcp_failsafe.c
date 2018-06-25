@@ -63,7 +63,7 @@
 #include <rtems/rtems_dhcp_failsafe.h>
 
 struct  proc;                   /* Unused parameter of some functions. */
-#include <sys/ioctl.h>
+#include <sys/sockio.h>
 #include <sys/socket.h>
 #include <net/route.h>
 #include <netinet/in.h>         /* for sockaddr_in */
@@ -71,8 +71,6 @@ struct  proc;                   /* Unused parameter of some functions. */
 #include <net/if_var.h>         /* for in_var.h */
 #include <netinet/in_var.h>     /* for in_aliasreq */
 #include <sys/sockio.h>         /* for ioctl definitions */
-#include <arpa/inet.h>          /* for inet_addr, inet_ntop */
-
 
 static int network_fail_timeout = RTEMS_DHCP_FAILSAFE_NETWORK_FAIL_TIMEOUT;
 static int network_down_time = RTEMS_DHCP_FAILSAFE_NETWORK_DOWN_TIME;

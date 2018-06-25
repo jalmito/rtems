@@ -20,6 +20,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include <rtems/bspIo.h>
 #include <rtems/libio.h>
 #include <termios.h>
 #include <rtems/termiostypes.h>
@@ -169,7 +170,7 @@ rtems_device_driver serial_mouse_control(
   switch( args->command ) {
 
     case MW_UID_REGISTER_DEVICE:
-      printk( "SerialMouse: reg=%s\n", args->buffer );
+      printk( "SerialMouse: reg=%s\n", (const char*) args->buffer );
       mouse_parser_initialize( serial_mouse_type );
       break;
 

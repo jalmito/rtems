@@ -32,6 +32,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <rtems/rtems_netdb.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <errno.h>
@@ -370,7 +371,7 @@ nodata:
 int gethostbyname_r(const char*      name, 
         struct hostent*  result,
         char            *buf, 
-        int              buflen,
+        size_t           buflen,
         struct hostent **RESULT, 
         int             *h_errnop) 
 {
@@ -413,8 +414,13 @@ int gethostbyname_r(const char*      name,
 
   {
     struct hostent* r;
+    struct hostent* he_buf = (struct hostent *)buf;
+    char *work_buf = buf + sizeof(struct hostent);
+    size_t remain_len = buflen - sizeof(struct hostent);
+    int he_errno;
+
     sethostent(0);
-    while ((r=gethostent_r(buf,buflen))) {
+    while (gethostent_r(he_buf, work_buf, remain_len, &r, &he_errno) == 0) {
       int i;
       if (r->h_addrtype==AF_INET && !strcasecmp(r->h_name,name)) {  /* found it! */
 found:

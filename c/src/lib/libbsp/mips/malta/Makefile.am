@@ -4,87 +4,64 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
+include $(top_srcdir)/../../bsp.am
 
-include_bspdir = $(includedir)/bsp
+dist_project_lib_DATA = ../../../../../../bsps/mips/malta/start/bsp_specs
 
-dist_project_lib_DATA = bsp_specs
-
-include_HEADERS = include/bsp.h
-include_HEADERS += ../../shared/include/tm27.h
-include_bsp_HEADERS = ../shared/liblnk/regs.h
 #isr
-include_bsp_HEADERS += ../../shared/include/irq-generic.h
-include_bsp_HEADERS += ../../shared/include/irq-info.h
-include_bsp_HEADERS += include/irq.h
 #pci
-include_bsp_HEADERS += include/pci.h
 #irq
-include_bsp_HEADERS += ../shared/irq/i8259.h
-nodist_include_HEADERS = include/bspopts.h
-nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
-DISTCLEANFILES = include/bspopts.h
 
-nodist_include_HEADERS += ../../shared/include/coverhd.h
 
-noinst_LIBRARIES = libbspstart.a
-libbspstart_a_SOURCES = start/start.S ../shared/liblnk/regs.h
+start.$(OBJEXT): ../../../../../../bsps/mips/malta/start/start.S
+	$(CPPASCOMPILE) -o $@ -c $<
 project_lib_DATA = start.$(OBJEXT)
 
-dist_project_lib_DATA += startup/linkcmds
+project_lib_DATA += linkcmds
 
-noinst_LIBRARIES += libbsp.a
-libbsp_a_SOURCES =
+project_lib_LIBRARIES = librtemsbsp.a
+librtemsbsp_a_SOURCES =
 
 # startup
-libbsp_a_SOURCES += startup/simple_access.c
-libbsp_a_SOURCES += ../../shared/bspclean.c
-libbsp_a_SOURCES += ../../shared/bsplibc.c
-libbsp_a_SOURCES += ../../shared/bsppredriverhook.c
-libbsp_a_SOURCES += ../../shared/bsppost.c
-libbsp_a_SOURCES += ../../shared/bsppretaskinghook.c
-libbsp_a_SOURCES += ../../shared/bspgetworkarea.c
-libbsp_a_SOURCES += startup/bspstart.c
-libbsp_a_SOURCES += startup/bspreset.c
-libbsp_a_SOURCES += ../../shared/bootcard.c
-libbsp_a_SOURCES += ../../shared/sbrk.c
-libbsp_a_SOURCES += startup/inittlb.c
-libbsp_a_SOURCES += ../shared/startup/idttlb.S
+librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/malta/start/simple_access.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/malta/start/bspstart.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/malta/start/bspreset.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/malta/start/inittlb.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/start/idttlb.S
 
 # clock
-libbsp_a_SOURCES += ../shared/clock/clockdrv.c
-libbsp_a_SOURCES += ../shared/clock/mips_timer.S
-libbsp_a_SOURCES += ../../shared/clockdrv_shell.h
+librtemsbsp_a_SOURCES +=../../../../../../bsps/mips/shared/clock/clockdrv.c
+librtemsbsp_a_SOURCES +=../../../../../../bsps/mips/shared/clock/mips_timer.S
 
 # console
-libbsp_a_SOURCES += console/conscfg.c
-libbsp_a_SOURCES += console/printk_support.c
-libbsp_a_SOURCES += ../../shared/console.c
-libbsp_a_SOURCES += ../../shared/console_select.c
-libbsp_a_SOURCES += ../../shared/console_read.c
-libbsp_a_SOURCES += ../../shared/console_write.c
-libbsp_a_SOURCES += ../../shared/console_control.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console-control.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console-select.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/malta/console/conscfg.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/malta/console/printk_support.c
 # timer
-libbsp_a_SOURCES += ../../shared/timerstub.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/btimer/btimer-stub.c
 
-libbsp_a_LIBADD  = ../../../libcpu/@RTEMS_CPU@/shared/cache.rel
-libbsp_a_LIBADD += ../../../libcpu/@RTEMS_CPU@/shared/interrupts.rel
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/cache/nocache.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/irq/installisrentries.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/irq/isr_entries.S
 
 # pci
-libbsp_a_SOURCES += pci/pci.c
-libbsp_a_SOURCES += pci/pcifinddevice.c
-libbsp_a_SOURCES += pci/pcilistdevices.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/malta/pci/pci.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/pci/pci_find_device.c
 
 #isr
-libbsp_a_SOURCES += ../../shared/src/irq-generic.c
-libbsp_a_SOURCES += ../../shared/src/irq-legacy.c
-libbsp_a_SOURCES += ../../shared/src/irq-info.c
-libbsp_a_SOURCES += ../../shared/src/irq-shell.c
-libbsp_a_SOURCES += ../../shared/src/irq-server.c
-libbsp_a_SOURCES += ../shared/irq/vectorexceptions.c
-libbsp_a_SOURCES += ../shared/irq/irq.c
-libbsp_a_SOURCES += irq/vectorisrs.c
-libbsp_a_SOURCES += irq/interruptmask.c
-libbsp_a_SOURCES += ../shared/irq/i8259.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/irq/vectorexceptions.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/irq/irq.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/malta/irq/vectorisrs.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/malta/irq/interruptmask.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/irq/i8259.c
 
-include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
+include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
+include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
+include $(srcdir)/../../../../../../bsps/mips/malta/headers.am

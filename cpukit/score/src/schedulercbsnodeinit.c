@@ -22,16 +22,16 @@
 
 void _Scheduler_CBS_Node_initialize(
   const Scheduler_Control *scheduler,
-  Thread_Control          *the_thread
+  Scheduler_Node          *node,
+  Thread_Control          *the_thread,
+  Priority_Control         priority
 )
 {
-  Scheduler_CBS_Node *node = _Scheduler_CBS_Thread_get_node( the_thread );
+  Scheduler_CBS_Node *the_node;
 
-  (void) scheduler;
+  _Scheduler_EDF_Node_initialize( scheduler, node, the_thread, priority );
 
-  _Scheduler_Node_do_initialize( &node->Base.Base, the_thread );
-
-  node->Base.thread = the_thread;
-  node->Base.queue_state = SCHEDULER_EDF_QUEUE_STATE_NEVER_HAS_BEEN;
-  node->cbs_server = NULL;
+  the_node = _Scheduler_CBS_Node_downcast( node );
+  the_node->cbs_server = NULL;
+  the_node->deadline_node = NULL;
 }

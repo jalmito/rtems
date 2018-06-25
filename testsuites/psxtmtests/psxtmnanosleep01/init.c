@@ -32,9 +32,9 @@ void *POSIX_Init(
 
   TEST_BEGIN();
 
-  benchmark_timer_initialize();    
+  benchmark_timer_initialize();
     nanosleep( &sleepTime, (struct  timespec *) NULL );
-  end_time = benchmark_timer_read();  
+  end_time = benchmark_timer_read();
 
   put_time( "nanosleep: yield", end_time, 1, 0, 0 );
 
@@ -45,7 +45,7 @@ void *POSIX_Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
 
 #define CONFIGURE_MAXIMUM_POSIX_THREADS     1

@@ -18,40 +18,30 @@
 #include "config.h"
 #endif
 
-#include <rtems/system.h>
-#include <rtems/rtems/status.h>
-#include <rtems/rtems/support.h>
-#include <rtems/score/thread.h>
 #include <rtems/rtems/timerimpl.h>
-#include <rtems/score/watchdogimpl.h>
 
 rtems_status_code rtems_timer_delete(
   rtems_id id
 )
 {
-  Timer_Control     *the_timer;
-  Objects_Locations  location;
+  Timer_Control    *the_timer;
+  ISR_lock_Context  lock_context;
 
   _Objects_Allocator_lock();
-  the_timer = _Timer_Get( id, &location );
-  switch ( location ) {
 
-    case OBJECTS_LOCAL:
-      _Objects_Close( &_Timer_Information, &the_timer->Object );
-      _Timer_Cancel( the_timer );
-      _Objects_Put( &the_timer->Object );
-      _Timer_Free( the_timer );
-      _Objects_Allocator_unlock();
-      return RTEMS_SUCCESSFUL;
+  the_timer = _Timer_Get( id, &lock_context );
+  if ( the_timer != NULL ) {
+    Per_CPU_Control *cpu;
 
-#if defined(RTEMS_MULTIPROCESSING)
-    case OBJECTS_REMOTE:            /* should never return this */
-#endif
-    case OBJECTS_ERROR:
-      break;
+    _Objects_Close( &_Timer_Information, &the_timer->Object );
+    cpu = _Timer_Acquire_critical( the_timer, &lock_context );
+    _Timer_Cancel( cpu, the_timer );
+    _Timer_Release( cpu, &lock_context );
+    _Timer_Free( the_timer );
+    _Objects_Allocator_unlock();
+    return RTEMS_SUCCESSFUL;
   }
 
   _Objects_Allocator_unlock();
-
   return RTEMS_INVALID_ID;
 }

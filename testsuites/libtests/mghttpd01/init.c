@@ -28,14 +28,14 @@
 
 #include <rtems/imfs.h>
 #include <rtems/error.h>
-#include "init_fs.h"
+#include "mghttpd01_tar.h"
 
 #include "test-http-client.h"
 
 const char rtems_test_name[] = "MGHTTPD 1";
 
-#define TARFILE_START init_fs_tar
-#define TARFILE_SIZE  init_fs_tar_size
+#define TARFILE_START mghttpd01_tar
+#define TARFILE_SIZE  mghttpd01_tar_size
 
 #define CBACKTEST_URI   "/callbacktest.txt"
 #define CBACKTEST_TXT   "HTTP/1.1 200 OK\r\n" \
@@ -264,11 +264,11 @@ static void Init(rtems_task_argument arg)
 
   TEST_END();
 
-  rtems_test_exit(0); 
+  rtems_test_exit(0);
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_FILESYSTEM_IMFS
 
@@ -283,6 +283,7 @@ static void Init(rtems_task_argument arg)
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
 
 #define CONFIGURE_INIT_TASK_STACK_SIZE (16 * 1024)
+#define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
 
 #define CONFIGURE_INIT
 

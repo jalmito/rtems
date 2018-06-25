@@ -8,7 +8,7 @@ AC_DEFUN([RTEMS_BSP_CONFIGURE],
 
   RTEMS_CHECK_CUSTOM_BSP(RTEMS_BSP)
 
-  AC_CONFIG_HEADERS([include/bspopts.tmp:include/bspopts.h.in],[
+  AC_CONFIG_HEADERS([include/bspopts.tmp:bspopts.h.in],[
 echo "/* BSP dependent options file */"         >$tmp/config.h
 echo "/* automatically generated -- DO NOT EDIT!! */" >>$tmp/config.h
 echo                                                  >>$tmp/config.h
@@ -31,7 +31,19 @@ echo "#endif /* __BSP_OPTIONS_H */"                   >>$tmp/config.h
 ])
   RTEMS_PROJECT_ROOT
 
+  RTEMS_PROG_CC_FOR_TARGET
+  RTEMS_CANONICALIZE_TOOLS
+  RTEMS_PROG_CCAS
+
   RTEMS_CHECK_MULTIPROCESSING
+  RTEMS_CHECK_NETWORKING
+  RTEMS_CHECK_SMP
+
+  AM_CONDITIONAL(HAS_NETWORKING,test "$HAS_NETWORKING" = "yes")
+  AM_CONDITIONAL(HAS_SMP,test "$rtems_cv_HAS_SMP" = "yes")
 
   RTEMS_BSP_BOOTCARD_OPTIONS
+
+  RTEMS_BSPOPTS_HELP([RTEMS_BSP],[The RTEMS BSP name])
+  RTEMS_BSPOPTS_SET([RTEMS_BSP],[*],[$RTEMS_BSP])
 ])

@@ -20,13 +20,14 @@
 
 #include <rtems/system.h>
 #include <rtems/config.h>
+#include <rtems/sysinit.h>
 #include <rtems/rtems/status.h>
 #include <rtems/rtems/support.h>
-#include <rtems/score/isr.h>
 #include <rtems/rtems/ratemonimpl.h>
-#include <rtems/score/thread.h>
 
-void _Rate_monotonic_Manager_initialization(void)
+Objects_Information _Rate_monotonic_Information;
+
+static void _Rate_monotonic_Manager_initialization(void)
 {
   _Objects_Initialize_information(
     &_Rate_monotonic_Information,    /* object information table */
@@ -36,11 +37,13 @@ void _Rate_monotonic_Manager_initialization(void)
                                      /* maximum objects of this class */
     sizeof( Rate_monotonic_Control ),/* size of this object's control block */
     false,                           /* true if the name is a string */
-    RTEMS_MAXIMUM_NAME_LENGTH        /* maximum length of an object name */
-#if defined(RTEMS_MULTIPROCESSING)
-    ,
-    false,                           /* true if this is a global object class */
+    RTEMS_MAXIMUM_NAME_LENGTH,       /* maximum length of an object name */
     NULL                             /* Proxy extraction support callout */
-#endif
   );
 }
+
+RTEMS_SYSINIT_ITEM(
+  _Rate_monotonic_Manager_initialization,
+  RTEMS_SYSINIT_CLASSIC_RATE_MONOTONIC,
+  RTEMS_SYSINIT_ORDER_MIDDLE
+);

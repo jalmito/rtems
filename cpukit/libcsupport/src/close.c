@@ -24,14 +24,45 @@ int close(
   int  fd
 )
 {
-  rtems_libio_t      *iop;
-  int                 rc;
+  rtems_libio_t *iop;
+  unsigned int   flags;
+  int            rc;
 
-  rtems_libio_check_fd(fd);
-  iop = rtems_libio_iop(fd);
-  rtems_libio_check_is_open(iop);
+  if ( (uint32_t) fd >= rtems_libio_number_iops ) {
+    rtems_set_errno_and_return_minus_one( EBADF );
+  }
 
-  iop->flags &= ~LIBIO_FLAGS_OPEN;
+  iop = rtems_libio_iop( fd );
+  flags = rtems_libio_iop_flags( iop );
+
+  while ( true ) {
+    unsigned int desired;
+    bool         success;
+
+    if ( ( flags & LIBIO_FLAGS_OPEN ) == 0 ) {
+      rtems_set_errno_and_return_minus_one( EBADF );
+    }
+
+    /* The expected flags */
+    flags &= LIBIO_FLAGS_REFERENCE_INC - 1U;
+
+    desired = flags & ~LIBIO_FLAGS_OPEN;
+    success = _Atomic_Compare_exchange_uint(
+      &iop->flags,
+      &flags,
+      desired,
+      ATOMIC_ORDER_ACQ_REL,
+      ATOMIC_ORDER_RELAXED
+    );
+
+    if ( success ) {
+      break;
+    }
+
+    if ( ( flags & ~( LIBIO_FLAGS_REFERENCE_INC - 1U ) ) != 0 ) {
+      rtems_set_errno_and_return_minus_one( EBUSY );
+    }
+  }
 
   rc = (*iop->pathinfo.handlers->close_h)( iop );
 
@@ -51,7 +82,7 @@ int close(
 #include <reent.h>
 
 int _close_r(
-  struct _reent *ptr __attribute__((unused)),
+  struct _reent *ptr RTEMS_UNUSED,
   int            fd
 )
 {

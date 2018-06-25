@@ -508,20 +508,23 @@ void make_many_symlinks(
 )
 {
   int  i;
-  char name1[5];
-  char name2[5];
+  char name1[32];
+  char name2[32];
   char *link_file;
+
+  /* limit the link_count to ensure filename buffer doesn't overflow */
+  rtems_test_assert( link_count < 1000 );
 
   link_file = real_file;
   for (i=1; i < link_count; i++) {
-    sprintf( name1, "%d", i );
+    sprintf( name1, "%04d", i );
     make_a_symlink( link_file, name1 );
     strcpy( name2, name1 );
     link_file = name2;
   }
 
   for (i=1; i < link_count; i++) {
-    sprintf( name1, "%d", i );
+    sprintf( name1, "%04d", i );
     stat_a_file( name1 );
     lstat_a_file( name1 );
   }

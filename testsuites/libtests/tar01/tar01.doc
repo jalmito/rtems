@@ -14,6 +14,8 @@ directives:
 
   + Untar_FromMemory
   + Untar_FromFile
+  + Untar_ChunksFromMemory
+  + Untar_UnzipTgz
 
 concepts:
 

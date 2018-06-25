@@ -90,10 +90,10 @@ typedef struct{
  uint32_t	FSM_WR_ENA;	// FSM Register Write Enable Register Section 7.10.31
  uint32_t 	NOTUSED_46[11];
  uint32_t	EEPROM_CONFIG;	// EEPROM Emulation Configuration Register Section 7.10.32
- uint32_t 	NOTUSED_48;
+ uint32_t 	NOTUSED_49;
  uint32_t	FSM_SECTOR1;	// FSM Sector Register 1 Section 7.10.33
  uint32_t	FSM_SECTOR2;	// FSM Sector Register 2 Section 7.10.34
- uint32_t 	NOTUSED_49[78];
+ uint32_t 	NOTUSED_50[78];
  uint32_t	FCFG_BANK;	//Flash Bank Configuration Register	Section 7.10.35
 } tms570_flash_t;
 

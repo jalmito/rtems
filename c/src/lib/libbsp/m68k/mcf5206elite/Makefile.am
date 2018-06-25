@@ -1,65 +1,53 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
+include $(top_srcdir)/../../bsp.am
 
-include_bspdir = $(includedir)/bsp
+dist_project_lib_DATA = ../../../../../../bsps/m68k/mcf5206elite/start/bsp_specs
 
-dist_project_lib_DATA = bsp_specs
-
-include_HEADERS = include/bsp.h
-include_HEADERS += include/tm27.h
-
-nodist_include_HEADERS = include/bspopts.h
-nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
-DISTCLEANFILES = include/bspopts.h
-
-SUBDIRS = . tools
-
-include_HEADERS += include/coverhd.h
-include_HEADERS += include/i2c.h
-include_HEADERS += include/i2cdrv.h
-include_HEADERS += include/ds1307.h
-include_HEADERS += include/nvram.h
-
-EXTRA_DIST = times
-
-noinst_LIBRARIES = libbspstart.a
-libbspstart_a_SOURCES = start/start.S
+start.$(OBJEXT): ../../../../../../bsps/m68k/mcf5206elite/start/start.S
+	$(CPPASCOMPILE) -o $@ -c $<
 project_lib_DATA = start.$(OBJEXT)
 
-dist_project_lib_DATA += startup/linkcmds startup/gdbinit \
-    startup/linkcmds.flash
+project_lib_DATA += linkcmds
+dist_project_lib_DATA += ../../../../../../bsps/m68k/mcf5206elite/start/linkcmds.flash
 
-noinst_LIBRARIES += libbsp.a
-libbsp_a_SOURCES =
+dist_project_lib_DATA += ../../../../../../bsps/m68k/mcf5206elite/start/gdbinit
+
+project_lib_LIBRARIES = librtemsbsp.a
+librtemsbsp_a_SOURCES =
 
 # startup
-libbsp_a_SOURCES += ../../shared/bspclean.c ../../shared/bsplibc.c \
-    ../../shared/bsppredriverhook.c ../../shared/bspgetworkarea.c \
-    ../../shared/bsppost.c ../../shared/bsppretaskinghook.c \
-    ../../shared/bspstart.c startup/init5206e.c ../../shared/bootcard.c \
-    ../../shared/sbrk.c ../../shared/setvec.c \
-    ../../shared/gnatinstallhandler.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspstart-empty.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf5206elite/start/init5206e.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/setvec.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-empty.c
 # console
-libbsp_a_SOURCES += console/console.c ../../shared/dummy_printk_support.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf5206elite/console/console.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/printk-dummy.c
 # i2c
-libbsp_a_SOURCES += i2c/i2c.c i2c/i2cdrv.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf5206elite/i2c/i2c.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf5206elite/i2c/i2cdrv.c
 # tod
-libbsp_a_SOURCES += tod/ds1307.c tod/todcfg.c ../../shared/tod.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf5206elite/rtc/ds1307.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf5206elite/rtc/todcfg.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/rtc/rtc-support.c
 # nvram
-libbsp_a_SOURCES += nvram/nvram.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf5206elite/nvram/nvram.c
 
-# Cache
-libbsp_a_SOURCES += ../../../libcpu/shared/src/cache_manager.c
-libbsp_a_SOURCES += ../../shared/include/cache_.h
-libbsp_a_CPPFLAGS = -I$(srcdir)/../../shared/include
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/cache/nocache.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/shared/m68kidle.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/shared/memProbe.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf5206elite/dev/ckinit.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf5206elite/dev/mcfmbus.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf5206elite/dev/mcfuart.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf5206elite/dev/timer.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/mcf5206elite/dev/timerisr.S
 
-libbsp_a_LIBADD = \
-    ../../../libcpu/@RTEMS_CPU@/shared/misc.rel \
-    ../../../libcpu/@RTEMS_CPU@/mcf5206/clock.rel \
-    ../../../libcpu/@RTEMS_CPU@/mcf5206/mcfuart.rel \
-    ../../../libcpu/@RTEMS_CPU@/mcf5206/timer.rel \
-    ../../../libcpu/@RTEMS_CPU@/mcf5206/mbus.rel
-
-include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
+include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
+include $(srcdir)/../../../../../../bsps/m68k/mcf5206elite/headers.am

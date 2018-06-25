@@ -20,7 +20,6 @@
 
 #include <rtems/system.h>
 #include <rtems/config.h>
-#include <rtems/score/apiext.h>
 #include <rtems/score/copyrt.h>
 #include <rtems/rtems/clock.h>
 #include <rtems/rtems/tasksimpl.h>
@@ -73,7 +72,6 @@ void print_formula(void);
  *
  * #include <rtems/copyrt.h>
  * #include <rtems/tables.h>
- * #include <rtems/sptables.h>
  */
 #define  HEAP_OVHD        16    /* wasted heap space per task stack */
 #define  NAME_PTR_SIZE     8    /* size of name and pointer table entries */
@@ -243,8 +241,6 @@ sys_req = SYSTEM_TASKS        +     /* MPCI Receive Server and IDLE */
 uninitialized =
 /*address.h*/   0                                         +
 
-/*apiext.h*/    (sizeof _API_extensions_List)             +
-
 /*asr.h*/       0                                         +
 
 /*attr.h*/      0                                         +
@@ -263,8 +259,6 @@ uninitialized =
 /*context.h*/   (sizeof _Thread_Dispatch_necessary)        +
 
 /*copyrt.h*/    0                                         +
-
-/*debug.h*/     (sizeof _Debug_Level)                     +
 
 /*dpmemimpl.h*/ (sizeof _Dual_ported_memory_Information)  +
 
@@ -321,11 +315,6 @@ uninitialized =
                 (sizeof _Objects_Maximum_nodes)           +
                 (sizeof _Objects_Information_table)       +
 
-#if defined(RTEMS_MULTIPROCESSING)
-/*objectmp.h*/  (sizeof _Objects_MP_Maximum_global_objects) +
-                (sizeof _Objects_MP_Inactive_global_objects) +
-#endif
-
 /*options.h*/   0                                         +
 
 /*partimpl.h*/  (sizeof _Partition_Information)           +
@@ -381,11 +370,6 @@ uninitialized =
 #endif
                 (sizeof _Thread_Internal_information)     +
 
-#if defined(RTEMS_MULTIPROCESSING)
-/*threadmp.h*/  (sizeof _Thread_MP_Active_proxies)        +
-                (sizeof _Thread_MP_Inactive_proxies)      +
-#endif
-
 /*threadq.h*/
 
 /*timerimpl.h*/ (sizeof _Timer_Information)               +
@@ -397,8 +381,6 @@ uninitialized =
 /*userext.h*/   (sizeof _User_extensions_List)            +
 
 /*watchdog.h*/  (sizeof _Watchdog_Ticks_since_boot)       +
-                (sizeof _Watchdog_Ticks_header)           +
-                (sizeof _Watchdog_Seconds_header)         +
 
 /*wkspace.h*/   (sizeof _Workspace_Area);
 
@@ -428,8 +410,7 @@ uninitialized += (sizeof _CPU_Interrupt_stack_low) +
 
 /* cpu.h */
 uninitialized += (sizeof _CPU_Interrupt_stack_low) +
-                 (sizeof _CPU_Interrupt_stack_high) +
-                 (sizeof _CPU_Null_fp_context);
+                 (sizeof _CPU_Interrupt_stack_high);
 
 #endif
 
@@ -457,7 +438,7 @@ initialized +=
 /*copyrt.h*/    (strlen(_Copyright_Notice)+1)             +
 
 #if defined(RTEMS_MULTIPROCESSING)
-/*sptables.h*/  (sizeof _Initialization_Default_multiprocessing_table)  +
+                (sizeof _Initialization_Default_multiprocessing_table)  +
 #endif
                 (strlen(_RTEMS_version)+1);
 

@@ -12,6 +12,7 @@
 #endif
 
 #include <tmacros.h>
+
 #include "test_support.h"
 #include <errno.h>
 #include <rtems/error.h>
@@ -23,16 +24,16 @@ rtems_task Init(rtems_task_argument argument);
 
 static void fatal_extension(
   rtems_fatal_source source,
-  bool is_internal,
+  bool always_set_to_false,
   rtems_fatal_code error
 )
 {
   if (
     source == RTEMS_FATAL_SOURCE_EXIT
-      && !is_internal
+      && !always_set_to_false
       && error == 1
   ) {
-    rtems_test_endk();
+    TEST_END();
   }
 }
 
@@ -44,7 +45,7 @@ rtems_task Init(
 
   errno = ENOMEM;
   rtems_error(
-    RTEMS_NO_MEMORY | RTEMS_ERROR_ABORT, 
+    RTEMS_NO_MEMORY | RTEMS_ERROR_ABORT,
     "Dummy: Resources unavailable\n"
   );
 
@@ -53,7 +54,7 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS             1
@@ -61,6 +62,8 @@ rtems_task Init(
   { .fatal = fatal_extension }, RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
+
+#define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
 
 #define CONFIGURE_INIT
 

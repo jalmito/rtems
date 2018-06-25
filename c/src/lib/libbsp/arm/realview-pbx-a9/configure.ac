@@ -7,19 +7,16 @@
 
 AC_PREREQ([2.69])
 AC_INIT([rtems-c-src-lib-libbsp-arm-realview-bpx-a9],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
-AC_CONFIG_SRCDIR([bsp_specs])
 RTEMS_TOP(../../../../../..)
+RTEMS_SOURCE_TOP
+RTEMS_BUILD_TOP
+RTEMS_BSP_LINKCMDS
 
 RTEMS_CANONICAL_TARGET_CPU
 AM_INIT_AUTOMAKE([no-define nostdinc foreign 1.12.2])
 RTEMS_BSP_CONFIGURE
 
-RTEMS_PROG_CC_FOR_TARGET
-RTEMS_CANONICALIZE_TOOLS
-RTEMS_PROG_CCAS
 
-RTEMS_CHECK_NETWORKING
-AM_CONDITIONAL(HAS_NETWORKING,test "$HAS_NETWORKING" = "yes")
 
 RTEMS_BSPOPTS_SET([BSP_START_RESET_VECTOR],[*],[])
 RTEMS_BSPOPTS_HELP([BSP_START_RESET_VECTOR],[reset vector address for BSP start])
@@ -41,11 +38,13 @@ RTEMS_BSPOPTS_HELP([CLOCK_DRIVER_USE_FAST_IDLE],
 occurs while the IDLE thread is executing.  This can significantly reduce
 simulation times.])
 
-RTEMS_CHECK_SMP
-AM_CONDITIONAL(HAS_SMP,[test "$rtems_cv_HAS_SMP" = "yes"])
+RTEMS_BSPOPTS_SET([CLOCK_DRIVER_USE_ONLY_BOOT_PROCESSOR],[*qemu*],[1])
+RTEMS_BSPOPTS_HELP([CLOCK_DRIVER_USE_ONLY_BOOT_PROCESSOR],
+[If defined, then do the clock tick processing on the boot processor on behalf
+of all other processors.])
 
-RTEMS_BSP_CLEANUP_OPTIONS(0, 1)
-RTEMS_BSP_LINKCMDS
+
+RTEMS_BSP_CLEANUP_OPTIONS
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

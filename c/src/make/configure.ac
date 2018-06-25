@@ -8,11 +8,13 @@ AC_PREREQ([2.69])
 AC_INIT([rtems-c-src-make],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
 AC_CONFIG_SRCDIR([bsp.cfg.in])
 RTEMS_TOP(../../..)
+RTEMS_SOURCE_TOP
+RTEMS_BUILD_TOP
 AC_SUBST(RTEMS_TOPdir,../../..)
 
 RTEMS_CANONICAL_TARGET_CPU
 
-AM_INIT_AUTOMAKE([no-define foreign 1.12.2])
+AM_INIT_AUTOMAKE([no-define foreign subdir-objects 1.12.2])
 AM_MAINTAINER_MODE
 
 RTEMS_VERSIONING

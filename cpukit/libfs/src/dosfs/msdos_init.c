@@ -25,7 +25,7 @@
 #endif
 
 #include <rtems/libio_.h>
-#include "dosfs.h"
+#include <rtems/dosfs.h>
 #include "msdos.h"
 
 static int msdos_clone_node_info(rtems_filesystem_location_info_t *loc)
@@ -75,24 +75,12 @@ const rtems_filesystem_operations_table  msdos_ops = {
 
 void msdos_lock(const rtems_filesystem_mount_table_entry_t *mt_entry)
 {
-  msdos_fs_info_t *fs_info = mt_entry->fs_info;
-  rtems_status_code sc = rtems_semaphore_obtain(
-    fs_info->vol_sema,
-    RTEMS_WAIT,
-    RTEMS_NO_TIMEOUT
-  );
-  if (sc != RTEMS_SUCCESSFUL) {
-    rtems_fatal_error_occurred(0xdeadbeef);
-  }
+  msdos_fs_lock(mt_entry->fs_info);
 }
 
 void msdos_unlock(const rtems_filesystem_mount_table_entry_t *mt_entry)
 {
-  msdos_fs_info_t *fs_info = mt_entry->fs_info;
-  rtems_status_code sc = rtems_semaphore_release(fs_info->vol_sema);
-  if (sc != RTEMS_SUCCESSFUL) {
-    rtems_fatal_error_occurred(0xdeadbeef);
-  }
+  msdos_fs_unlock(mt_entry->fs_info);
 }
 
 /* msdos_initialize --

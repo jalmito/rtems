@@ -18,15 +18,52 @@
 #include "config.h"
 #endif
 
-#include <errno.h>
-#include <pthread.h>
-
-#include <rtems/system.h>
-#include <rtems/score/coremuteximpl.h>
-#include <rtems/score/watchdog.h>
 #include <rtems/posix/muteximpl.h>
+#include <rtems/posix/posixapi.h>
 #include <rtems/posix/priorityimpl.h>
-#include <rtems/posix/time.h>
+#include <rtems/score/schedulerimpl.h>
+
+#include <limits.h>
+
+RTEMS_STATIC_ASSERT(
+  offsetof( POSIX_Mutex_Control, flags )
+    == offsetof( pthread_mutex_t, _flags ),
+  POSIX_MUTEX_CONTROL_FLAGS
+);
+
+RTEMS_STATIC_ASSERT(
+  offsetof( POSIX_Mutex_Control, Recursive )
+    == offsetof( pthread_mutex_t, _Recursive ),
+  POSIX_MUTEX_CONTROL_RECURSIVE
+);
+
+RTEMS_STATIC_ASSERT(
+  offsetof( POSIX_Mutex_Control, Priority_ceiling )
+    == offsetof( pthread_mutex_t, _Priority_ceiling ),
+  POSIX_MUTEX_CONTROL_SCHEDULER
+);
+
+RTEMS_STATIC_ASSERT(
+  offsetof( POSIX_Mutex_Control, scheduler )
+    == offsetof( pthread_mutex_t, _scheduler ),
+  POSIX_MUTEX_CONTROL_SCHEDULER
+);
+
+RTEMS_STATIC_ASSERT(
+  sizeof( POSIX_Mutex_Control ) == sizeof( pthread_mutex_t ),
+  POSIX_MUTEX_CONTROL_SIZE
+);
+
+const pthread_mutexattr_t _POSIX_Mutex_Default_attributes = {
+#if defined(_UNIX98_THREAD_MUTEX_ATTRIBUTES)
+  .type           = PTHREAD_MUTEX_DEFAULT,
+#endif
+  .is_initialized = true,
+  .process_shared = PTHREAD_PROCESS_PRIVATE,
+  .prio_ceiling   = INT_MAX,
+  .protocol       = PTHREAD_PRIO_NONE,
+  .recursive      = false
+};
 
 /**
  * 11.3.2 Initializing and Destroying a Mutex, P1003.1c/Draft 10, p. 87
@@ -40,10 +77,12 @@ int pthread_mutex_init(
   const pthread_mutexattr_t *attr
 )
 {
-  POSIX_Mutex_Control          *the_mutex;
-  CORE_mutex_Attributes        *the_mutex_attr;
-  const pthread_mutexattr_t    *the_attr;
-  CORE_mutex_Disciplines        the_discipline;
+  POSIX_Mutex_Control       *the_mutex;
+  const pthread_mutexattr_t *the_attr;
+  POSIX_Mutex_Protocol       protocol;
+  unsigned long              flags;
+  Priority_Control           priority;
+  const Scheduler_Control   *scheduler;
 
   if ( attr ) the_attr = attr;
   else        the_attr = &_POSIX_Mutex_Default_attributes;
@@ -53,84 +92,41 @@ int pthread_mutex_init(
     return EINVAL;
 
   /*
-   *  This code should eventually be removed.
-   *
-   *  Although the POSIX specification says:
+   *  The POSIX specification says:
    *
    *  "Attempting to initialize an already initialized mutex results
    *  in undefined behavior."
    *
    *  Trying to keep the caller from doing the create when *mutex
    *  is actually a valid ID causes grief.  All it takes is the wrong
-   *  value in an uninitialized variable to make this fail.  As best
-   *  I can tell, RTEMS was the only pthread implementation to choose
-   *  this option for "undefined behavior" and doing so has created
-   *  portability problems.  In particular, Rosimildo DaSilva
-   *  <rdasilva@connecttel.com> saw seemingly random failures in the
-   *  RTEMS port of omniORB2 when this code was enabled.
+   *  value in an uninitialized variable to make this fail.
    *
-   *  Joel Sherrill <joel@OARcorp.com>     14 May 1999
-   *  NOTE: Be careful to avoid infinite recursion on call to this
-   *        routine in _POSIX_Mutex_Get.
+   *  Thus, we do not look at *mutex.
    */
-  #if 0
-  {
-    POSIX_Mutex_Control *mutex_in_use;
-    Objects_Locations    location;
-
-    if ( *mutex != PTHREAD_MUTEX_INITIALIZER ) {
-
-      /* EBUSY if *mutex is a valid id */
-
-      mutex_in_use = _POSIX_Mutex_Get( mutex, &location );
-      switch ( location ) {
-        case OBJECTS_LOCAL:
-          _Objects_Put( &mutex_in_use->Object );
-          return EBUSY;
-        #if defined(RTEMS_MULTIPROCESSING)
-          case OBJECTS_REMOTE:
-        #endif
-        case OBJECTS_ERROR:
-          break;
-      }
-    }
-  }
-  #endif
 
   if ( !the_attr->is_initialized )
     return EINVAL;
 
-  /*
-   *  We only support process private mutexes.
-   */
-  if ( the_attr->process_shared == PTHREAD_PROCESS_SHARED )
-    return ENOSYS;
-
-  if ( the_attr->process_shared != PTHREAD_PROCESS_PRIVATE )
+  if ( !_POSIX_Is_valid_pshared( the_attr->process_shared ) ) {
     return EINVAL;
+  }
 
   /*
    *  Determine the discipline of the mutex
    */
   switch ( the_attr->protocol ) {
     case PTHREAD_PRIO_NONE:
-      the_discipline = CORE_MUTEX_DISCIPLINES_FIFO;
+      protocol = POSIX_MUTEX_NO_PROTOCOL;
       break;
     case PTHREAD_PRIO_INHERIT:
-      the_discipline = CORE_MUTEX_DISCIPLINES_PRIORITY_INHERIT;
+      protocol = POSIX_MUTEX_PRIORITY_INHERIT;
       break;
     case PTHREAD_PRIO_PROTECT:
-      the_discipline = CORE_MUTEX_DISCIPLINES_PRIORITY_CEILING;
+      protocol = POSIX_MUTEX_PRIORITY_CEILING;
       break;
     default:
       return EINVAL;
   }
-
-  /*
-   *  Validate the priority ceiling field -- should always be valid.
-   */
-  if ( !_POSIX_Priority_Is_valid( the_attr->prio_ceiling ) )
-    return EINVAL;
 
 #if defined(_UNIX98_THREAD_MUTEX_ATTRIBUTES)
   /*
@@ -149,35 +145,44 @@ int pthread_mutex_init(
   }
 #endif
 
-  the_mutex = _POSIX_Mutex_Allocate();
+  the_mutex = _POSIX_Mutex_Get( mutex );
 
-  if ( !the_mutex ) {
-    _Objects_Allocator_unlock();
-    return EAGAIN;
+  flags = (uintptr_t) the_mutex ^ POSIX_MUTEX_MAGIC;
+  flags &= ~POSIX_MUTEX_FLAGS_MASK;
+  flags |= protocol;
+
+  if ( the_attr->type == PTHREAD_MUTEX_RECURSIVE ) {
+    flags |= POSIX_MUTEX_RECURSIVE;
   }
 
-  the_mutex->process_shared = the_attr->process_shared;
+  the_mutex->flags = flags;
 
-  the_mutex_attr = &the_mutex->Mutex.Attributes;
+  if ( protocol == POSIX_MUTEX_PRIORITY_CEILING ) {
+    int  prio_ceiling;
+    bool valid;
 
-  if ( the_attr->type == PTHREAD_MUTEX_RECURSIVE )
-    the_mutex_attr->lock_nesting_behavior = CORE_MUTEX_NESTING_ACQUIRES;
-  else
-    the_mutex_attr->lock_nesting_behavior = CORE_MUTEX_NESTING_IS_ERROR;
-  the_mutex_attr->only_owner_release = true;
-  the_mutex_attr->priority_ceiling =
-    _POSIX_Priority_To_core( the_attr->prio_ceiling );
-  the_mutex_attr->discipline = the_discipline;
+    scheduler = _Thread_Scheduler_get_home( _Thread_Get_executing() );
+    prio_ceiling = the_attr->prio_ceiling;
 
-  /*
-   *  Must be initialized to unlocked.
-   */
-  _CORE_mutex_Initialize( &the_mutex->Mutex, NULL, the_mutex_attr, false );
+    if ( prio_ceiling == INT_MAX ) {
+      prio_ceiling = _POSIX_Priority_Get_maximum( scheduler );
+    }
 
-  _Objects_Open_u32( &_POSIX_Mutex_Information, &the_mutex->Object, 0 );
+    priority = _POSIX_Priority_To_core( scheduler, prio_ceiling, &valid );
+    if ( !valid ) {
+      return EINVAL;
+    }
+  } else {
+    priority = 0;
+    scheduler = NULL;
+  }
 
-  *mutex = the_mutex->Object.id;
-
-  _Objects_Allocator_unlock();
+  _Thread_queue_Queue_initialize(
+    &the_mutex->Recursive.Mutex.Queue.Queue,
+    NULL
+  );
+  the_mutex->Recursive.nest_level = 0;
+  _Priority_Node_initialize( &the_mutex->Priority_ceiling, priority );
+  the_mutex->scheduler = scheduler;
   return 0;
 }

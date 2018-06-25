@@ -7,10 +7,10 @@
  */
 
 /*
- * Copyright (c) 2012 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2012, 2017 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
- *  Obere Lagerstr. 30
+ *  Dornierstr. 4
  *  82178 Puchheim
  *  Germany
  *  <rtems@embedded-brains.de>
@@ -27,7 +27,16 @@
 #include <rtems/config.h>
 #include <rtems/score/userextimpl.h>
 
-CHAIN_DEFINE_EMPTY( _User_extensions_List );
+#include <pthread.h>
+
+User_extensions_List _User_extensions_List = {
+  CHAIN_INITIALIZER_EMPTY( _User_extensions_List.Active ),
+  CHAIN_ITERATOR_REGISTRY_INITIALIZER( _User_extensions_List.Iterators )
+#if defined(RTEMS_SMP)
+  ,
+  ISR_LOCK_INITIALIZER( "User Extensions List" )
+#endif
+};
 
 void _User_extensions_Thread_create_visitor(
   Thread_Control              *executing,
@@ -120,7 +129,7 @@ void _User_extensions_Fatal_visitor(
   if ( callout != NULL ) {
     const User_extensions_Fatal_context *ctx = arg;
 
-    (*callout)( ctx->source, ctx->is_internal, ctx->error );
+    (*callout)( ctx->source, false, ctx->error );
   }
 }
 
@@ -139,32 +148,80 @@ void _User_extensions_Thread_terminate_visitor(
 }
 
 void _User_extensions_Iterate(
-  void                    *arg,
-  User_extensions_Visitor  visitor
+  void                     *arg,
+  User_extensions_Visitor   visitor,
+  Chain_Iterator_direction  direction
 )
 {
-  Thread_Control *executing = _Thread_Get_executing();
-  const User_extensions_Table *callouts_current =
-    rtems_configuration_get_user_extension_table();
-  const User_extensions_Table *callouts_end =
-    callouts_current + rtems_configuration_get_number_of_initial_extensions();
-  const Chain_Node *node;
-  const Chain_Node *tail;
+  Thread_Control              *executing;
+  const User_extensions_Table *initial_current;
+  const User_extensions_Table *initial_begin;
+  const User_extensions_Table *initial_end;
+  const Chain_Node            *end;
+  Chain_Node                  *node;
+  User_extensions_Iterator     iter;
+  ISR_lock_Context             lock_context;
 
-  while ( callouts_current != callouts_end ) {
-    (*visitor)( executing, arg, callouts_current );
+  executing = _Thread_Get_executing();
 
-    ++callouts_current;
+  initial_begin = rtems_configuration_get_user_extension_table();
+  initial_end =
+    initial_begin + rtems_configuration_get_number_of_initial_extensions();
+
+  if ( direction == CHAIN_ITERATOR_FORWARD ) {
+    initial_current = initial_begin;
+
+    while ( initial_current != initial_end ) {
+      (*visitor)( executing, arg, initial_current );
+      ++initial_current;
+    }
+
+    end = _Chain_Immutable_tail( &_User_extensions_List.Active );
+  } else {
+    end = _Chain_Immutable_head( &_User_extensions_List.Active );
   }
 
-  node = _Chain_Immutable_first( &_User_extensions_List );
-  tail = _Chain_Immutable_tail( &_User_extensions_List );
-  while ( node != tail ) {
-    const User_extensions_Control *extension =
-      (const User_extensions_Control *) node;
+  _User_extensions_Acquire( &lock_context );
 
-    (*visitor)( executing, arg, &extension->Callouts );
+  _Chain_Iterator_initialize(
+    &_User_extensions_List.Active,
+    &_User_extensions_List.Iterators,
+    &iter.Iterator,
+    direction
+  );
 
-    node = _Chain_Immutable_next( node );
+  if ( executing != NULL ) {
+    iter.previous = executing->last_user_extensions_iterator;
+    executing->last_user_extensions_iterator = &iter;
+  }
+
+  while ( ( node = _Chain_Iterator_next( &iter.Iterator ) ) != end ) {
+    const User_extensions_Control *extension;
+
+    _Chain_Iterator_set_position( &iter.Iterator, node );
+
+    _User_extensions_Release( &lock_context );
+
+    extension = (const User_extensions_Control *) node;
+    ( *visitor )( executing, arg, &extension->Callouts );
+
+    _User_extensions_Acquire( &lock_context );
+  }
+
+  if ( executing != NULL ) {
+    executing->last_user_extensions_iterator = iter.previous;
+  }
+
+  _Chain_Iterator_destroy( &iter.Iterator );
+
+  _User_extensions_Release( &lock_context );
+
+  if ( direction == CHAIN_ITERATOR_BACKWARD ) {
+    initial_current = initial_end;
+
+    while ( initial_current != initial_begin ) {
+      --initial_current;
+      (*visitor)( executing, arg, initial_current );
+    }
   }
 }

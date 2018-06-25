@@ -13,6 +13,7 @@
 #include <tmacros.h>
 #include <rtems.h>
 #include <limits.h>
+#include <unistd.h>
 #include <sys/param.h>
 
 const char rtems_test_name[] = "SPPAGESIZE";
@@ -34,7 +35,7 @@ rtems_task Init(
     rtems_test_exit(0);
 }
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS 1

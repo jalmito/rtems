@@ -16,6 +16,7 @@
 #define CONFIGURE_INIT
 #include "system.h"
 #include <errno.h>
+#include <limits.h>
 
 #include <rtems/score/todimpl.h>
 
@@ -26,12 +27,6 @@ const char rtems_test_name[] = "PSX 5";
 void Print_mutexattr(
   char                *msg,
   pthread_mutexattr_t *attr
-);
-
-void calculate_abstimeout(
-  struct timespec *times,
-  uint32_t         seconds,
-  uint32_t         nanoseconds
 );
 
 void Print_mutexattr(
@@ -91,10 +86,10 @@ void Print_mutexattr(
   }
 }
 
-void calculate_abstimeout(
+static void calculate_abstimeout(
   struct timespec *times,
-  uint32_t         seconds,
-  uint32_t         nanoseconds
+  int              seconds,
+  long             nanoseconds
 )
 {
   struct timeval       tv1;
@@ -110,6 +105,299 @@ void calculate_abstimeout(
     times->tv_nsec -= TOD_NANOSECONDS_PER_SECOND;
   }
 
+}
+
+static void test_get_priority( void )
+{
+  int                 status;
+  pthread_mutexattr_t attr;
+  pthread_mutex_t     mutex;
+  int                 policy;
+  struct sched_param  param;
+  int                 real_priority;
+
+  status = pthread_getschedparam( pthread_self(), &policy, &param );
+  rtems_test_assert( status == 0 );
+
+  real_priority = param.sched_priority;
+
+  status = pthread_mutexattr_init( &attr );
+  rtems_test_assert( status == 0 );
+
+  status = pthread_mutexattr_setprotocol( &attr, PTHREAD_PRIO_PROTECT );
+  rtems_test_assert( !status );
+
+  status = pthread_mutexattr_setprioceiling( &attr, real_priority + 1 );
+  rtems_test_assert( status == 0 );
+
+  status = pthread_mutex_init( &mutex, &attr );
+  rtems_test_assert( status == 0 );
+
+  status = pthread_mutexattr_destroy( &attr );
+  rtems_test_assert( status == 0 );
+
+  status = pthread_mutex_lock( &mutex );
+  rtems_test_assert( status == 0 );
+
+  status = pthread_getschedparam( pthread_self(), &policy, &param );
+  rtems_test_assert( status == 0 );
+
+  rtems_test_assert( real_priority == param.sched_priority );
+
+  status = pthread_mutex_unlock( &mutex );
+  rtems_test_assert( status == 0 );
+
+  status = pthread_mutex_destroy( &mutex );
+  rtems_test_assert( status == 0 );
+}
+
+static void *counter_task(void *arg)
+{
+  int *counter;
+
+  counter = arg;
+
+  while ( *counter >= 0 ) {
+    ++(*counter);
+
+    sched_yield();
+  }
+
+  return counter;
+}
+
+static void test_set_priority( void )
+{
+  int                 status;
+  int                 policy;
+  struct sched_param  param;
+  pthread_t           thread;
+  int                 counter;
+  void               *exit_code;
+
+  counter = 0;
+
+  status = pthread_getschedparam( pthread_self(), &policy, &param );
+  rtems_test_assert( status == 0 );
+
+  status = pthread_create( &thread, NULL, counter_task, &counter);
+  rtems_test_assert( status == 0 );
+
+  ++param.sched_priority;
+  status = pthread_setschedparam( pthread_self(), policy, &param );
+  rtems_test_assert( status == 0 );
+
+  rtems_test_assert( counter == 0 );
+
+  --param.sched_priority;
+  status = pthread_setschedparam( pthread_self(), policy, &param );
+  rtems_test_assert( status == 0 );
+
+  rtems_test_assert( counter == 1 );
+
+  status = pthread_setschedprio( pthread_self(), param.sched_priority + 1 );
+  rtems_test_assert( status == 0 );
+
+  rtems_test_assert( counter == 1 );
+
+  status = pthread_setschedprio( pthread_self(), param.sched_priority );
+  rtems_test_assert( status == 0 );
+
+  rtems_test_assert( counter == 1 );
+
+  counter = -1;
+  sched_yield();
+
+  status = pthread_join( thread, &exit_code );
+  rtems_test_assert( status == 0 );
+  rtems_test_assert( exit_code == &counter );
+  rtems_test_assert( counter == -1 );
+}
+
+static void test_errors_pthread_setschedprio( void )
+{
+  int                status;
+  int                policy;
+  struct sched_param param;
+
+  status = pthread_getschedparam( pthread_self(), &policy, &param );
+  rtems_test_assert( status == 0 );
+
+  status = pthread_setschedprio( pthread_self(), INT_MAX );
+  rtems_test_assert( status == EINVAL );
+
+  status = pthread_setschedprio( 0xdeadbeef, param.sched_priority );
+  rtems_test_assert( status == ESRCH );
+
+  status = pthread_setschedprio( pthread_self(), param.sched_priority );
+  rtems_test_assert( status == 0 );
+}
+
+static void test_mutex_pshared_init(void)
+{
+  pthread_mutex_t mutex;
+  pthread_mutexattr_t attr;
+  int eno;
+
+  eno = pthread_mutexattr_init(&attr);
+  rtems_test_assert(eno == 0);
+
+  eno = pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_PRIVATE);
+  rtems_test_assert(eno == 0);
+
+  eno = pthread_mutex_init(&mutex, &attr);
+  rtems_test_assert(eno == 0);
+
+  eno = pthread_mutex_destroy(&mutex);
+  rtems_test_assert(eno == 0);
+
+  eno = pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+  rtems_test_assert(eno == 0);
+
+  eno = pthread_mutex_init(&mutex, &attr);
+  rtems_test_assert(eno == 0);
+
+  eno = pthread_mutex_destroy(&mutex);
+  rtems_test_assert(eno == 0);
+
+  attr.process_shared = -1;
+
+  eno = pthread_mutex_init(&mutex, &attr);
+  rtems_test_assert(eno == EINVAL);
+
+  eno = pthread_mutexattr_destroy(&attr);
+  rtems_test_assert(eno == 0);
+}
+
+static void test_mutex_null( void )
+{
+  struct timespec to;
+  int eno;
+
+  eno = pthread_mutex_destroy( NULL );
+  rtems_test_assert( eno == EINVAL );
+
+  eno = pthread_mutex_init( NULL, NULL );
+  rtems_test_assert( eno == EINVAL );
+
+  eno = pthread_mutex_lock( NULL );
+  rtems_test_assert( eno == EINVAL );
+
+  to.tv_sec = 1;
+  to.tv_nsec = 1;
+  eno = pthread_mutex_timedlock( NULL, &to );
+  rtems_test_assert( eno == EINVAL );
+
+  eno = pthread_mutex_trylock( NULL );
+  rtems_test_assert( eno == EINVAL );
+
+  eno = pthread_mutex_unlock( NULL );
+  rtems_test_assert( eno == EINVAL );
+}
+
+static void test_mutex_not_initialized( void )
+{
+  pthread_mutex_t mutex;
+  struct timespec to;
+  int eno;
+
+  memset( &mutex, 0xff, sizeof( mutex ) );
+
+  eno = pthread_mutex_destroy( &mutex );
+  rtems_test_assert( eno == EINVAL );
+
+  eno = pthread_mutex_lock( &mutex );
+  rtems_test_assert( eno == EINVAL );
+
+  to.tv_sec = 1;
+  to.tv_nsec = 1;
+  eno = pthread_mutex_timedlock( &mutex, &to );
+  rtems_test_assert( eno == EINVAL );
+
+  eno = pthread_mutex_trylock( &mutex );
+  rtems_test_assert( eno == EINVAL );
+
+  eno = pthread_mutex_unlock( &mutex );
+  rtems_test_assert( eno == EINVAL );
+}
+
+static void test_mutex_invalid_copy( void )
+{
+  pthread_mutex_t mutex;
+  pthread_mutex_t mutex2;
+  struct timespec to;
+  int eno;
+
+  eno = pthread_mutex_init( &mutex, NULL );
+  rtems_test_assert( eno == 0 );
+
+  memcpy( &mutex2, &mutex, sizeof( mutex2 ) );
+
+  eno = pthread_mutex_destroy( &mutex2 );
+  rtems_test_assert( eno == EINVAL );
+
+  eno = pthread_mutex_lock( &mutex2 );
+  rtems_test_assert( eno == EINVAL );
+
+  to.tv_sec = 1;
+  to.tv_nsec = 1;
+  eno = pthread_mutex_timedlock( &mutex2, &to );
+  rtems_test_assert( eno == EINVAL );
+
+  eno = pthread_mutex_trylock( &mutex2 );
+  rtems_test_assert( eno == EINVAL );
+
+  eno = pthread_mutex_unlock( &mutex2 );
+  rtems_test_assert( eno == EINVAL );
+
+  eno = pthread_mutex_destroy( &mutex );
+  rtems_test_assert( eno == 0 );
+}
+
+static void test_mutex_auto_initialization( void )
+{
+  struct timespec to;
+  int eno;
+
+  {
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+    eno = pthread_mutex_destroy( &mutex );
+    rtems_test_assert( eno == 0 );
+
+    eno = pthread_mutex_destroy( &mutex );
+    rtems_test_assert( eno == EINVAL );
+  }
+
+  {
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+    eno = pthread_mutex_lock( &mutex );
+    rtems_test_assert( eno == 0 );
+  }
+
+  {
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+    to.tv_sec = 1;
+    to.tv_nsec = 1;
+    eno = pthread_mutex_timedlock( &mutex, &to );
+    rtems_test_assert( eno == 0 );
+  }
+
+  {
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+    eno = pthread_mutex_trylock( &mutex );
+    rtems_test_assert( eno == 0 );
+  }
+
+  {
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+    eno = pthread_mutex_unlock( &mutex );
+    rtems_test_assert( eno == EPERM );
+  }
 }
 
 void *POSIX_Init(
@@ -128,10 +416,18 @@ void *POSIX_Init(
   int                  old_ceiling;
   int                  priority;
 
-  rtems_test_assert( MUTEX_BAD_ID != PTHREAD_MUTEX_INITIALIZER );
-  Mutex_bad_id = MUTEX_BAD_ID;
+  Mutex_bad_id = NULL;
 
   TEST_BEGIN();
+
+  test_mutex_pshared_init();
+  test_mutex_null();
+  test_mutex_not_initialized();
+  test_mutex_invalid_copy();
+  test_mutex_auto_initialization();
+  test_get_priority();
+  test_set_priority();
+  test_errors_pthread_setschedprio();
 
   /* set the time of day, and print our buffer in multiple ways */
 
@@ -245,11 +541,13 @@ void *POSIX_Init(
   status = pthread_mutexattr_setprioceiling( NULL, 128 );
   rtems_test_assert( status == EINVAL );
 
-  puts( "Init: pthread_mutexattr_setprioceiling - EINVAL (invalid priority)" );
-  status = pthread_mutexattr_setprioceiling( &attr, 512 );
-  if ( status != EINVAL )
-    printf( "status = %d\n", status );
-  rtems_test_assert( status == EINVAL );
+  puts( "Init: pthread_mutexattr_setprioceiling - SUCCESSFUL (priority INT_MAX)" );
+  status = pthread_mutexattr_setprioceiling( &attr, INT_MAX );
+  rtems_test_assert( status == 0 );
+
+  puts( "Init: pthread_mutexattr_setprioceiling - SUCCESSFUL (priority INT_MIN)" );
+  status = pthread_mutexattr_setprioceiling( &attr, INT_MIN );
+  rtems_test_assert( status == 0 );
 
   puts( "Init: pthread_mutexattr_setprioceiling - EINVAL (not initialized)" );
   status = pthread_mutexattr_setprioceiling( &destroyed_attr, -1 );
@@ -279,9 +577,13 @@ void *POSIX_Init(
   status = pthread_mutex_init( &Mutex_id, &attr );
   rtems_test_assert( status == EINVAL );
 
-  /* must get around error checks in attribute set routines */
-  attr.protocol = PTHREAD_PRIO_INHERIT;
-  attr.prio_ceiling = -1;
+  puts( "Init: pthread_mutexattr_setprotocol - SUCCESSFUL" );
+  status = pthread_mutexattr_setprotocol( &attr, PTHREAD_PRIO_PROTECT );
+  rtems_test_assert( !status );
+
+  puts( "Init: pthread_mutexattr_setprioceiling - SUCCESSFUL" );
+  status = pthread_mutexattr_setprioceiling( &attr, -1 );
+  rtems_test_assert( !status );
 
   puts( "Init: pthread_mutex_init - EINVAL (bad priority ceiling)" );
   status = pthread_mutex_init( &Mutex_id, &attr );
@@ -292,10 +594,13 @@ void *POSIX_Init(
   status = pthread_mutexattr_init( &attr );
   rtems_test_assert( !status );
 
-  puts( "Init: pthread_mutex_init - ENOSYS (process wide scope)" );
-  attr.process_shared = PTHREAD_PROCESS_SHARED;
+  puts( "Init: pthread_mutex_init - process shared scope" );
+  status = pthread_mutexattr_setpshared( &attr, PTHREAD_PROCESS_SHARED );
+  rtems_test_assert( status == 0 );
   status = pthread_mutex_init( &Mutex_id, &attr );
-  rtems_test_assert( status == ENOSYS );
+  rtems_test_assert( status == 0 );
+  status = pthread_mutex_destroy( &Mutex_id );
+  rtems_test_assert( status == 0 );
 
   puts( "Init: pthread_mutex_init - EINVAL (invalid scope)" );
   attr.process_shared = -1;
@@ -364,7 +669,7 @@ void *POSIX_Init(
 #endif
 
   puts( "Init: pthread_mutex_trylock - EINVAL (illegal ID)" );
-  status = pthread_mutex_trylock( &Mutex_bad_id );
+  status = pthread_mutex_trylock( Mutex_bad_id );
   if ( status != EINVAL )
     printf( "status = %d\n", status );
   rtems_test_assert( status == EINVAL );
@@ -406,7 +711,7 @@ void *POSIX_Init(
      /* switch to task 1 */
 
   puts( "Init: pthread_mutex_unlock - EINVAL (invalid id)" );
-  status = pthread_mutex_unlock( &Mutex_bad_id );
+  status = pthread_mutex_unlock( Mutex_bad_id );
   if ( status != EINVAL )
     printf( "status = %d\n", status );
   rtems_test_assert( status == EINVAL );
@@ -453,12 +758,16 @@ void *POSIX_Init(
     printf( "status = %d\n", status );
   rtems_test_assert( !status );
 
-  puts( "Init: pthread_mutex_init - EAGAIN (too many)" );
+  puts( "Init: pthread_mutex_init - SUCCESSFUL" );
   status = pthread_mutex_init( &Mutex3_id, &attr );
-  rtems_test_assert( status == EAGAIN );
+  rtems_test_assert( !status );
 
   puts( "Init: pthread_mutexattr_destroy - SUCCESSFUL" );
   status = pthread_mutexattr_destroy( &attr );
+  rtems_test_assert( !status );
+
+  puts( "Init: pthread_mutex_destroy - SUCCESSFUL" );
+  status = pthread_mutex_destroy( &Mutex3_id );
   rtems_test_assert( !status );
 
   puts( "Init: pthread_mutex_destroy - SUCCESSFUL" );
@@ -466,7 +775,7 @@ void *POSIX_Init(
   rtems_test_assert( !status );
 
   puts( "Init: pthread_mutex_destroy - EINVAL (invalid id)" );
-  status = pthread_mutex_destroy( &Mutex_bad_id );
+  status = pthread_mutex_destroy( Mutex_bad_id );
   rtems_test_assert( status == EINVAL );
 
   /* destroy a busy mutex */
@@ -573,7 +882,7 @@ void *POSIX_Init(
   rtems_test_assert( !status );
 
   puts( "Init: pthread_mutex_getprioceiling - EINVAL (invalid id)" );
-  status = pthread_mutex_getprioceiling( &Mutex_bad_id, &ceiling );
+  status = pthread_mutex_getprioceiling( Mutex_bad_id, &ceiling );
   rtems_test_assert( status == EINVAL );
 
   puts( "Init: pthread_mutex_getprioceiling - EINVAL (NULL ceiling)" );
@@ -585,11 +894,11 @@ void *POSIX_Init(
   printf( "Init: pthread_mutex_getprioceiling - %d\n", ceiling );
 
   puts( "Init: pthread_mutex_setprioceiling - EINVAL (invalid id)" );
-  status = pthread_mutex_setprioceiling( &Mutex_bad_id, 200, &old_ceiling );
+  status = pthread_mutex_setprioceiling( Mutex_bad_id, 200, &old_ceiling );
   rtems_test_assert( status == EINVAL );
 
   puts( "Init: pthread_mutex_setprioceiling - EINVAL (illegal priority)" );
-  status = pthread_mutex_setprioceiling( &Mutex2_id, 512, &old_ceiling );
+  status = pthread_mutex_setprioceiling( &Mutex2_id, INT_MAX, &old_ceiling );
   rtems_test_assert( status == EINVAL );
 
   puts( "Init: pthread_mutex_setprioceiling - EINVAL (NULL ceiling)" );

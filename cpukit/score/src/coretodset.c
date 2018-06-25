@@ -19,38 +19,52 @@
 #endif
 
 #include <rtems/score/todimpl.h>
-#include <rtems/score/threaddispatch.h>
+#include <rtems/score/assert.h>
 #include <rtems/score/watchdogimpl.h>
 
-void _TOD_Set_with_timestamp(
-  const Timestamp_Control *tod_as_timestamp
+void _TOD_Set(
+  const struct timespec *tod,
+  ISR_lock_Context      *lock_context
 )
 {
-  struct timespec ts;
-  uint32_t nanoseconds;
-  Watchdog_Interval seconds_next;
-  Watchdog_Interval seconds_now;
-  Watchdog_Header *header;
+  struct bintime  tod_as_bintime;
+  uint64_t        tod_as_ticks;
+  uint32_t        cpu_count;
+  uint32_t        cpu_index;
 
-  _Timestamp_To_timespec( tod_as_timestamp, &ts );
-  nanoseconds = ts.tv_nsec;
-  seconds_next = ts.tv_sec;
+  _Assert( _TOD_Is_owner() );
 
-  _Thread_Disable_dispatch();
+  timespec2bintime( tod, &tod_as_bintime );
+  _Timecounter_Set_clock( &tod_as_bintime, lock_context );
 
-  seconds_now = _TOD_Seconds_since_epoch();
+  tod_as_ticks = _Watchdog_Ticks_from_timespec( tod );
+  cpu_count = _SMP_Get_processor_count();
 
-  _Timecounter_Set_clock( &ts );
+  for ( cpu_index = 0 ; cpu_index < cpu_count ; ++cpu_index ) {
+    Per_CPU_Control  *cpu;
+    Watchdog_Header  *header;
+    ISR_lock_Context  lock_context;
+    Watchdog_Control *first;
 
-  header = &_Watchdog_Seconds_header;
+    cpu = _Per_CPU_Get_by_index( cpu_index );
+    header = &cpu->Watchdog.Header[ PER_CPU_WATCHDOG_REALTIME ];
 
-  if ( seconds_next < seconds_now )
-    _Watchdog_Adjust_backward( header, seconds_now - seconds_next );
-  else
-    _Watchdog_Adjust_forward( header, seconds_next - seconds_now );
+    _ISR_lock_ISR_disable_and_acquire( &cpu->Watchdog.Lock, &lock_context );
 
-  _TOD.seconds_trigger = nanoseconds;
+    first = _Watchdog_Header_first( header );
+
+    if ( first != NULL ) {
+      _Watchdog_Tickle(
+        header,
+        first,
+        tod_as_ticks,
+        &cpu->Watchdog.Lock,
+        &lock_context
+      );
+    }
+
+    _ISR_lock_Release_and_ISR_enable( &cpu->Watchdog.Lock, &lock_context );
+  }
+
   _TOD.is_set = true;
-
-  _Thread_Enable_dispatch();
 }

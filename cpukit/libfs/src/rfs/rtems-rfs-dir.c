@@ -28,15 +28,8 @@
 #endif
 
 #include <inttypes.h>
+#include <rtems/inttypes.h>
 #include <string.h>
-
-#if SIZEOF_OFF_T == 8
-#define PRIooff_t PRIo64
-#elif SIZEOF_OFF_T == 4
-#define PRIooff_t PRIo32
-#else
-#error "unsupported size of off_t"
-#endif
 
 #include <rtems/rfs/rtems-rfs-block.h>
 #include <rtems/rfs/rtems-rfs-buffer.h>
@@ -609,7 +602,7 @@ rtems_rfs_dir_read (rtems_rfs_file_system*  fs,
       }
 
       memset (dirent, 0, sizeof (struct dirent));
-      dirent->d_off = offset;
+      dirent->d_off = rtems_rfs_block_get_pos (fs, &map.bpos);
       dirent->d_reclen = sizeof (struct dirent);
 
       *length += elength;

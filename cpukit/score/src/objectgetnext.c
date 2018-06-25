@@ -20,46 +20,16 @@
 
 #include <rtems/score/objectimpl.h>
 
-/*
- * _Objects_Get_next
- *
- * Like _Objects_Get, but considers the 'id' as a "hint" and
- * finds next valid one after that point.
- * Mostly used for monitor and debug traversal of an object.
- *
- * Input parameters:
- *   information - pointer to entry in table for this class
- *   id          - object id to search for
- *   location    - address of where to store the location
- *   next_id     - address to store next id to try
- *
- * Output parameters:
- *   returns     - address of object if local
- *   location    - one of the following:
- *                  OBJECTS_ERROR  - invalid object ID
- *                  OBJECTS_REMOTE - remote object
- *                  OBJECTS_LOCAL  - local object
- *   next_id     - will contain a reasonable "next" id to continue traversal
- *
- * NOTE:
- *      assumes can add '1' to an id to get to next index.
- */
-
-Objects_Control *
-_Objects_Get_next(
-    Objects_Information *information,
-    Objects_Id           id,
-    Objects_Locations   *location_p,
-    Objects_Id          *next_id_p
+Objects_Control *_Objects_Get_next(
+  Objects_Id                 id,
+  const Objects_Information *information,
+  Objects_Id                *next_id_p
 )
 {
-    Objects_Control *object;
+    Objects_Control *the_object;
     Objects_Id       next_id;
 
     if ( !information )
-      return NULL;
-
-    if ( !location_p )
       return NULL;
 
     if ( !next_id_p )
@@ -70,25 +40,24 @@ _Objects_Get_next(
     else
         next_id = id;
 
+    _Objects_Allocator_lock();
+
     do {
         /* walked off end of list? */
         if (_Objects_Get_index(next_id) > information->maximum)
         {
-            *location_p = OBJECTS_ERROR;
-            goto final;
+            _Objects_Allocator_unlock();
+            *next_id_p = OBJECTS_ID_FINAL;
+            return NULL;
         }
 
         /* try to grab one */
-        object = _Objects_Get(information, next_id, location_p);
+        the_object = _Objects_Get_no_protection( next_id, information );
 
         next_id++;
 
-    } while (*location_p != OBJECTS_LOCAL);
+    } while ( the_object == NULL );
 
     *next_id_p = next_id;
-    return object;
-
-final:
-    *next_id_p = OBJECTS_ID_FINAL;
-    return 0;
+    return the_object;
 }

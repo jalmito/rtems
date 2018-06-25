@@ -3,7 +3,6 @@
 
 include $(top_srcdir)/automake/compile.am
 
-EXTRA_DIST = README
 
 noinst_LIBRARIES =
 
@@ -14,7 +13,6 @@ libbspcmdline_a_SOURCES = bspcmdline/bspcmdline_get.c \
     bspcmdline/bspcmdline_getparamrhs.c
 
 ## capture
-EXTRA_DIST += capture/README
 
 noinst_LIBRARIES += libcapture.a
 libcapture_a_SOURCES = capture/capture.c capture/capture-cli.c \
@@ -25,11 +23,11 @@ libcapture_a_SOURCES = capture/capture.c capture/capture-cli.c \
     capture/rtems-trace-buffer-vars.c capture/rtems-trace-buffer-vars.h
 
 ## cpuuse
-EXTRA_DIST += cpuuse/README
 
 noinst_LIBRARIES += libcpuuse.a
 libcpuuse_a_SOURCES = cpuuse/cpuusagereport.c cpuuse/cpuusagereset.c \
      cpuuse/cpuuse.h cpuuse/cpuusagedata.c cpuuse/cpuusagetop.c
+libcpuuse_a_SOURCES += cpuuse/cpuinforeport.c
 
 ## devnull
 noinst_LIBRARIES += libdevnull.a
@@ -59,16 +57,19 @@ if HAS_MP
 libmonitor_a_SOURCES += monitor/mon-mpci.c
 endif
 
-EXTRA_DIST += monitor/README
 
 ## fb
 noinst_LIBRARIES += libmw-fb.a
 libmw_fb_a_SOURCES = fb/mw_print.c fb/mw_uid.c fb/fb.h fb/mw_uid.h
 
+## rtems-fdt
+noinst_LIBRARIES += librtemsfdt.a
+librtemsfdt_a_SOURCES = rtems-fdt/rtems-fdt-shell.c rtems-fdt/rtems-fdt-shell.h \
+    rtems-fdt/rtems-fdt.c rtems-fdt/rtems-fdt.h
+
 ## mouse
 noinst_LIBRARIES += libmouse.a
 libmouse_a_SOURCES = mouse/mouse_parser.c mouse/serial_mouse.c
-EXTRA_DIST += mouse/README
 
 ## redirector
 noinst_LIBRARIES += libredirector.a
@@ -114,6 +115,7 @@ libshell_a_SOURCES = shell/cat_file.c shell/cmds.c shell/internal.h \
 libshell_a_SOURCES += shell/main_cmdls.c
 libshell_a_SOURCES += shell/main_cmdchown.c
 libshell_a_SOURCES += shell/main_cmdchmod.c
+libshell_a_SOURCES += shell/main_cpuinfo.c
 libshell_a_SOURCES += shell/main_profreport.c
 
 if LIBDRVMGR
@@ -131,7 +133,6 @@ libshell_a_SOURCES += \
 endif
 endif
 
-EXTRA_DIST += shell/README
 
 ## serdbg
 
@@ -142,20 +143,18 @@ libserdbg_a_SOURCES = serdbg/serdbg.c serdbg/serdbgio.c \
     serdbg/termios_printk_cnf.h serdbg/termios_printk.h
 endif
 
-EXTRA_DIST += serdbg/README
 
 ## stackchk
 noinst_LIBRARIES += libstackchk.a
-libstackchk_a_SOURCES = stackchk/check.c stackchk/internal.h \
+libstackchk_a_SOURCES = stackchk/check.c \
     stackchk/stackchk.h
 
-EXTRA_DIST += stackchk/README
 
 ## libuntar
 noinst_LIBRARIES += libuntar.a
-libuntar_a_SOURCES = untar/untar.c untar/untar.h
+libuntar_a_SOURCES = untar/untar.c untar/untar_txz.c untar/untar_tgz.c \
+	untar/untar.h
 
-EXTRA_DIST += untar/README
 
 ## stringto
 noinst_LIBRARIES += libstringto.a
@@ -171,8 +170,10 @@ libstringto_a_SOURCES = stringto/stringtodouble.c stringto/stringtofloat.c \
 noinst_LIBRARIES += libtestsupport.a
 libtestsupport_a_SOURCES =
 libtestsupport_a_SOURCES += testsupport/testbeginend.c
+libtestsupport_a_SOURCES += testsupport/testbusy.c
 libtestsupport_a_SOURCES += testsupport/testextension.c
 libtestsupport_a_SOURCES += testsupport/testparallel.c
+libtestsupport_a_SOURCES += testsupport/testwrappers.c
 
 ## fsmount
 noinst_LIBRARIES += libfsmount.a
@@ -190,6 +191,11 @@ libuuid_a_SOURCES = uuid/clear.c uuid/compare.c uuid/copy.c uuid/gen_uuid.c \
 	uuid/isnull.c uuid/pack.c uuid/parse.c uuid/unpack.c uuid/unparse.c \
 	uuid/uuid_time.c uuid/uuidd.h uuid/uuidP.h
 
+## xz-embedded
+noinst_LIBRARIES += libxz.a
+libxz_a_SOURCES = xz/xz/h xz/xz_crc32.c \
+	xz/xz_dec_lzma2.c xz/xz_dec_stream.c
+
+
 ## ---
-include $(srcdir)/preinstall.am
 include $(top_srcdir)/automake/local.am

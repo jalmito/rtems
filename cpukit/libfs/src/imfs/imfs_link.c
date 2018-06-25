@@ -18,7 +18,7 @@
   #include "config.h"
 #endif
 
-#include "imfs.h"
+#include <rtems/imfs.h>
 
 static const IMFS_node_control IMFS_node_control_hard_link;
 
@@ -93,6 +93,7 @@ static const rtems_filesystem_file_handlers_r IMFS_link_handlers = {
   .fdatasync_h = rtems_filesystem_default_fsync_or_fdatasync,
   .fcntl_h = rtems_filesystem_default_fcntl,
   .kqfilter_h = rtems_filesystem_default_kqfilter,
+  .mmap_h = rtems_filesystem_default_mmap,
   .poll_h = rtems_filesystem_default_poll,
   .readv_h = rtems_filesystem_default_readv,
   .writev_h = rtems_filesystem_default_writev

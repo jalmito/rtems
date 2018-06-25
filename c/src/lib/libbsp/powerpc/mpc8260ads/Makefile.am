@@ -1,82 +1,64 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
+include $(top_srcdir)/../../bsp.am
 
-include_bspdir = $(includedir)/bsp
+dist_project_lib_DATA = ../../../../../../bsps/powerpc/mpc8260ads/start/bsp_specs
 
-dist_project_lib_DATA = bsp_specs
-
-include_HEADERS = include/bsp.h
-include_HEADERS += include/tm27.h
-
-nodist_include_HEADERS = include/bspopts.h
-nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
-DISTCLEANFILES = include/bspopts.h
 
 noinst_PROGRAMS =
 
-include_HEADERS += ../../shared/include/coverhd.h
-
-dist_project_lib_DATA += startup/linkcmds
-
-noinst_LIBRARIES = libbspstart.a
-libbspstart_a_SOURCES = start/start.S
+start.$(OBJEXT): ../../../../../../bsps/powerpc/mpc8260ads/start/start.S
+	$(CPPASCOMPILE) -o $@ -c $<
 project_lib_DATA = start.$(OBJEXT)
 
-libbspstart_a_SOURCES += ../../powerpc/shared/start/rtems_crti.S
+project_lib_DATA += linkcmds
+
+rtems_crti.$(OBJEXT): ../../../../../../bsps/powerpc/shared/start/rtems_crti.S
+	$(CPPASCOMPILE) -o $@ -c $<
 project_lib_DATA += rtems_crti.$(OBJEXT)
 
-noinst_LIBRARIES += libbsp.a
-libbsp_a_SOURCES =
+project_lib_LIBRARIES = librtemsbsp.a
+librtemsbsp_a_SOURCES =
 
 # clock
-libbsp_a_SOURCES += ../shared/clock/clock.c
+librtemsbsp_a_SOURCES +=../../../../../../bsps/powerpc/shared/clock/clock.c
 
 # console
-libbsp_a_SOURCES += console/console.c
-
-include_bsp_HEADERS = irq/irq.h \
-	../../shared/include/irq-generic.h \
-	../../shared/include/irq-info.h
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc8260ads/console/console.c
 
 # irq
-libbsp_a_SOURCES += ../../shared/src/irq-default-handler.c
-libbsp_a_SOURCES += ../../shared/src/irq-generic.c
-libbsp_a_SOURCES += ../../shared/src/irq-info.c
-libbsp_a_SOURCES += ../../shared/src/irq-legacy.c
-libbsp_a_SOURCES += ../../shared/src/irq-server.c
-libbsp_a_SOURCES += ../../shared/src/irq-shell.c
-libbsp_a_SOURCES += irq/irq.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/irq/irq-default-handler.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc8260ads/irq/irq.c
 
 # startup
-libbsp_a_SOURCES += ../../shared/bspclean.c ../../shared/bsplibc.c \
-    ../../shared/bsppredriverhook.c ../../shared/bsppost.c \
-    ../shared/startup/bspidle.c startup/bspstart.c ../../shared/bootcard.c \
-    ../../shared/sbrk.c ../../shared/gnatinstallhandler.c startup/cpuinit.c \
-    ../../shared/bspgetworkarea.c ../../shared/bsppretaskinghook.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/start/bspidle.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc8260ads/start/bspstart.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc8260ads/start/cpuinit.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-empty.c
 
 if HAS_NETWORKING
-network_CPPFLAGS = -D__INSIDE_RTEMS_BSD_TCPIP_STACK__
-network_CPPFLAGS += -D__BSD_VISIBLE
-noinst_PROGRAMS += network.rel
-network_rel_SOURCES = network/network.c network/if_hdlcsubr.c
-network_rel_CPPFLAGS = $(AM_CPPFLAGS) $(network_CPPFLAGS)
-network_rel_LDFLAGS = $(RTEMS_RELLDFLAGS)
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc8260ads/net/if_hdlcsubr.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc8260ads/net/network.c
 endif
 
-libbsp_a_LIBADD = ../../../libcpu/@RTEMS_CPU@/shared/cpuIdent.rel \
-    ../../../libcpu/@RTEMS_CPU@/shared/cache.rel \
-    ../../../libcpu/@RTEMS_CPU@/@exceptions@/rtems-cpu.rel \
-    ../../../libcpu/@RTEMS_CPU@/@exceptions@/exc_bspsupport.rel \
-    ../../../libcpu/@RTEMS_CPU@/mpc8260/console-generic.rel \
-    ../../../libcpu/@RTEMS_CPU@/mpc8260/cpm.rel \
-    ../../../libcpu/@RTEMS_CPU@/mpc8260/mmu.rel \
-    ../../../libcpu/@RTEMS_CPU@/mpc8260/timer.rel
-if HAS_NETWORKING
-libbsp_a_LIBADD += network.rel
-endif
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/cache/cache.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/btimer/btimer-ppc-dec.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc8260ads/dev/console-generic.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc8260ads/start/brg.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc8260ads/start/cp.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc8260ads/start/dpram.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc8260ads/start/mmu.c
 
-EXTRA_DIST = times
 
-include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
+include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
+include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
+include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
+include $(srcdir)/../../../../../../bsps/powerpc/shared/shared-sources.am
+include $(srcdir)/../../../../../../bsps/powerpc/shared/exceptions-sources.am
+include $(srcdir)/../../../../../../bsps/powerpc/mpc8260ads/headers.am

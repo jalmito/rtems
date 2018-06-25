@@ -13,7 +13,9 @@
 
 /*
  *  Written by: Jake Janovetz <janovetz@tempest.ece.uiuc.edu>
-
+ *
+ *  Copyright 2016 Chris Johns <chrisj@rtems.org>
+ *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
  *  http://www.rtems.org/license/LICENSE.
@@ -23,6 +25,7 @@
 #include "config.h"
 #endif
 
+#include <stdbool.h>
 #include <sys/param.h>
 #include <stdio.h>
 #include <string.h>
@@ -33,7 +36,6 @@
 #include <fcntl.h>
 #include <rtems/untar.h>
 #include <rtems/bspIo.h>
-
 
 /*
  * TAR file format:
@@ -64,14 +66,16 @@
  *   sum = 0;
  *   for(i = 0; i < 512; i++)
  *       sum += 0xFF & header[i];
- */ 
+ */
 
 #define MAX_NAME_FIELD_SIZE      99
 
 /*
  * This converts octal ASCII number representations into an
  * unsigned long.  Only support 32-bit numbers for now.
- */ 
+ *
+ * warning: this code is referenced in the IMFS.
+ */
 unsigned long
 _rtems_octal2ulong(
   const char *octascii,
@@ -89,6 +93,366 @@ _rtems_octal2ulong(
     num  = num * 8 + ((unsigned long)(octascii[i] - '0'));
   }
   return(num);
+}
+
+/*
+ * Common error message formatter.
+ */
+static void
+Print_Error(const rtems_printer *printer, const char* message, const char* path)
+{
+  rtems_printf(printer, "untar: %s: %s: (%d) %s\n",
+               message, path, errno, strerror(errno));
+}
+
+/*
+ * Get the type of node on in the file system if present.
+ */
+static int
+Stat_Node(const char* path)
+{
+  struct stat sb;
+  if (stat(path, &sb) < 0)
+    return -1;
+  if (S_ISDIR(sb.st_mode))
+    return DIRTYPE;
+  return REGTYPE;
+}
+
+/*
+ * Make the directory path for a file if it does not exist.
+ */
+static int
+Make_Path(const rtems_printer *printer, const char* filename, bool end_is_dir)
+{
+  char* copy = strdup(filename);
+  char* path = copy;
+
+  /*
+   * Skip leading path separators.
+   */
+  while (*path == '/')
+    ++path;
+
+  /*
+   * Any path left?
+   */
+  if (*path != '\0') {
+    bool  path_end = false;
+    char* end = path;
+    int   r;
+
+    /*
+     * Split the path into directory components. Check the node and if a file
+     * and not the end of the path remove it and create a directory. If a
+     * directory and not the end of the path decend into the directory.
+     */
+    while (!path_end) {
+      while (*end != '\0' && *end != '/')
+        ++end;
+
+      /*
+       * Are we at the end of the path?
+       */
+      if (*end == '\0')
+        path_end = true;
+
+      /*
+       * Split the path.
+       */
+      *end = '\0';
+
+      /*
+       * Get the node's status, exists, error, directory or regular? Regular
+       * means not a directory.
+       */
+      r = Stat_Node(path);
+
+      /*
+       * If there are errors other than not existing we are finished.
+       */
+      if (r < 0 && errno != ENOENT) {
+        Print_Error(printer, "stat", path);
+        return -1;
+      }
+
+      /*
+       * If a file remove and create a directory if not the end.
+       */
+      if (r == REGTYPE) {
+        r = unlink(path);
+        if (r < 0) {
+          Print_Error(printer, "unlink", path);
+          free(copy);
+          return -1;
+        }
+        if (!path_end) {
+          r = mkdir(path, S_IRWXU | S_IRWXG | S_IRWXO);
+          if (r < 0) {
+            Print_Error(printer, "mkdir (unlink)", path);
+            free(copy);
+            return -1;
+          }
+        }
+      }
+      else if (r < 0) {
+        /*
+         * Node does not exist which means the rest of the path will not exist.
+         */
+        while (!path_end) {
+          r = mkdir(path, S_IRWXU | S_IRWXG | S_IRWXO);
+          if (r < 0) {
+            Print_Error(printer, "mkdir", path);
+            free(copy);
+            return -1;
+          }
+          if (!path_end) {
+            *end = '/';
+            ++end;
+          }
+          while (*end != '\0' && *end != '/')
+            ++end;
+          if (*end == '\0')
+            path_end = true;
+        }
+      }
+      else if (path_end && r == DIRTYPE && !end_is_dir) {
+        /*
+         * We only handle a directory if at the end of the path and the end is
+         * a file. If we cannot remove the directory because it is not empty we
+         * raise an error. Otherwise this is a directory and we do nothing
+         * which lets us decend into it.
+         */
+        r = rmdir(path);
+        if (r < 0) {
+          Print_Error(printer, "rmdir", path);
+          free(copy);
+          return -1;
+        }
+      }
+
+      /*
+       * If not the end of the path put back the directory separator.
+       */
+      if (!path_end) {
+        *end = '/';
+        ++end;
+      }
+    }
+  }
+
+  free(copy);
+
+  return 0;
+}
+
+static int
+Untar_ProcessHeader(
+  const char          *bufr,
+  char                *fname,
+  unsigned long       *mode,
+  unsigned long       *file_size,
+  unsigned long       *nblocks,
+  unsigned char       *linkflag,
+  const rtems_printer *printer
+)
+{
+  char           linkname[100];
+  int            sum;
+  int            hdr_chksum;
+  int            retval = UNTAR_SUCCESSFUL;
+
+  fname[0] = '\0';
+  *file_size = 0;
+  *nblocks = 0;
+  *linkflag = -1;
+
+  if (strncmp(&bufr[257], "ustar", 5)) {
+    return UNTAR_SUCCESSFUL;
+  }
+
+  /*
+   * Compute the TAR checksum and check with the value in the archive.  The
+   * checksum is computed over the entire header, but the checksum field is
+   * substituted with blanks.
+   */
+  hdr_chksum = _rtems_octal2ulong(&bufr[148], 8);
+  sum        = _rtems_tar_header_checksum(bufr);
+
+  if (sum != hdr_chksum) {
+    rtems_printf(printer, "untar: file header checksum error\n");
+    return UNTAR_INVALID_CHECKSUM;
+  }
+
+  strncpy(fname, bufr, MAX_NAME_FIELD_SIZE);
+  fname[MAX_NAME_FIELD_SIZE] = '\0';
+
+  *mode = strtoul(&bufr[100], NULL, 8);
+
+  *linkflag   = bufr[156];
+  *file_size = _rtems_octal2ulong(&bufr[124], 12);
+
+  /*
+   * We've decoded the header, now figure out what it contains and do something
+   * with it.
+   */
+  if (*linkflag == SYMTYPE) {
+    strncpy(linkname, &bufr[157], MAX_NAME_FIELD_SIZE);
+    linkname[MAX_NAME_FIELD_SIZE] = '\0';
+    rtems_printf(printer, "untar: symlink: %s -> %s\n", linkname, fname);
+    symlink(linkname, fname);
+  } else if (*linkflag == REGTYPE) {
+    rtems_printf(printer, "untar: file: %s (s:%i,m:%04o)\n",
+                 fname, (int) *file_size, (int) *mode);
+    *nblocks = (((*file_size) + 511) & ~511) / 512;
+    if (Make_Path(printer, fname, false) < 0) {
+      retval  = UNTAR_FAIL;
+    }
+  } else if (*linkflag == DIRTYPE) {
+    int r;
+    rtems_printf(printer, "untar:  dir: %s\n", fname);
+    if (Make_Path(printer, fname, true) < 0) {
+      retval  = UNTAR_FAIL;
+    }
+    r = mkdir(fname, S_IRWXU | S_IRWXG | S_IRWXO);
+    if (r < 0) {
+      if (errno == EEXIST) {
+        struct stat stat_buf;
+        if (stat(fname, &stat_buf) == 0) {
+          if (S_ISDIR(stat_buf.st_mode)) {
+            r = 0;
+          } else {
+            r = unlink(fname);
+            if (r == 0) {
+              r = mkdir(fname, *mode);
+            }
+          }
+        }
+      }
+      if (r < 0) {
+        Print_Error(printer, "mkdir", fname);
+        retval = UNTAR_FAIL;
+      }
+    }
+  }
+
+  return retval;
+}
+
+/*
+ * Function: Untar_FromMemory
+ *
+ * Description:
+ *
+ *    This is a simple subroutine used to rip links, directories, and
+ *    files out of a block of memory.
+ *
+ *
+ * Inputs:
+ *
+ *    void *  tar_buf    - Pointer to TAR buffer.
+ *    size_t  size       - Length of TAR buffer.
+ *
+ *
+ * Output:
+ *
+ *    int - UNTAR_SUCCESSFUL (0)    on successful completion.
+ *          UNTAR_INVALID_CHECKSUM  for an invalid header checksum.
+ *          UNTAR_INVALID_HEADER    for an invalid header.
+ *
+ */
+int
+Untar_FromMemory_Print(
+  void                *tar_buf,
+  size_t               size,
+  const rtems_printer *printer
+)
+{
+  int            fd;
+  const char     *tar_ptr = (const char *)tar_buf;
+  const char     *bufr;
+  char           fname[100];
+  int            retval = UNTAR_SUCCESSFUL;
+  unsigned long  ptr;
+  unsigned long  nblocks = 0;
+  unsigned long  file_size = 0;
+  unsigned long  mode = 0;
+  unsigned char  linkflag = 0;
+
+  rtems_printf(printer, "untar: memory at %p (%zu)\n", tar_buf, size);
+
+  ptr = 0;
+  while (true) {
+    if (ptr + 512 > size) {
+      retval = UNTAR_SUCCESSFUL;
+      break;
+    }
+
+    /* Read the header */
+    bufr = &tar_ptr[ptr];
+    ptr += 512;
+
+    retval = Untar_ProcessHeader(bufr, fname, &mode, &file_size,
+                                 &nblocks, &linkflag, printer);
+
+    if (retval != UNTAR_SUCCESSFUL)
+      break;
+
+    if (linkflag == REGTYPE) {
+      if ((fd = open(fname, O_TRUNC | O_CREAT | O_WRONLY, mode)) == -1) {
+        Print_Error(printer, "open", fname);
+        ptr += 512 * nblocks;
+      } else {
+        unsigned long sizeToGo = file_size;
+        ssize_t       len;
+        ssize_t       i;
+        ssize_t       n;
+
+        /*
+         * Read out the data.  There are nblocks of data where nblocks is the
+         * file_size rounded to the nearest 512-byte boundary.
+         */
+        for (i = 0; i < nblocks; i++) {
+          len = ((sizeToGo < 512L) ? (sizeToGo) : (512L));
+          n = write(fd, &tar_ptr[ptr], len);
+          if (n != len) {
+            Print_Error(printer, "write", fname);
+            retval  = UNTAR_FAIL;
+            break;
+          }
+          ptr += 512;
+          sizeToGo -= n;
+        }
+<<<<<<< HEAD
+        fclose(fp);
+      }
+    } else if (linkflag == DIRTYPE) {
+      if ( mkdir(fname, S_IRWXU | S_IRWXG | S_IRWXO) != 0 ) {
+        if (errno == EEXIST) {
+          struct stat stat_buf;
+          if ( stat(fname, &stat_buf) == 0 ) {
+            if (  S_ISDIR(stat_buf.st_mode) ) {
+              continue;
+            } else {
+              if ( unlink(fname) != -1 ) {
+                if ( mkdir(fname, S_IRWXU | S_IRWXG | S_IRWXO) == 0 )
+                  continue;
+              }
+            }
+          }
+        }
+        printk("Untar: failed to create directory %s\n", fname);
+        retval = UNTAR_FAIL;
+        break;
+=======
+        close(fd);
+>>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
+      }
+
+    }
+  }
+
+  return retval;
 }
 
 /*
@@ -119,89 +483,88 @@ Untar_FromMemory(
   size_t  size
 )
 {
-  FILE           *fp;
-  const char     *tar_ptr = (const char *)tar_buf;
-  const char     *bufr;
-  size_t         n;
+  return Untar_FromMemory_Print(tar_buf, size, false);
+}
+
+/*
+ * Function: Untar_FromFile
+ *
+ * Description:
+ *
+ *    This is a simple subroutine used to rip links, directories, and
+ *    files out of a TAR file.
+ *
+ * Inputs:
+ *
+ *    const char *tar_name   - TAR filename.
+ *
+ * Output:
+ *
+ *    int - UNTAR_SUCCESSFUL (0)    on successful completion.
+ *          UNTAR_INVALID_CHECKSUM  for an invalid header checksum.
+ *          UNTAR_INVALID_HEADER    for an invalid header.
+ */
+int
+Untar_FromFile_Print(
+  const char          *tar_name,
+  const rtems_printer *printer
+)
+{
+  int            fd;
+  char           *bufr;
+  ssize_t        n;
   char           fname[100];
-  char           linkname[100];
-  int            sum;
-  int            hdr_chksum;
   int            retval;
-  unsigned long  ptr;
   unsigned long  i;
-  unsigned long  nblocks;
-  unsigned long  file_size;
-  unsigned char  linkflag;
+  unsigned long  nblocks = 0;
+  unsigned long  file_size = 0;
+  unsigned long  mode = 0;
+  unsigned char  linkflag = 0;
 
-  ptr = 0;
+  retval = UNTAR_SUCCESSFUL;
+
+  if ((fd = open(tar_name, O_RDONLY)) < 0) {
+    return UNTAR_FAIL;
+  }
+
+  bufr = (char *)malloc(512);
+  if (bufr == NULL) {
+    close(fd);
+    return(UNTAR_FAIL);
+  }
+
   while (1) {
-    if (ptr + 512 > size) {
-      retval = UNTAR_SUCCESSFUL;
-      break;
-    }
-
     /* Read the header */
-    bufr = &tar_ptr[ptr];
-    ptr += 512;
-    if (strncmp(&bufr[257], "ustar", 5)) {
-      retval = UNTAR_SUCCESSFUL;
+    /* If the header read fails, we just consider it the end of the tarfile. */
+    if ((n = read(fd, bufr, 512)) != 512) {
       break;
     }
 
-    strncpy(fname, bufr, MAX_NAME_FIELD_SIZE);
-    fname[MAX_NAME_FIELD_SIZE] = '\0';
+    retval = Untar_ProcessHeader(bufr, fname, &mode, &file_size,
+                                 &nblocks, &linkflag, printer);
 
-    linkflag   = bufr[156];
-    file_size  = _rtems_octal2ulong(&bufr[124], 12);
-
-    /*
-     * Compute the TAR checksum and check with the value in
-     * the archive.  The checksum is computed over the entire
-     * header, but the checksum field is substituted with blanks.
-     */
-    hdr_chksum = _rtems_octal2ulong(&bufr[148], 8);
-    sum = _rtems_tar_header_checksum(bufr);
-
-    if (sum != hdr_chksum) {
-      retval = UNTAR_INVALID_CHECKSUM;
+    if (retval != UNTAR_SUCCESSFUL)
       break;
-    }
 
-    /*
-     * We've decoded the header, now figure out what it contains and
-     * do something with it.
-     */
-    if (linkflag == SYMTYPE) {
-      strncpy(linkname, &bufr[157], MAX_NAME_FIELD_SIZE);
-      linkname[MAX_NAME_FIELD_SIZE] = '\0';
-      symlink(linkname, fname);
-    } else if (linkflag == REGTYPE) {
-      nblocks = (((file_size) + 511) & ~511) / 512;
-      if ((fp = fopen(fname, "w")) == NULL) {
-        printk("Untar: failed to create file %s\n", fname);
-        ptr += 512 * nblocks;
+    if (linkflag == REGTYPE) {
+      int out_fd;
+
+      /*
+       * Read out the data.  There are nblocks of data where nblocks
+       * is the size rounded to the nearest 512-byte boundary.
+       */
+
+      if ((out_fd = creat(fname, mode)) == -1) {
+        (void) lseek(fd, SEEK_CUR, 512UL * nblocks);
       } else {
-        unsigned long sizeToGo = file_size;
-        size_t len;
-
-        /*
-         * Read out the data.  There are nblocks of data where nblocks
-         * is the file_size rounded to the nearest 512-byte boundary.
-         */
-        for (i=0; i<nblocks; i++) {
-          len = ((sizeToGo < 512L)?(sizeToGo):(512L));
-          n = fwrite(&tar_ptr[ptr], 1, len, fp);
-          if (n != len) {
-            printk("untar: Error during write\n");
-            retval  = UNTAR_FAIL;
-            break;
-          }
-          ptr += 512;
-          sizeToGo -= n;
+        for (i = 0; i < nblocks; i++) {
+          n = read(fd, bufr, 512);
+          n = MIN(n, file_size - (i * 512UL));
+          (void) write(out_fd, bufr, n);
         }
-        fclose(fp);
+        close(out_fd);
       }
+<<<<<<< HEAD
     } else if (linkflag == DIRTYPE) {
       if ( mkdir(fname, S_IRWXU | S_IRWXG | S_IRWXO) != 0 ) {
         if (errno == EEXIST) {
@@ -217,14 +580,121 @@ Untar_FromMemory(
             }
           }
         }
-        printk("Untar: failed to create directory %s\n", fname);
-        retval = UNTAR_FAIL;
-        break;
       }
+=======
+>>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
     }
   }
 
-  return(retval);
+  free(bufr);
+  close(fd);
+
+  return retval;
+}
+
+
+void Untar_ChunkContext_Init(Untar_ChunkContext *context)
+{
+  context->state = UNTAR_CHUNK_HEADER;
+  context->done_bytes = 0;
+  context->out_fd = -1;
+}
+
+int Untar_FromChunk_Print(
+  Untar_ChunkContext *context,
+  void *chunk,
+  size_t chunk_size,
+  const rtems_printer* printer
+)
+{
+  char *buf;
+  size_t done;
+  size_t todo;
+  size_t remaining;
+  size_t consume;
+  int retval;
+  unsigned char linkflag;
+
+  buf = chunk;
+  done = 0;
+  todo = chunk_size;
+
+  while (todo > 0) {
+    switch (context->state) {
+      case UNTAR_CHUNK_HEADER:
+        remaining = 512 - context->done_bytes;
+        consume = MIN(remaining, todo);
+        memcpy(&context->header[context->done_bytes], &buf[done], consume);
+        context->done_bytes += consume;
+
+        if (context->done_bytes == 512) {
+          retval = Untar_ProcessHeader(
+            &context->header[0],
+            &context->fname[0],
+            &context->mode,
+            &context->todo_bytes,
+            &context->todo_blocks,
+            &linkflag,
+            printer
+          );
+
+          if (retval != UNTAR_SUCCESSFUL) {
+            context->state = UNTAR_CHUNK_ERROR;
+            return retval;
+          }
+
+          if (linkflag == REGTYPE) {
+            context->out_fd = creat(&context->fname[0], context->mode);
+
+            if (context->out_fd >= 0) {
+              context->state = UNTAR_CHUNK_WRITE;
+              context->done_bytes = 0;
+            } else {
+              context->state = UNTAR_CHUNK_SKIP;
+              context->todo_bytes = 512 * context->todo_blocks;
+              context->done_bytes = 0;
+            }
+          } else {
+              context->done_bytes = 0;
+          }
+        }
+
+        break;
+      case UNTAR_CHUNK_SKIP:
+        remaining = context->todo_bytes - context->done_bytes;
+        consume = MIN(remaining, todo);
+        context->done_bytes += consume;
+
+        if (context->done_bytes == context->todo_bytes) {
+          context->state = UNTAR_CHUNK_HEADER;
+          context->done_bytes = 0;
+        }
+
+        break;
+      case UNTAR_CHUNK_WRITE:
+        remaining = context->todo_bytes - context->done_bytes;
+        consume = MIN(remaining, todo);
+        write(context->out_fd, &buf[done], consume);
+        context->done_bytes += consume;
+
+        if (context->done_bytes == context->todo_bytes) {
+          close(context->out_fd);
+          context->out_fd = -1;
+          context->state = UNTAR_CHUNK_SKIP;
+          context->todo_bytes = 512 * context->todo_blocks - context->todo_bytes;
+          context->done_bytes = 0;
+        }
+
+        break;
+      default:
+        return UNTAR_FAIL;
+    }
+
+    done += consume;
+    todo -= consume;
+  }
+
+  return UNTAR_SUCCESSFUL;
 }
 
 /*
@@ -250,110 +720,7 @@ Untar_FromFile(
   const char *tar_name
 )
 {
-  int            fd;
-  char           *bufr;
-  ssize_t        n;
-  char           fname[100];
-  char           linkname[100];
-  int            sum;
-  int            hdr_chksum;
-  int            retval;
-  unsigned long  i;
-  unsigned long  nblocks;
-  unsigned long  size;
-  unsigned char  linkflag;
-
-  retval = UNTAR_SUCCESSFUL;
-
-  if ((fd = open(tar_name, O_RDONLY)) < 0) {
-    return UNTAR_FAIL;
-  }
-
-  bufr = (char *)malloc(512);
-  if (bufr == NULL) {
-    close(fd);
-    return(UNTAR_FAIL);
-  }
-
-  while (1) {
-    /* Read the header */
-    /* If the header read fails, we just consider it the end of the tarfile. */
-    if ((n = read(fd, bufr, 512)) != 512) {
-      break;
-    }
-
-    if (strncmp(&bufr[257], "ustar", 5)) {
-      break;
-    }
-
-    strncpy(fname, bufr, MAX_NAME_FIELD_SIZE);
-    fname[MAX_NAME_FIELD_SIZE] = '\0';
-
-    linkflag   = bufr[156];
-    size       = _rtems_octal2ulong(&bufr[124], 12);
-
-    /*
-     * Compute the TAR checksum and check with the value in
-     * the archive.  The checksum is computed over the entire
-     * header, but the checksum field is substituted with blanks.
-     */
-    hdr_chksum = _rtems_octal2ulong(&bufr[148], 8);
-    sum = _rtems_tar_header_checksum(bufr);
-
-    if (sum != hdr_chksum) {
-      retval = UNTAR_INVALID_CHECKSUM;
-      break;
-    }
-
-    /*
-     * We've decoded the header, now figure out what it contains and
-     * do something with it.
-     */
-    if (linkflag == SYMTYPE) {
-      strncpy(linkname, &bufr[157], MAX_NAME_FIELD_SIZE);
-      linkname[MAX_NAME_FIELD_SIZE] = '\0';
-      symlink(linkname,fname);
-    } else if (linkflag == REGTYPE) {
-      int out_fd;
-
-      /*
-       * Read out the data.  There are nblocks of data where nblocks
-       * is the size rounded to the nearest 512-byte boundary.
-       */
-      nblocks = (((size) + 511) & ~511) / 512;
-
-      if ((out_fd = creat(fname, 0644)) == -1) {
-        (void) lseek(fd, SEEK_CUR, 512 * nblocks);
-      } else {
-        for (i=0; i<nblocks; i++) {
-          n = read(fd, bufr, 512);
-          n = MIN(n, size - i*512);
-          (void) write(out_fd, bufr, n);
-        }
-        close(out_fd);
-      }
-    } else if (linkflag == DIRTYPE) {
-      if ( mkdir(fname, S_IRWXU | S_IRWXG | S_IRWXO) != 0 ) {
-        if (errno == EEXIST) {
-          struct stat stat_buf;
-          if ( stat(fname, &stat_buf) == 0 ) {
-            if (  S_ISDIR(stat_buf.st_mode) ) {
-              continue;
-            } else {
-              if ( unlink(fname) != -1 ) {
-                if ( mkdir(fname, S_IRWXU | S_IRWXG | S_IRWXO) == 0 )
-                  continue;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  free(bufr);
-  close(fd);
-
-  return(retval);
+  return Untar_FromFile_Print(tar_name, NULL);
 }
 
 /*

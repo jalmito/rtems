@@ -2,21 +2,18 @@
 
 AC_PREREQ([2.69])
 AC_INIT([rtems-c-src-lib-libbsp-powerpc-beatnik],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
-AC_CONFIG_SRCDIR([bsp_specs])
 RTEMS_TOP(../../../../../..)
+RTEMS_SOURCE_TOP
+RTEMS_BUILD_TOP
+RTEMS_BSP_LINKCMDS
 
 RTEMS_CANONICAL_TARGET_CPU
 AM_INIT_AUTOMAKE([no-define nostdinc foreign 1.12.2])
 RTEMS_BSP_CONFIGURE
 
-RTEMS_PROG_CC_FOR_TARGET([-ansi -fasm])
-RTEMS_CANONICALIZE_TOOLS
-RTEMS_PROG_CCAS
 
 RTEMS_CHECK_TOOL([OBJCOPY],[objcopy])
 
-RTEMS_CHECK_NETWORKING
-AM_CONDITIONAL(HAS_NETWORKING,test "$HAS_NETWORKING" = "yes")
 
 AS=$CC
 AM_PROG_AS
@@ -36,6 +33,8 @@ Note that the policy can still be defined by the application
 (see sbrk.c, BSP_sbrk_policy). By undefining
 CONFIGURE_MALLOC_BSP_SUPPORTS_SBRK this feature is removed
 and a little memory is saved.])
+
+AC_DEFINE(__ppc_generic, 1, [PowerPC model option])
 
 # Explicitly list all Makefiles here
 AC_CONFIG_FILES([Makefile])

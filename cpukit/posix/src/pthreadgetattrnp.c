@@ -21,37 +21,82 @@
 #define  _GNU_SOURCE
 #include <pthread.h>
 #include <errno.h>
+#include <string.h>
 
 #include <rtems/posix/pthreadimpl.h>
+#include <rtems/posix/pthreadattrimpl.h>
+#include <rtems/posix/priorityimpl.h>
+#include <rtems/score/schedulerimpl.h>
 #include <rtems/score/threadimpl.h>
 
 int pthread_getattr_np(
-  pthread_t       id,
+  pthread_t       thread,
   pthread_attr_t *attr
 )
 {
-  Objects_Locations        location;
-  POSIX_API_Control       *api;
-  Thread_Control          *the_thread;
+  Thread_Control               *the_thread;
+  ISR_lock_Context              lock_context;
+  Thread_CPU_budget_algorithms  budget_algorithm;
+  const Scheduler_Control      *scheduler;
+  bool                          ok;
 
-  if ( !attr )
+  if ( attr == NULL ) {
     return EINVAL;
-
-  the_thread = _Thread_Get( id, &location );
-  switch ( location ) {
-
-    case OBJECTS_LOCAL:
-      api = the_thread->API_Extensions[ THREAD_API_POSIX ];
-      _POSIX_Threads_Copy_attributes( attr, &api->Attributes);
-      _Objects_Put( &the_thread->Object );
-      return 0;
-
-#if defined(RTEMS_MULTIPROCESSING)
-    case OBJECTS_REMOTE:
-#endif
-    case OBJECTS_ERROR:
-      break;
   }
 
-  return ESRCH;
+  attr = memset( attr, 0, sizeof( *attr ) );
+
+  the_thread = _Thread_Get( thread, &lock_context );
+
+  if ( the_thread == NULL ) {
+    return ESRCH;
+  }
+
+  _Thread_State_acquire_critical( the_thread, &lock_context );
+
+  attr->stackaddr = the_thread->Start.Initial_stack.area;
+  attr->stacksize = the_thread->Start.Initial_stack.size;
+
+  if ( the_thread->was_created_with_inherited_scheduler ) {
+    attr->inheritsched = PTHREAD_INHERIT_SCHED;
+  } else {
+    attr->inheritsched = PTHREAD_EXPLICIT_SCHED;
+  }
+
+  scheduler = _Thread_Scheduler_get_home( the_thread );
+  attr->schedparam.sched_priority = _POSIX_Priority_From_core(
+    scheduler,
+    _Thread_Get_priority( the_thread )
+  );
+  _POSIX_Threads_Get_sched_param_sporadic(
+    the_thread,
+    scheduler,
+    &attr->schedparam
+  );
+
+  if ( _Thread_Is_joinable( the_thread ) ) {
+    attr->detachstate = PTHREAD_CREATE_JOINABLE;
+  } else {
+    attr->detachstate = PTHREAD_CREATE_DETACHED;
+  }
+
+  attr->affinityset = &attr->affinitysetpreallocated;
+  attr->affinitysetsize = sizeof( attr->affinitysetpreallocated );
+  ok = _Scheduler_Get_affinity(
+    the_thread,
+    attr->affinitysetsize,
+    attr->affinityset
+  );
+
+  budget_algorithm = the_thread->budget_algorithm;
+
+  _Thread_State_release( the_thread, &lock_context );
+
+  attr->is_initialized = true;
+  attr->contentionscope = PTHREAD_SCOPE_PROCESS;
+  attr->cputime_clock_allowed = 1;
+  attr->schedpolicy =
+    _POSIX_Thread_Translate_to_sched_policy( budget_algorithm );
+
+  return ok ? 0 : EINVAL;
 }

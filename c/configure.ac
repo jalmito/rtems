@@ -3,12 +3,15 @@
 
 AC_PREREQ([2.69])
 AC_INIT([rtems-c],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
-AC_CONFIG_SRCDIR([TOOL_TARGETS])
+AC_CONFIG_SRCDIR([src])
 RTEMS_TOP(..)
+with_rtems_source_top=$(cd ${srcdir}/.. && pwd)
+RTEMS_SOURCE_TOP
+RTEMS_BUILD_TOP
 
 RTEMS_CANONICAL_TARGET_CPU
 
-AM_INIT_AUTOMAKE([no-define foreign 1.12.2])
+AM_INIT_AUTOMAKE([no-define foreign subdir-objects 1.12.2])
 AM_MAINTAINER_MODE
 
 ## These options are used within this file.
@@ -28,7 +31,7 @@ AS_IF([test x"$enable_rtemsbsp" = x"no"],[
 
 # Check sanity of BSPs in $rtems_bsp
 for _rtems_bsp in : $rtems_bsp; do test "x$_rtems_bsp" = x: && continue
-  # make sure there is a make/custom file for the bsp
+  # make sure there is a config/*.cfg file for the bsp
   _RTEMS_CHECK_CUSTOM_BSP([$_rtems_bsp.cfg],[bsp_cfg])
 
   AS_IF([test -n "$bsp_cfg"],
@@ -65,6 +68,7 @@ AC_SUBST(RTEMS_BSP_LIST)
 # Explicitly list all Makefiles here
 AC_CONFIG_FILES([Makefile],[
 for bsp in : $RTEMS_BSP_LIST; do test "x$bsp" = x: && continue
+rtems_source_top=$(cd ${srcdir}/.. && pwd)
 cat >> Makefile << BSPEOF
 
 $bsp: src/configure
@@ -72,7 +76,8 @@ $bsp: src/configure
 	  echo "Configuring RTEMS_BSP=$bsp"; \\
 	  \$(MKDIR_P) $bsp; \\
 	  ( cd $bsp && \\
-	    CONFIG_SHELL=\$(SHELL) RTEMS_BSP=$bsp \$(rtems_bsp_configure) ) \\
+           CONFIG_SHELL=\$(SHELL) RTEMS_BSP=$bsp \$(rtems_bsp_configure) \\
+           --with-rtems-build-top=\$\${PWD} --with-rtems-source-top=${rtems_source_top} ) \\
 	  || case "\$\$amf" in *=*) exit 1;; *k*) fail=yes;; *) exit 1;; esac;
 BSPEOF
 done

@@ -59,12 +59,10 @@
 #undef rtems_semaphore_release
 #undef rtems_task_create
 #undef rtems_task_delete
-#undef rtems_task_get_note
 #undef rtems_task_ident
 #undef rtems_task_mode
 #undef rtems_task_restart
 #undef rtems_task_resume
-#undef rtems_task_set_note
 #undef rtems_task_set_priority
 #undef rtems_task_start
 #undef rtems_task_suspend
@@ -184,8 +182,6 @@
            Empty_directive()
 #define     rtems_task_delete( tid ) \
            Empty_directive()
-#define     rtems_task_get_note( tid, notepad, note ) \
-           Empty_directive()
 #define     rtems_task_ident( name, node, tid ) \
            Empty_directive()
 #define     rtems_task_mode( mode, mask, pmode ) \
@@ -194,8 +190,6 @@
            Empty_directive()
 #define     rtems_task_resume( tid ) \
            Empty_directive()
-#define     rtems_task_set_note( tid, notepad, note ) \
-           Empty_directive()
 #define     rtems_task_set_priority( tid, priority, ppriority ) \
            Empty_directive()
 #define     rtems_task_start( tid, saddr, arg ) \
@@ -203,7 +197,7 @@
 #define     rtems_task_suspend( tid ) \
            Empty_directive()
 
-#define     rtems_clock_get( options, time ) \
+#define     rtems_clock_get_tod( tod ) \
            Empty_directive()
 #define     rtems_clock_set( time ) \
            Empty_directive()
@@ -247,7 +241,7 @@
            Empty_directive()
 
 #if defined(__GNUC__)
-#define RTEMS_GCC_NOWARN_UNUSED	__attribute__((unused))
+#define RTEMS_GCC_NOWARN_UNUSED	RTEMS_UNUSED
 #else
 #define RTEMS_GCC_NOWARN_UNUSED
 #endif

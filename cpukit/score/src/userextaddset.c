@@ -26,7 +26,15 @@ void _User_extensions_Add_set(
   User_extensions_Control *the_extension
 )
 {
-  _Chain_Append( &_User_extensions_List, &the_extension->Node );
+  ISR_lock_Context lock_context;
+
+  _User_extensions_Acquire( &lock_context );
+  _Chain_Initialize_node( &the_extension->Node );
+  _Chain_Append_unprotected(
+    &_User_extensions_List.Active,
+    &the_extension->Node
+  );
+  _User_extensions_Release( &lock_context );
 
   /*
    * If a switch handler is present, append it to the switch chain.
@@ -39,6 +47,7 @@ void _User_extensions_Add_set(
       the_extension->Callouts.thread_switch;
 
     _Per_CPU_Acquire_all( level );
+    _Chain_Initialize_node( &the_extension->Switch.Node );
     _Chain_Append_unprotected(
       &_User_extensions_Switches_list,
       &the_extension->Switch.Node

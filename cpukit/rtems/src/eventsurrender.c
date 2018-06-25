@@ -65,7 +65,7 @@ static bool _Event_Is_satisfied(
     && ( *seized_events == event_condition || _Options_Is_any( option_set ) );
 }
 
-void _Event_Surrender(
+rtems_status_code _Event_Surrender(
   Thread_Control    *the_thread,
   rtems_event_set    event_in,
   Event_Control     *event,
@@ -77,7 +77,7 @@ void _Event_Surrender(
   rtems_event_set seized_events;
   bool            unblock;
 
-  _Thread_Lock_acquire_default_critical( the_thread, lock_context );
+  _Thread_Wait_acquire_default_critical( the_thread, lock_context );
 
   _Event_sets_Post( event_in, &event->pending_events );
   pending_events = event->pending_events;
@@ -88,6 +88,7 @@ void _Event_Surrender(
   ) {
     Thread_Wait_flags ready_again;
     bool              success;
+<<<<<<< HEAD
 
     _Event_Satisfy( the_thread, event, pending_events, seized_events );
 
@@ -96,6 +97,13 @@ void _Event_Surrender(
 
     ready_again = wait_class | THREAD_WAIT_STATE_READY_AGAIN;
     success = _Thread_Wait_flags_try_change_critical(
+=======
+
+    _Event_Satisfy( the_thread, event, pending_events, seized_events );
+
+    ready_again = wait_class | THREAD_WAIT_STATE_READY_AGAIN;
+    success = _Thread_Wait_flags_try_change_release(
+>>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
       the_thread,
       wait_class | THREAD_WAIT_STATE_INTEND_TO_BLOCK,
       ready_again
@@ -119,13 +127,15 @@ void _Event_Surrender(
     Per_CPU_Control *cpu_self;
 
     cpu_self = _Thread_Dispatch_disable_critical( lock_context );
-    _Thread_Lock_release_default( the_thread, lock_context );
+    _Thread_Wait_release_default( the_thread, lock_context );
 
-    _Watchdog_Remove_ticks( &the_thread->Timer );
+    _Thread_Timer_remove( the_thread );
     _Thread_Unblock( the_thread );
 
     _Thread_Dispatch_enable( cpu_self );
   } else {
-    _Thread_Lock_release_default( the_thread, lock_context );
+    _Thread_Wait_release_default( the_thread, lock_context );
   }
+
+  return RTEMS_SUCCESSFUL;
 }

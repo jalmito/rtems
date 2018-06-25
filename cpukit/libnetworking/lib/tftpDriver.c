@@ -28,13 +28,17 @@
 #include <rtems.h>
 #include <rtems/libio_.h>
 #include <rtems/seterr.h>
-#include <rtems/rtems_bsdnet.h>
 #include <rtems/tftp.h>
+#include <rtems/thread.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+
+#ifdef RTEMS_NETWORKING
+#include <rtems/rtems_bsdnet.h>
+#endif
 
 #ifdef RTEMS_TFTP_DRIVER_DEBUG
 int rtems_tftp_driver_debug = 1;
@@ -151,7 +155,7 @@ struct tftpStream {
  */
 typedef struct tftpfs_info_s {
   uint32_t flags;
-  rtems_id tftp_mutex;
+  rtems_mutex tftp_mutex;
   int nStreams;
   struct tftpStream ** volatile tftpStreams;
 } tftpfs_info_t;
@@ -180,7 +184,6 @@ int rtems_tftpfs_initialize(
   const void                           *data
 )
 {
-  rtems_status_code  sc;
   const char *device = mt_entry->dev;
   size_t devicelen = strlen (device);
   tftpfs_info_t *fs;
@@ -213,20 +216,7 @@ int rtems_tftpfs_initialize(
    *  NOTE:  This could be in an fsinfo for this filesystem type.
    */
 
-  sc = rtems_semaphore_create (
-    rtems_build_name('T', 'F', 'T', 'P'),
-    1,
-    RTEMS_FIFO |
-    RTEMS_BINARY_SEMAPHORE |
-    RTEMS_NO_INHERIT_PRIORITY |
-    RTEMS_NO_PRIORITY_CEILING |
-    RTEMS_LOCAL,
-    0,
-    &fs->tftp_mutex
-  );
-
-  if (sc != RTEMS_SUCCESSFUL)
-      goto error;
+  rtems_mutex_init (&fs->tftp_mutex, "TFTPFS");
 
   if (data) {
       char* config = (char*) data;
@@ -258,10 +248,10 @@ releaseStream (tftpfs_info_t *fs, int s)
 {
     if (fs->tftpStreams[s] && (fs->tftpStreams[s]->socket >= 0))
         close (fs->tftpStreams[s]->socket);
-    rtems_semaphore_obtain (fs->tftp_mutex, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
+    rtems_mutex_lock (&fs->tftp_mutex);
     free (fs->tftpStreams[s]);
     fs->tftpStreams[s] = NULL;
-    rtems_semaphore_release (fs->tftp_mutex);
+    rtems_mutex_unlock (&fs->tftp_mutex);
 }
 
 static void
@@ -271,7 +261,7 @@ rtems_tftpfs_shutdown (rtems_filesystem_mount_table_entry_t* mt_entry)
   int            s;
   for (s = 0; s < fs->nStreams; s++)
       releaseStream (fs, s);
-  rtems_semaphore_delete (fs->tftp_mutex);
+  rtems_mutex_destroy (&fs->tftp_mutex);
   free (fs);
   free (mt_entry->mt_fs_root->location.node_access);
 }
@@ -538,7 +528,6 @@ static int rtems_tftp_open_worker(
     char                 *cp2;
     char                 *remoteFilename;
     rtems_interval       now;
-    rtems_status_code    sc;
     char                 *hostname;
 
     /*
@@ -551,9 +540,11 @@ static int rtems_tftp_open_worker(
      */
     hostname = full_path_name;
     cp1 = strchr (full_path_name, ':');
-    if (!cp1)
+    if (!cp1) {
+#ifdef RTEMS_NETWORKING
         hostname = "BOOTP_HOST";
-    else {
+#endif
+    } else {
         *cp1 = '\0';
         ++cp1;
     }
@@ -561,9 +552,12 @@ static int rtems_tftp_open_worker(
     /*
      * Convert hostname to Internet address
      */
+#ifdef RTEMS_NETWORKING
     if (strcmp (hostname, "BOOTP_HOST") == 0)
         farAddress = rtems_bsdnet_bootp_server_address;
-    else if (inet_aton (hostname, &farAddress) == 0) {
+    else
+#endif
+    if (inet_aton (hostname, &farAddress) == 0) {
         struct hostent *he = gethostbyname(hostname);
         if (he == NULL)
             return ENOENT;
@@ -573,9 +567,11 @@ static int rtems_tftp_open_worker(
     /*
      * Extract file pathname component
      */
+#ifdef RTEMS_NETWORKING
     if (strcmp (cp1, "BOOTP_FILE") == 0) {
         cp1 = rtems_bsdnet_bootp_boot_file_name;
     }
+#endif
     if (*cp1 == '\0')
         return ENOENT;
     remoteFilename = cp1;
@@ -585,9 +581,7 @@ static int rtems_tftp_open_worker(
     /*
      * Find a free stream
      */
-    sc = rtems_semaphore_obtain (fs->tftp_mutex, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
-    if (sc != RTEMS_SUCCESSFUL)
-        return EBUSY;
+    rtems_mutex_lock (&fs->tftp_mutex);
     for (s = 0 ; s < fs->nStreams ; s++) {
         if (fs->tftpStreams[s] == NULL)
         break;
@@ -601,13 +595,13 @@ static int rtems_tftp_open_worker(
 
         np = realloc (fs->tftpStreams, ++fs->nStreams * sizeof *fs->tftpStreams);
         if (np == NULL) {
-            rtems_semaphore_release (fs->tftp_mutex);
+            rtems_mutex_unlock (&fs->tftp_mutex);
             return ENOMEM;
         }
         fs->tftpStreams = np;
     }
     tp = fs->tftpStreams[s] = malloc (sizeof (struct tftpStream));
-    rtems_semaphore_release (fs->tftp_mutex);
+    rtems_mutex_unlock (&fs->tftp_mutex);
     if (tp == NULL)
         return ENOMEM;
     iop->data0 = s;
@@ -968,8 +962,8 @@ static ssize_t rtems_tftp_write(
  * Dummy version to let fopen(xxxx,"w") work properly.
  */
 static int rtems_tftp_ftruncate(
-    rtems_libio_t   *iop __attribute__((unused)),
-    off_t            count __attribute__((unused))
+    rtems_libio_t   *iop RTEMS_UNUSED,
+    off_t            count RTEMS_UNUSED
 )
 {
     return 0;
@@ -1055,6 +1049,7 @@ static const rtems_filesystem_file_handlers_r rtems_tftp_handlers = {
    .fdatasync_h = rtems_filesystem_default_fsync_or_fdatasync,
    .fcntl_h = rtems_filesystem_default_fcntl,
    .kqfilter_h = rtems_filesystem_default_kqfilter,
+   .mmap_h = rtems_filesystem_default_mmap,
    .poll_h = rtems_filesystem_default_poll,
    .readv_h = rtems_filesystem_default_readv,
    .writev_h = rtems_filesystem_default_writev

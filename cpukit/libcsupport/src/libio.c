@@ -55,20 +55,19 @@ static const rtems_assoc_t status_flags_assoc[] = {
 #endif
   { "NONBLOCK",  LIBIO_FLAGS_NO_DELAY,  O_NONBLOCK },
   { "APPEND",    LIBIO_FLAGS_APPEND,    O_APPEND },
-  { "CREATE",    LIBIO_FLAGS_CREATE,    O_CREAT },
   { 0, 0, 0 },
 };
 
-uint32_t rtems_libio_fcntl_flags( int fcntl_flags )
+unsigned int rtems_libio_fcntl_flags( int fcntl_flags )
 {
-  uint32_t   flags = 0;
+  unsigned int   flags = 0;
   uint32_t   access_modes;
 
   /*
    * Access mode is a small integer
    */
 
-  access_modes = (uint32_t) (fcntl_flags & O_ACCMODE);
+  access_modes = (unsigned int) (fcntl_flags & O_ACCMODE);
   fcntl_flags &= ~O_ACCMODE;
   flags = rtems_assoc_local_by_remote( access_modes_assoc, access_modes );
 
@@ -76,7 +75,7 @@ uint32_t rtems_libio_fcntl_flags( int fcntl_flags )
    * Everything else is single bits
    */
 
-  flags |= rtems_assoc_local_by_remote_bitfield(
+  flags |= (unsigned int ) rtems_assoc_local_by_remote_bitfield(
     status_flags_assoc,
     (uint32_t) fcntl_flags
   );
@@ -84,7 +83,7 @@ uint32_t rtems_libio_fcntl_flags( int fcntl_flags )
   return flags;
 }
 
-int rtems_libio_to_fcntl_flags( uint32_t flags )
+int rtems_libio_to_fcntl_flags( unsigned int flags )
 {
   int fcntl_flags = 0;
 
@@ -104,24 +103,26 @@ int rtems_libio_to_fcntl_flags( uint32_t flags )
     fcntl_flags |= O_APPEND;
   }
 
-  if ( (flags & LIBIO_FLAGS_CREATE) == LIBIO_FLAGS_CREATE ) {
-    fcntl_flags |= O_CREAT;
-  }
-
   return fcntl_flags;
 }
 
 rtems_libio_t *rtems_libio_allocate( void )
 {
-  rtems_libio_t *iop = NULL;
+  rtems_libio_t *iop;
 
   rtems_libio_lock();
 
-  if (rtems_libio_iop_freelist) {
-    iop = rtems_libio_iop_freelist;
-    rtems_libio_iop_freelist = iop->data1;
-    memset( iop, 0, sizeof(*iop) );
-    iop->flags = LIBIO_FLAGS_OPEN;
+  iop = rtems_libio_iop_free_head;
+
+  if ( iop != NULL ) {
+    void *next;
+
+    next = iop->data1;
+    rtems_libio_iop_free_head = next;
+
+    if ( next == NULL ) {
+      rtems_libio_iop_free_tail = &rtems_libio_iop_free_head;
+    }
   }
 
   rtems_libio_unlock();
@@ -137,9 +138,9 @@ void rtems_libio_free(
 
   rtems_libio_lock();
 
-    iop->flags = 0;
-    iop->data1 = rtems_libio_iop_freelist;
-    rtems_libio_iop_freelist = iop;
+  iop = memset( iop, 0, sizeof( *iop ) );
+  *rtems_libio_iop_free_tail = iop;
+  rtems_libio_iop_free_tail = &iop->data1;
 
   rtems_libio_unlock();
 }

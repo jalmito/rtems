@@ -7,104 +7,72 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
+include $(top_srcdir)/../../bsp.am
 
-include_bspdir = $(includedir)/bsp
-include_libcpudir = $(includedir)/libcpu
-
-dist_project_lib_DATA = bsp_specs
+dist_project_lib_DATA = ../../../../../../bsps/or1k/generic_or1k/start/bsp_specs
 
 ###############################################################################
 #                  Header                                                     #
 ###############################################################################
 
-include_bsp_HEADERS =
-include_HEADERS = include/bsp.h
-include_HEADERS += ../../shared/include/tm27.h
-
-nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
-include_bsp_HEADERS += ../shared/include/linker-symbols.h
-include_bsp_HEADERS += ../../../libbsp/shared/include/mm.h
-include_bsp_HEADERS += ../../shared/include/utility.h
-include_bsp_HEADERS += ../../shared/include/irq-generic.h
-include_bsp_HEADERS += ../../shared/include/irq-info.h
-include_bsp_HEADERS += ../../shared/include/stackalloc.h
-include_bsp_HEADERS += ../../shared/include/uart-output-char.h
-include_bsp_HEADERS += ../shared/include/cache_.h
-include_bsp_HEADERS += include/irq.h
-include_bsp_HEADERS += include/uart.h
-include_bsp_HEADERS += include/generic_or1k.h
-
-nodist_include_HEADERS = ../../shared/include/coverhd.h \
-  include/bspopts.h
-
 ###############################################################################
 #                  Data                                                       #
 ###############################################################################
 
-noinst_LIBRARIES = libbspstart.a
-
-libbspstart_a_SOURCES = start/start.S
-
+start.$(OBJEXT): ../../../../../../bsps/or1k/generic_or1k/start/start.S
+	$(CPPASCOMPILE) -o $@ -c $<
 project_lib_DATA = start.$(OBJEXT)
 
-project_lib_DATA += startup/linkcmds
-project_lib_DATA += ../shared/startup/linkcmds.base
+project_lib_DATA += linkcmds
+dist_project_lib_DATA += ../../../../../../bsps/or1k/shared/start/linkcmds.base
 
 ###############################################################################
 #                  LibBSP                                                     #
 ###############################################################################
 
-noinst_LIBRARIES += libbsp.a
+project_lib_LIBRARIES = librtemsbsp.a
 
-libbsp_a_SOURCES =
-libbsp_a_CPPFLAGS =
-libbsp_a_LIBADD =
+librtemsbsp_a_SOURCES =
+librtemsbsp_a_CPPFLAGS = $(AM_CPPFLAGS)
+librtemsbsp_a_LIBADD =
 
 # Startup
-libbsp_a_SOURCES += ../../shared/bspreset.c
-libbsp_a_SOURCES += startup/bspstart.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-empty.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/or1k/generic_or1k/start/bspstart.c
 
 # Shared
-libbsp_a_SOURCES += ../../shared/bootcard.c
-libbsp_a_SOURCES += ../../shared/bspclean.c
-libbsp_a_SOURCES += ../../shared/bspgetworkarea.c
-libbsp_a_SOURCES += ../../shared/bsplibc.c
-libbsp_a_SOURCES += ../../shared/bsppost.c
-libbsp_a_SOURCES += ../../shared/bsppredriverhook.c
-libbsp_a_SOURCES += ../../shared/bsppretaskinghook.c
-libbsp_a_SOURCES += ../../shared/gnatinstallhandler.c
-libbsp_a_SOURCES += ../../shared/sbrk.c
-libbsp_a_SOURCES += ../../shared/src/stackalloc.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/stackalloc.c
 
 # Console
-libbsp_a_SOURCES += ../../shared/console.c
-libbsp_a_SOURCES += ../../shared/console_control.c
-libbsp_a_SOURCES += ../../shared/console_read.c
-libbsp_a_SOURCES += ../../shared/console_select.c
-libbsp_a_SOURCES += ../../shared/console_write.c
-libbsp_a_SOURCES += console/console-config.c
-libbsp_a_SOURCES += console/uart.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console-control.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console-select.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/or1k/generic_or1k/console/console-config.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/or1k/generic_or1k/console/uart.c
 
 # Timer
-libbsp_a_SOURCES += timer/timer.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/or1k/generic_or1k/btimer/btimer.c
 
 # clock
-libbsp_a_SOURCES += clock/clockdrv.c ../../../shared/clockdrv_shell.h
+librtemsbsp_a_SOURCES +=../../../../../../bsps/or1k/generic_or1k/clock/clockdrv.c
 
 # IRQ
-libbsp_a_SOURCES += ../../shared/src/irq-default-handler.c
-libbsp_a_SOURCES += ../../shared/src/irq-generic.c
-libbsp_a_SOURCES += ../../shared/src/irq-info.c
-libbsp_a_SOURCES += irq/irq.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/irq/irq-default-handler.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/or1k/generic_or1k/irq/irq.c
 
 # Cache
-libbsp_a_LIBADD += ../../../libcpu/@RTEMS_CPU@/shared/cache.rel
+librtemsbsp_a_SOURCES += ../../../../../../bsps/or1k/shared/cache/cache.c
 
 ###############################################################################
 #                  Special Rules                                              #
 ###############################################################################
 
-DISTCLEANFILES = include/bspopts.h
 
-include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
+include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
+include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
+include $(srcdir)/../../../../../../bsps/or1k/generic_or1k/headers.am

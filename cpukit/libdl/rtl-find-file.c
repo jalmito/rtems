@@ -22,6 +22,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 #include <rtems/libio_.h>
@@ -30,7 +31,7 @@
 #include "rtl-find-file.h"
 #include "rtl-error.h"
 #include "rtl-string.h"
-#include "rtl-trace.h"
+#include <rtems/rtl/rtl-trace.h>
 
 #if WAF_BUILD
 #define rtems_filesystem_is_delimiter rtems_filesystem_is_separator

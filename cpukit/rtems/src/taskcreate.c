@@ -6,7 +6,7 @@
  */
 
 /*
- *  COPYRIGHT (c) 1989-2014.
+ *  COPYRIGHT (c) 1989-2014,2016.
  *  On-Line Applications Research Corporation (OAR).
  *
  *  The license and distribution terms for this file may be
@@ -37,6 +37,7 @@ rtems_status_code rtems_task_create(
 )
 {
   Thread_Control          *the_thread;
+  const Scheduler_Control *scheduler;
   bool                     is_fp;
 #if defined(RTEMS_MULTIPROCESSING)
   Objects_MP_Control      *the_global_object = NULL;
@@ -44,7 +45,8 @@ rtems_status_code rtems_task_create(
 #endif
   bool                     status;
   rtems_attribute          the_attribute_set;
-  Priority_Control         core_priority;
+  bool                     valid;
+  Priority_Control         priority;
   RTEMS_API_Control       *api;
   ASR_Information         *asr;
 
@@ -83,11 +85,17 @@ rtems_status_code rtems_task_create(
    */
 
   if ( !_Attributes_Is_system_task( the_attribute_set ) ) {
-    if ( !_RTEMS_tasks_Priority_is_valid( initial_priority ) )
+    if ( initial_priority == PRIORITY_MINIMUM ) {
       return RTEMS_INVALID_PRIORITY;
+    }
   }
 
-  core_priority = _RTEMS_tasks_Priority_to_Core( initial_priority );
+  scheduler = _Thread_Scheduler_get_home( _Thread_Get_executing() );
+
+  priority = _RTEMS_Priority_To_core( scheduler, initial_priority, &valid );
+  if ( !valid ) {
+    return RTEMS_INVALID_PRIORITY;
+  }
 
 #if defined(RTEMS_MULTIPROCESSING)
   if ( _Attributes_Is_global( the_attribute_set ) ) {
@@ -102,19 +110,14 @@ rtems_status_code rtems_task_create(
 #endif
 
   /*
-   *  Make sure system is MP if this task is global
-   */
-
-  /*
    *  Allocate the thread control block and -- if the task is global --
    *  allocate a global object control block.
    *
    *  NOTE:  This routine does not use the combined allocate and open
-   *         global object routine because this results in a lack of
-   *         control over when memory is allocated and can be freed in
-   *         the event of an error.
+   *         global object routine (_Objects_MP_Allocate_and_open) because
+   *         this results in a lack of control over when memory is allocated
+   *         and can be freed in the event of an error.
    */
-
   the_thread = _RTEMS_tasks_Allocate();
 
   if ( !the_thread ) {
@@ -141,11 +144,11 @@ rtems_status_code rtems_task_create(
   status = _Thread_Initialize(
     &_RTEMS_tasks_Information,
     the_thread,
-    _Scheduler_Get_by_CPU_index( _SMP_Get_current_processor() ),
+    scheduler,
     NULL,
     stack_size,
     is_fp,
-    core_priority,
+    priority,
     _Modes_Is_preempt(initial_modes)   ? true : false,
     _Modes_Is_timeslice(initial_modes) ?
       THREAD_CPU_BUDGET_ALGORITHM_RESET_TIMESLICE :
@@ -177,7 +180,7 @@ rtems_status_code rtems_task_create(
   if ( is_global ) {
 
     _Objects_MP_Open(
-      &_RTEMS_tasks_Information,
+      &_RTEMS_tasks_Information.Objects,
       the_global_object,
       name,
       the_thread->Object.id

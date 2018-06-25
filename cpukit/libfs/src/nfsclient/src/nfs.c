@@ -67,6 +67,7 @@
 #include <rtems/libio.h>
 #include <rtems/libio_.h>
 #include <rtems/seterr.h>
+#include <rtems/thread.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -79,8 +80,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include <nfs_prot.h>
-#include <mount_prot.h>
+#include "../proto/nfs_prot.h"
+#include "../proto/mount_prot.h"
 
 #include "rpcio.h"
 #include "librtemsNfs.h"
@@ -197,19 +198,9 @@ static struct timeval _nfscalltimeout = { 10, 0 };	/* {secs, us } */
 #define STATIC static
 #endif
 
-#define MUTEX_ATTRIBUTES    (RTEMS_LOCAL           |   \
-                            RTEMS_PRIORITY         |   \
-                            RTEMS_INHERIT_PRIORITY |   \
-                            RTEMS_BINARY_SEMAPHORE)
+#define LOCK(s)		rtems_recursive_mutex_lock(&(s))
 
-#define LOCK(s)		do {                               \
-						rtems_semaphore_obtain((s),    \
-									RTEMS_WAIT,        \
-									RTEMS_NO_TIMEOUT); \
-					} while (0)
-
-#define UNLOCK(s)	do { rtems_semaphore_release((s)); \
-					} while (0)
+#define UNLOCK(s)	rtems_recursive_mutex_unlock(&(s))
 
 RTEMS_INTERRUPT_LOCK_DEFINE(static, nfs_global_lock, "NFS")
 
@@ -249,7 +240,7 @@ typedef struct strbuf {
 
 /* Read 'readlink' results into a 'strbuf'.
  * This is convenient as it avoids
- * one extra step of copying / lenght
+ * one extra step of copying / length
  * checking.
  */
 typedef struct readlinkres_strbuf {
@@ -661,13 +652,13 @@ static struct nfsstats {
 		 * linked ist of mounted NFS
 		 * and the num_mounted_fs field
 		 */
-	rtems_id					llock;
+	rtems_recursive_mutex			llock;
 		/* A lock for protecting misc
 		 * stuff  within the driver.
 		 * The lock must only be held
 		 * for short periods of time.
 		 */
-	rtems_id					lock;
+	rtems_recursive_mutex			lock;
 		/* Our major number as assigned
 		 * by RTEMS
 		 */
@@ -700,7 +691,7 @@ static struct nfsstats {
 	 */
 	RpcUdpXactPool smallPool;
 	RpcUdpXactPool bigPool;
-} nfsGlob = {0, 0,  0xffffffff, 0, 0, 0, NULL, NULL};
+} nfsGlob = {RTEMS_RECURSIVE_MUTEX_INITIALIZER("NFS List"), RTEMS_RECURSIVE_MUTEX_INITIALIZER("NFS Misc"),  0xffffffff, 0, 0, 0, NULL, NULL};
 
 /*
  * Global variable to tune the 'st_blksize' (stat(2)) value this nfs
@@ -1036,6 +1027,9 @@ rtems_status_code status;
 	if (0==bigPoolDepth)
 		bigPoolDepth   = 10;
 
+	rtems_recursive_mutex_init(&nfsGlob.llock, "NFSl");
+	rtems_recursive_mutex_init(&nfsGlob.lock, "NFSm");
+
 	/* it's crucial to zero out the 'next' pointer
 	 * because it terminates the xdr_entry recursion
 	 *
@@ -1067,26 +1061,6 @@ rtems_status_code status;
 		goto cleanup;
 	}
 
-	status = rtems_semaphore_create(
-		rtems_build_name('N','F','S','l'),
-		1,
-		MUTEX_ATTRIBUTES,
-		0,
-		&nfsGlob.llock);
-	if (status != RTEMS_SUCCESSFUL) {
-		goto cleanup;
-	}
-
-	status = rtems_semaphore_create(
-		rtems_build_name('N','F','S','m'),
-		1,
-		MUTEX_ATTRIBUTES,
-		0,
-		&nfsGlob.lock);
-	if (status != RTEMS_SUCCESSFUL) {
-		goto cleanup;
-	}
-
 	if (sizeof(ino_t) < sizeof(u_int)) {
 		fprintf(stderr,
 			"WARNING: Using 'short st_ino' hits performance and may fail to access/find correct files\n");
@@ -1112,23 +1086,16 @@ nfsCleanup(void)
 {
 int			refuse;
 
-	if (nfsGlob.llock != 0) {
-		LOCK(nfsGlob.llock);
-		if ( (refuse = nfsGlob.num_mounted_fs) ) {
-			fprintf(stderr,"Refuse to unload NFS; %i filesystems still mounted.\n",
-							refuse);
-			nfsMountsShow(stderr);
-			/* yes, printing is slow - but since you try to unload the driver,
-			 * you assume nobody is using NFS, so what if they have to wait?
-			 */
-			UNLOCK(nfsGlob.llock);
-			return -1;
-		}
-	}
-
-	if (nfsGlob.lock != 0) {
-		rtems_semaphore_delete(nfsGlob.lock);
-		nfsGlob.lock = 0;
+	LOCK(nfsGlob.llock);
+	if ( (refuse = nfsGlob.num_mounted_fs) ) {
+		fprintf(stderr,"Refuse to unload NFS; %i filesystems still mounted.\n",
+						refuse);
+		nfsMountsShow(stderr);
+		/* yes, printing is slow - but since you try to unload the driver,
+		 * you assume nobody is using NFS, so what if they have to wait?
+		 */
+		UNLOCK(nfsGlob.llock);
+		return -1;
 	}
 
 	if (nfsGlob.smallPool != NULL) {
@@ -1146,10 +1113,10 @@ int			refuse;
 		nfsGlob.nfs_major = 0xffffffff;
 	}
 
-	if (nfsGlob.llock != 0) {
-		rtems_semaphore_delete(nfsGlob.llock);
-		nfsGlob.llock = 0;
-	}
+	UNLOCK(nfsGlob.llock);
+
+	rtems_recursive_mutex_destroy(&nfsGlob.lock);
+	rtems_recursive_mutex_destroy(&nfsGlob.llock);
 
 	return 0;
 }
@@ -2566,7 +2533,11 @@ Nfs			nfs  = node->nfs;
 
 
 	SERP_ARGS(node).writearg.beginoffset = UINT32_C(0xdeadbeef);
+<<<<<<< HEAD
 	if ( LIBIO_FLAGS_APPEND & iop->flags ) {
+=======
+	if (rtems_libio_iop_is_append(iop)) {
+>>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 		if ( updateAttr(node, 0) ) {
 			return -1;
 		}
@@ -2585,12 +2556,21 @@ Nfs			nfs  = node->nfs;
 			return -1;
 		}
 		SERP_ARGS(node).writearg.offset = iop->offset;
+<<<<<<< HEAD
 	}
 
 	if (count > UINT32_MAX - SERP_ARGS(node).writearg.offset) {
 		count = UINT32_MAX - SERP_ARGS(node).writearg.offset;
 	}
 
+=======
+	}
+
+	if (count > UINT32_MAX - SERP_ARGS(node).writearg.offset) {
+		count = UINT32_MAX - SERP_ARGS(node).writearg.offset;
+	}
+
+>>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 	SERP_ARGS(node).writearg.totalcount	   = UINT32_C(0xdeadbeef);
 	SERP_ARGS(node).writearg.data.data_len = count;
 	SERP_ARGS(node).writearg.data.data_val = (void*)buffer;
@@ -2884,6 +2864,7 @@ struct _rtems_filesystem_file_handlers_r nfs_file_file_handlers = {
 	.fdatasync_h = rtems_filesystem_default_fsync_or_fdatasync,
 	.fcntl_h     = rtems_filesystem_default_fcntl,
 	.kqfilter_h  = rtems_filesystem_default_kqfilter,
+	.mmap_h      = rtems_filesystem_default_mmap,
 	.poll_h      = rtems_filesystem_default_poll,
 	.readv_h     = rtems_filesystem_default_readv,
 	.writev_h    = rtems_filesystem_default_writev
@@ -2904,6 +2885,7 @@ struct _rtems_filesystem_file_handlers_r nfs_dir_file_handlers = {
 	.fdatasync_h = rtems_filesystem_default_fsync_or_fdatasync,
 	.fcntl_h     = rtems_filesystem_default_fcntl,
 	.kqfilter_h  = rtems_filesystem_default_kqfilter,
+	.mmap_h      = rtems_filesystem_default_mmap,
 	.poll_h      = rtems_filesystem_default_poll,
 	.readv_h     = rtems_filesystem_default_readv,
 	.writev_h    = rtems_filesystem_default_writev
@@ -2924,6 +2906,7 @@ struct _rtems_filesystem_file_handlers_r nfs_link_file_handlers = {
 	.fdatasync_h = rtems_filesystem_default_fsync_or_fdatasync,
 	.fcntl_h     = rtems_filesystem_default_fcntl,
 	.kqfilter_h  = rtems_filesystem_default_kqfilter,
+	.mmap_h      = rtems_filesystem_default_mmap,
 	.poll_h      = rtems_filesystem_default_poll,
 	.readv_h     = rtems_filesystem_default_readv,
 	.writev_h    = rtems_filesystem_default_writev
@@ -3112,7 +3095,7 @@ typedef struct ResolvePathArgRec_ {
 	rtems_filesystem_location_info_t	*loc;	/* IN: location to resolve	*/
 	char								*buf;	/* IN/OUT: buffer where to put the path */
 	int									len;	/* IN: buffer length		*/
-	rtems_id							sync;	/* IN: synchronization		*/
+	rtems_binary_semaphore			sync;	/* IN: synchronization		*/
 	rtems_status_code					status; /* OUT: result				*/
 } ResolvePathArgRec, *ResolvePathArg;
 
@@ -3135,7 +3118,7 @@ rtems_filesystem_location_info_t	old;
 		/* must restore the cwd because 'freenode' will be called on it */
 		rtems_filesystem_current->location = old;
 	}
-	rtems_semaphore_release(rpa->sync);
+	rtems_binary_semaphore_post(&rpa->sync);
 	rtems_task_delete(RTEMS_SELF);
 }
 
@@ -3160,17 +3143,8 @@ rtems_status_code	status;
 	arg.loc  = loc;
 	arg.buf  = buf;
 	arg.len  = len;
-	arg.sync = 0;
 
-	status = rtems_semaphore_create(
-					rtems_build_name('r','e','s','s'),
-					0,
-					RTEMS_SIMPLE_BINARY_SEMAPHORE,
-					0,
-					&arg.sync);
-
-	if (RTEMS_SUCCESSFUL != status)
-		goto cleanup;
+	rtems_binary_semaphore_init(&arg.sync, "NFSress");
 
 	rtems_task_set_priority(RTEMS_SELF, RTEMS_CURRENT_PRIORITY, &pri);
 
@@ -3194,13 +3168,12 @@ rtems_status_code	status;
 
 
 	/* synchronize with the helper task */
-	rtems_semaphore_obtain(arg.sync, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
+	rtems_binary_semaphore_wait(&arg.sync);
 
 	status = arg.status;
 
 cleanup:
-	if (arg.sync)
-		rtems_semaphore_delete(arg.sync);
+	rtems_binary_semaphore_destroy(&arg.sync);
 
 	return status;
 }

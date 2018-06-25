@@ -10,20 +10,25 @@
  */
 
 #include <rtems.h>
-#include <rtems/libcsupport.h>
 #include <rtems/score/protectedheap.h>
 #include <rtems/malloc.h>
 
-#ifdef RTEMS_NEWLIB
-#include <sys/reent.h>
-#endif
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
-#include <stdint.h>
-#include <rtems/chain.h>
+typedef enum {
+  MALLOC_SYSTEM_STATE_NORMAL,
+  MALLOC_SYSTEM_STATE_NO_PROTECTION,
+  MALLOC_SYSTEM_STATE_NO_ALLOCATION
+} Malloc_System_state;
 
-/*
- *  Process deferred free operations
- */
-bool malloc_is_system_state_OK(void);
-void malloc_deferred_frees_process(void);
-void malloc_deferred_free(void *);
+Malloc_System_state _Malloc_System_state( void );
+
+void _Malloc_Deferred_free( void * );
+
+void _Malloc_Process_deferred_frees( void );
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */

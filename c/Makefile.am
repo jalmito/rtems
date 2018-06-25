@@ -11,12 +11,9 @@ SUBDIRS = . $(RTEMS_BSP)
 DIST_SUBDIRS = $(RTEMS_BSP)
 
 ## Let all RTEMS' make targets depend on ${RTEMS_BSP}
-all-local: ${RTEMS_BSP}
-preinstall-am: ${RTEMS_BSP}
+all-local: $(RTEMS_BSP)
 
 ## Pull in extra files intro the distribution
-EXTRA_DIST = ACKNOWLEDGEMENTS
-EXTRA_DIST += TOOL_TARGETS
 
 include $(top_srcdir)/../automake/host.am
 include $(top_srcdir)/../automake/subdirs.am

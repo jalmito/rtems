@@ -11,7 +11,6 @@
 #include <assert.h>
 #include "system.h"
 
-#if defined(__RTEMS_HAVE_SYS_CPUSET_H__)
 void test_cpu_and_case_1(size_t cpu1, size_t cpu2);
 void test_cpu_nand_case_1(size_t cpu1, size_t cpu2);
 void test_cpu_or_case_1(size_t cpu1, size_t cpu2);
@@ -55,10 +54,10 @@ void test_cpu_nand_case_1(size_t cpu1, size_t cpu2)
 
   /* test if all bits clear except cpu1 */
   for (i=0 ; i<CPU_SETSIZE ; i++) {
-    if (i== cpu1)
-      rtems_test_assert( CPU_ISSET(i, &set3) == 0 );
-    else
+    if (i== cpu2)
       rtems_test_assert( CPU_ISSET(i, &set3) == 1 );
+    else
+      rtems_test_assert( CPU_ISSET(i, &set3) == 0 );
   }
 }
 
@@ -104,7 +103,7 @@ static void test_logic01_setup(size_t cpu1, size_t cpu2)
   CPU_ZERO(&set1);
   CPU_SET(cpu1, &set1);
   CPU_SET(cpu2, &set1);
-  CPU_COPY(&set2, &set1);
+  CPU_COPY(&set1, &set2);
   CPU_CLR(cpu2, &set2);
 }
 
@@ -124,4 +123,3 @@ void cpuset_logic_test()
     }
   }
 }
-#endif

@@ -2,20 +2,17 @@
 
 AC_PREREQ([2.69])
 AC_INIT([rtems-c-src-lib-libbsp-powerpc-mvme3100],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
-AC_CONFIG_SRCDIR([bsp_specs])
 RTEMS_TOP(../../../../../..)
+RTEMS_SOURCE_TOP
+RTEMS_BUILD_TOP
+RTEMS_BSP_LINKCMDS
 
 RTEMS_CANONICAL_TARGET_CPU
 AM_INIT_AUTOMAKE([no-define nostdinc foreign 1.12.2])
 RTEMS_BSP_CONFIGURE
 
-RTEMS_PROG_CC_FOR_TARGET
-RTEMS_CANONICALIZE_TOOLS
 RTEMS_CHECK_TOOL(NM,nm,no)
-RTEMS_PROG_CCAS
 
-RTEMS_CHECK_NETWORKING
-AM_CONDITIONAL(HAS_NETWORKING,test "$HAS_NETWORKING" = "yes")
 
 AS=$CC
 AM_PROG_AS
@@ -40,7 +37,9 @@ Note that the policy can still be defined by the application
 CONFIGURE_MALLOC_BSP_SUPPORTS_SBRK this feature is removed
 and a little memory is saved.])
 
-RTEMS_BSP_CLEANUP_OPTIONS(0, 1)
+AC_DEFINE(__ppc_generic, 1, [PowerPC model option])
+
+RTEMS_BSP_CLEANUP_OPTIONS
 
 # Explicitly list all Makefiles here
 AC_CONFIG_FILES([Makefile])

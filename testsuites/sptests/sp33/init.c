@@ -11,7 +11,6 @@
 #include "config.h"
 #endif
 
-#define CONFIGURE_INIT
 #include <tmacros.h>  /* includes bsp.h, stdio, etc... */
 
 const char rtems_test_name[] = "SP 33";
@@ -23,7 +22,7 @@ rtems_task Init (rtems_task_argument ignored);
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 #define CONFIGURE_MAXIMUM_TASKS     5
 #define CONFIGURE_MAXIMUM_BARRIERS  1

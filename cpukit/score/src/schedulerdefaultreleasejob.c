@@ -24,10 +24,27 @@
 void _Scheduler_default_Release_job(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread,
-  uint32_t                 deadline
+  Priority_Node           *priority_node,
+  uint64_t                 deadline,
+  Thread_queue_Context    *queue_context
 )
 {
-  ( void ) scheduler;
-  ( void ) the_thread;
-  ( void ) deadline;
+  (void) scheduler;
+  (void) the_thread;
+  (void) priority_node;
+  (void) deadline;
+  (void) queue_context;
+}
+
+void _Scheduler_default_Cancel_job(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *the_thread,
+  Priority_Node           *priority_node,
+  Thread_queue_Context    *queue_context
+)
+{
+  (void) scheduler;
+  (void) the_thread;
+  (void) priority_node;
+  (void) queue_context;
 }

@@ -20,18 +20,15 @@
 #include <bsp.h>
 #include <rtems/score/thread.h>
 
-/* forward declarations to avoid warnings */
-rtems_task Init(rtems_task_argument argument);
-
-rtems_task Init(
-  rtems_task_argument ignored
-)
+static void *Init( uintptr_t ignored )
 {
   /* initialize application */
 
   /* Real application would call idle loop functionality */
 
   /* but in this case, just return and fall into a fatal error */
+
+  return NULL;
 }
 
 /* configuration information */
@@ -54,12 +51,6 @@ rtems_task Init(
  *  be reentrant.  Caveat Emptor!!
  */
 #define CONFIGURE_DISABLE_NEWLIB_REENTRANCY
-
-/*
- *  This test does not need the console driver so there is no reason
- *  to configure termios.
- */
-#define CONFIGURE_TERMIOS_DISABLED
 
 /*
  *  This test does not use any stdio.
@@ -98,7 +89,7 @@ rtems_task Init(
  *  In this application, the initialization task performs the system
  *  initialization and then transforms itself into the idle task.
  */
-#define CONFIGURE_IDLE_TASK_BODY (Thread_Entry_numeric) Init
+#define CONFIGURE_IDLE_TASK_BODY Init
 #define CONFIGURE_IDLE_TASK_INITIALIZES_APPLICATION
 
 /*

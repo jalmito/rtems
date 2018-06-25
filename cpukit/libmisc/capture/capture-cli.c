@@ -37,14 +37,9 @@
 #include <rtems/monitor.h>
 #include <rtems/cpuuse.h>
 #
-#define RC_UNUSED __attribute__((unused))
+#define RC_UNUSED RTEMS_UNUSED
 
 #define RTEMS_CAPTURE_CLI_MAX_LOAD_TASKS (20)
-
-/*
- * Counter used to count the number of active tasks.
- */
-static int rtems_capture_cli_task_count = 0;
 
 /*
  * The user capture timestamper.
@@ -111,7 +106,7 @@ rtems_capture_cli_open (int                                argc,
   if (!enable)
     return;
 
-  sc = rtems_capture_control (enable);
+  sc = rtems_capture_set_control (enable);
 
   if (sc != RTEMS_SUCCESSFUL)
   {
@@ -161,7 +156,7 @@ rtems_capture_cli_enable (int                                argc RC_UNUSED,
 {
   rtems_status_code sc;
 
-  sc = rtems_capture_control (true);
+  sc = rtems_capture_set_control (true);
 
   if (sc != RTEMS_SUCCESSFUL)
   {
@@ -186,7 +181,7 @@ rtems_capture_cli_disable (int                                argc RC_UNUSED,
 {
   rtems_status_code sc;
 
-  sc = rtems_capture_control (false);
+  sc = rtems_capture_set_control (false);
 
   if (sc != RTEMS_SUCCESSFUL)
   {
@@ -197,21 +192,29 @@ rtems_capture_cli_disable (int                                argc RC_UNUSED,
   fprintf (stdout, "capture engine disabled.\n");
 }
 
-static void
-rtems_capture_cli_print_task (rtems_tcb *tcb)
+static bool
+rtems_capture_cli_print_task (rtems_tcb *tcb, void *arg)
 {
   rtems_task_priority   ceiling = rtems_capture_watch_get_ceiling ();
   rtems_task_priority   floor = rtems_capture_watch_get_floor ();
   rtems_task_priority   priority;
   int                   length;
+  uint32_t              flags = rtems_capture_task_control_flags (tcb);
 
   priority = rtems_capture_task_real_priority (tcb);
 
   fprintf (stdout, " ");
   rtems_monitor_dump_id (rtems_capture_task_id (tcb));
   fprintf (stdout, " ");
-  rtems_monitor_dump_name (rtems_capture_task_id (tcb));
-  fprintf (stdout, " ");
+  if (rtems_capture_task_api (rtems_capture_task_id (tcb)) != OBJECTS_POSIX_API)
+  {
+    rtems_monitor_dump_name (rtems_capture_task_id (tcb));
+    fprintf (stdout, " ");
+  }
+  else
+  {
+    fprintf (stdout, "     ");
+  }
   rtems_monitor_dump_priority (rtems_capture_task_start_priority (tcb));
   fprintf (stdout, " ");
   rtems_monitor_dump_priority (rtems_capture_task_real_priority (tcb));
@@ -222,19 +225,19 @@ rtems_capture_cli_print_task (rtems_tcb *tcb)
   fprintf (stdout, "%*c", 14 - length, ' ');
   fprintf (stdout, " %c%c",
            'a',
-           rtems_capture_task_flags (tcb) & RTEMS_CAPTURE_TRACED ? 't' : '-');
+           flags & RTEMS_CAPTURE_TRACED ? 't' : '-');
 
   if ((floor > ceiling) && (ceiling > priority))
     fprintf (stdout, "--");
   else
   {
-    uint32_t flags = rtems_capture_task_control_flags (tcb);
     fprintf (stdout, "%c%c",
              rtems_capture_task_control (tcb) ?
              (flags & RTEMS_CAPTURE_WATCH ? 'w' : '+') : '-',
              rtems_capture_watch_global_on () ? 'g' : '-');
   }
   fprintf (stdout, "\n");
+  return false;
 }
 
 /*
@@ -244,10 +247,12 @@ rtems_capture_cli_print_task (rtems_tcb *tcb)
  * number of tasks.
  */
 
-static void
-rtems_capture_cli_count_tasks (rtems_tcb *tcb)
+static bool
+rtems_capture_cli_count_tasks (rtems_tcb *tcb, void *arg)
 {
-  rtems_capture_cli_task_count++;
+  uint32_t *task_count = arg;
+  ++(*task_count);
+  return false;
 }
 
 
@@ -263,17 +268,18 @@ rtems_capture_cli_task_list (int                                argc RC_UNUSED,
                              const rtems_monitor_command_arg_t* command_arg RC_UNUSED,
                              bool                               verbose RC_UNUSED)
 {
-  rtems_capture_time_t  uptime;
+  rtems_capture_time uptime;
+  uint32_t           task_count;
 
-  rtems_capture_time (&uptime);
+  rtems_capture_get_time (&uptime);
 
-  rtems_capture_cli_task_count = 0;
-  rtems_iterate_over_all_threads (rtems_capture_cli_count_tasks);
+  task_count = 0;
+  rtems_task_iterate (rtems_capture_cli_count_tasks, &task_count);
 
   fprintf (stdout, "uptime: ");
   rtems_capture_print_timestamp (uptime);
-  fprintf (stdout, "\ntotal %i\n", rtems_capture_cli_task_count);
-  rtems_iterate_over_all_threads (rtems_capture_cli_print_task);
+  fprintf (stdout, "\ntotal %" PRIu32 "\n", task_count);
+  rtems_task_iterate (rtems_capture_cli_print_task, NULL);
 }
 
 /*
@@ -703,14 +709,14 @@ static char const *trigger_set_types =
 /*
  * Structure to handle the parsing of the trigger command line.
  */
-typedef struct rtems_capture_cli_triggers_s
+typedef struct rtems_capture_cli_triggers
 {
-  char const *            name;
-  rtems_capture_trigger_t type;
-  int                     to_only;
-} rtems_capture_cli_triggers_t;
+  char const *          name;
+  rtems_capture_trigger type;
+  int                   to_only;
+} rtems_capture_cli_triggers;
 
-static rtems_capture_cli_triggers_t rtems_capture_cli_triggers[] =
+static const rtems_capture_cli_triggers rtems_capture_cli_trigger[] =
 {
   { "switch",  rtems_capture_switch,  0 }, /* must be first */
   { "create",  rtems_capture_create,  0 },
@@ -721,39 +727,39 @@ static rtems_capture_cli_triggers_t rtems_capture_cli_triggers[] =
   { "exitted", rtems_capture_exitted, 1 }
 };
 
-typedef enum rtems_capture_cli_trig_state_e
+typedef enum rtems_capture_cli_trig_state
 {
   trig_type,
   trig_to,
   trig_from_from,
   trig_from
-} rtems_capture_cli_trig_state_t;
+} rtems_capture_cli_trig_state;
 
 #define RTEMS_CAPTURE_CLI_TRIGGERS_NUM \
-  (sizeof (rtems_capture_cli_triggers) / sizeof (rtems_capture_cli_triggers_t))
+  (sizeof (rtems_capture_cli_trigger) / sizeof (rtems_capture_cli_triggers))
 
 static void
 rtems_capture_cli_trigger_worker (int set, int argc, char** argv)
 {
-  rtems_status_code            sc;
-  int                          arg;
-  int                          trigger = 0; /* switch */
-  rtems_capture_trigger_mode_t trigger_mode = rtems_capture_from_any;
-  bool                         trigger_set = false;
-  bool                         is_from = false;
-  bool                         is_to = false;
-  rtems_name                   name = 0;
-  rtems_id                     id = 0;
-  bool                         valid_name = false;
-  bool                         valid_id = false;
-  rtems_name                   from_name = 0;
-  rtems_id                     from_id = 0;
-  bool                         from_valid_name = false;
-  bool                         from_valid_id = false;
-  rtems_name                   to_name = 0;
-  rtems_id                     to_id = 0;
-  bool                         to_valid_name = false;
-  bool                         to_valid_id = false;
+  rtems_status_code          sc;
+  int                        arg;
+  int                        trigger = 0; /* switch */
+  rtems_capture_trigger_mode trigger_mode = rtems_capture_from_any;
+  bool                       trigger_set = false;
+  bool                       is_from = false;
+  bool                       is_to = false;
+  rtems_name                 name = 0;
+  rtems_id                   id = 0;
+  bool                       valid_name = false;
+  bool                       valid_id = false;
+  rtems_name                 from_name = 0;
+  rtems_id                   from_id = 0;
+  bool                       from_valid_name = false;
+  bool                       from_valid_id = false;
+  rtems_name                 to_name = 0;
+  rtems_id                   to_id = 0;
+  bool                       to_valid_name = false;
+  bool                       to_valid_id = false;
 
   for (arg = 1; arg < argc; arg++)
   {
@@ -778,7 +784,7 @@ rtems_capture_cli_trigger_worker (int set, int argc, char** argv)
         int  t;
 
         for (t = 0; t < RTEMS_CAPTURE_CLI_TRIGGERS_NUM; t++)
-          if (strcmp (argv[arg], rtems_capture_cli_triggers[t].name) == 0)
+          if (strcmp (argv[arg], rtems_capture_cli_trigger[t].name) == 0)
           {
             trigger = t;
             found = true;
@@ -795,7 +801,7 @@ rtems_capture_cli_trigger_worker (int set, int argc, char** argv)
           continue;
       }
 
-      if (strcmp (arg[argv], "from") == 0)
+      if (strcmp (argv[arg], "from") == 0)
       {
         if (from_valid_name || from_valid_id)
           fprintf (stdout, "warning: extra 'from' ignored\n");
@@ -804,7 +810,7 @@ rtems_capture_cli_trigger_worker (int set, int argc, char** argv)
         continue;
       }
 
-      if (strcmp (arg[argv], "to") == 0)
+      if (strcmp (argv[arg], "to") == 0)
       {
         if (to_valid_name || from_valid_id)
           fprintf (stdout, "warning: extra 'to' ignored\n");
@@ -867,10 +873,10 @@ rtems_capture_cli_trigger_worker (int set, int argc, char** argv)
     }
   }
 
-  if (is_from && rtems_capture_cli_triggers[trigger].to_only)
+  if (is_from && rtems_capture_cli_trigger[trigger].to_only)
   {
     fprintf (stdout, "error: a %s trigger can be a TO trigger\n",
-             rtems_capture_cli_triggers[trigger].name);
+             rtems_capture_cli_trigger[trigger].name);
     return;
   }
 
@@ -883,14 +889,14 @@ rtems_capture_cli_trigger_worker (int set, int argc, char** argv)
   if (!is_from && !to_valid_name && !to_valid_id)
   {
     fprintf (stdout, "error: a %s trigger needs a TO name or id\n",
-             rtems_capture_cli_triggers[trigger].name);
+             rtems_capture_cli_trigger[trigger].name);
     return;
   }
 
   if (is_from && !from_valid_name && !from_valid_id)
   {
     fprintf (stdout, "error: a %s trigger needs a FROM name or id\n",
-             rtems_capture_cli_triggers[trigger].name);
+             rtems_capture_cli_trigger[trigger].name);
     return;
   }
 
@@ -904,11 +910,11 @@ rtems_capture_cli_trigger_worker (int set, int argc, char** argv)
   if (set)
     sc = rtems_capture_set_trigger (from_name, from_id, to_name, to_id,
                                     trigger_mode,
-                                    rtems_capture_cli_triggers[trigger].type);
+                                    rtems_capture_cli_trigger[trigger].type);
   else
     sc = rtems_capture_clear_trigger (from_name, from_id, to_name, to_id,
                                       trigger_mode,
-                                      rtems_capture_cli_triggers[trigger].type);
+                                      rtems_capture_cli_trigger[trigger].type);
 
   if (sc != RTEMS_SUCCESSFUL)
   {
@@ -1040,7 +1046,7 @@ static rtems_monitor_command_entry_t rtems_capture_cli_cmds[] =
 {
   {
     "copen",
-    "usage: copen [-i] size\n",
+    "usage: copen [-i] size",
     0,
     rtems_capture_cli_open,
     { 0 },
@@ -1048,7 +1054,7 @@ static rtems_monitor_command_entry_t rtems_capture_cli_cmds[] =
   },
   {
     "cclose",
-    "usage: cclose\n",
+    "usage: cclose",
     0,
     rtems_capture_cli_close,
     { 0 },
@@ -1056,7 +1062,7 @@ static rtems_monitor_command_entry_t rtems_capture_cli_cmds[] =
   },
   {
     "cenable",
-    "usage: cenable\n",
+    "usage: cenable",
     0,
     rtems_capture_cli_enable,
     { 0 },
@@ -1064,7 +1070,7 @@ static rtems_monitor_command_entry_t rtems_capture_cli_cmds[] =
   },
   {
     "cdisable",
-    "usage: cdisable\n",
+    "usage: cdisable",
     0,
     rtems_capture_cli_disable,
     { 0 },
@@ -1072,7 +1078,7 @@ static rtems_monitor_command_entry_t rtems_capture_cli_cmds[] =
   },
   {
     "ctlist",
-    "usage: ctlist \n",
+    "usage: ctlist",
     0,
      rtems_capture_cli_task_list,
     { 0 },
@@ -1080,7 +1086,7 @@ static rtems_monitor_command_entry_t rtems_capture_cli_cmds[] =
   },
   {
     "cwlist",
-    "usage: cwlist\n",
+    "usage: cwlist",
     0,
     rtems_capture_cli_watch_list,
     { 0 },
@@ -1088,7 +1094,7 @@ static rtems_monitor_command_entry_t rtems_capture_cli_cmds[] =
   },
   {
     "cwadd",
-    "usage: cwadd [task name] [id]\n",
+    "usage: cwadd [task name] [id]",
     0,
     rtems_capture_cli_watch_add,
     { 0 },
@@ -1096,7 +1102,7 @@ static rtems_monitor_command_entry_t rtems_capture_cli_cmds[] =
   },
   {
     "cwdel",
-    "usage: cwdel [task name] [id]\n",
+    "usage: cwdel [task name] [id]",
     0,
     rtems_capture_cli_watch_del,
     { 0 },
@@ -1104,7 +1110,7 @@ static rtems_monitor_command_entry_t rtems_capture_cli_cmds[] =
   },
   {
     "cwctl",
-    "usage: cwctl [task name] [id] on/off\n",
+    "usage: cwctl [task name] [id] on/off",
     0,
     rtems_capture_cli_watch_control,
     { 0 },
@@ -1112,7 +1118,7 @@ static rtems_monitor_command_entry_t rtems_capture_cli_cmds[] =
   },
   {
     "cwglob",
-    "usage: cwglob on/off\n",
+    "usage: cwglob on/off",
     0,
     rtems_capture_cli_watch_global,
     { 0 },
@@ -1120,7 +1126,7 @@ static rtems_monitor_command_entry_t rtems_capture_cli_cmds[] =
   },
   {
     "cwceil",
-    "usage: cwceil priority\n",
+    "usage: cwceil priority",
     0,
     rtems_capture_cli_watch_ceiling,
     { 0 },
@@ -1128,7 +1134,7 @@ static rtems_monitor_command_entry_t rtems_capture_cli_cmds[] =
   },
   {
     "cwfloor",
-    "usage: cwfloor priority\n",
+    "usage: cwfloor priority",
     0,
     rtems_capture_cli_watch_floor,
     { 0 },
@@ -1136,7 +1142,7 @@ static rtems_monitor_command_entry_t rtems_capture_cli_cmds[] =
   },
   {
     "ctrace",
-    "usage: ctrace [-c] [-r records]\n",
+    "usage: ctrace [-c] [-r records]",
     0,
     rtems_capture_cli_trace_records,
     { 0 },
@@ -1144,7 +1150,7 @@ static rtems_monitor_command_entry_t rtems_capture_cli_cmds[] =
   },
   {
     "ctset",
-    "usage: ctset -h\n",
+    "usage: ctset -h",
     0,
     rtems_capture_cli_trigger_set,
     { 0 },
@@ -1152,7 +1158,7 @@ static rtems_monitor_command_entry_t rtems_capture_cli_cmds[] =
   },
   {
     "ctclear",
-    "usage: ctclear -?\n",
+    "usage: ctclear -?",
     0,
     rtems_capture_cli_trigger_clear,
     { 0 },
@@ -1160,7 +1166,7 @@ static rtems_monitor_command_entry_t rtems_capture_cli_cmds[] =
   },
   {
     "cflush",
-    "usage: cflush [-n]\n",
+    "usage: cflush [-n]",
     0,
     rtems_capture_cli_flush,
     { 0 },
@@ -1185,7 +1191,7 @@ rtems_capture_cli_init (rtems_capture_timestamp timestamp)
   for (cmd = 0;
        cmd < sizeof (rtems_capture_cli_cmds) / sizeof (rtems_monitor_command_entry_t);
        cmd++)
-      rtems_monitor_insert_cmd (&rtems_capture_cli_cmds[cmd]);
+    rtems_monitor_insert_cmd (&rtems_capture_cli_cmds[cmd]);
 
   return RTEMS_SUCCESSFUL;
 }

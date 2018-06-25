@@ -1,73 +1,54 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
+include $(top_srcdir)/../../bsp.am
 
-include_bspdir = $(includedir)/bsp
-
-dist_project_lib_DATA = bsp_specs
+dist_project_lib_DATA = ../../../../../../bsps/powerpc/virtex5/start/bsp_specs
 
 # include
-include_HEADERS     = include/bsp.h
-include_HEADERS    += ../../shared/include/tm27.h
-
-include_bsp_HEADERS =
-
-nodist_include_HEADERS     = include/bspopts.h
-nodist_include_HEADERS    += include/coverhd.h
-nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
-DISTCLEANFILES             = include/bspopts.h
 
 # start
-noinst_LIBRARIES      = libbspstart.a
-libbspstart_a_SOURCES = ../../powerpc/shared/start/rtems_crti.S
-project_lib_DATA      = rtems_crti.$(OBJEXT)
+rtems_crti.$(OBJEXT): ../../../../../../bsps/powerpc/shared/start/rtems_crti.S
+	$(CPPASCOMPILE) -o $@ -c $<
+project_lib_DATA = rtems_crti.$(OBJEXT)
 
-dist_project_lib_DATA += startup/linkcmds
+project_lib_DATA += linkcmds
 
-noinst_LIBRARIES += libbsp.a
+project_lib_LIBRARIES = librtemsbsp.a
 
 # startup
-libbsp_a_SOURCES = startup/bspclean.c \
-                   ../shared/startup/zerobss.c \
-                   ../../shared/bsplibc.c \
-                   ../../shared/bspgetworkarea.c \
-                   ../../shared/bsppost.c \
-                   startup/bspstart.c \
-                   ../../shared/bootcard.c \
-                   ../../shared/sbrk.c \
-                   ../../shared/gnatinstallhandler.c \
-                   ../shared/src/memcpy.c
+librtemsbsp_a_SOURCES = ../../../../../../bsps/powerpc/virtex5/start/bspclean.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/start/zerobss.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/virtex5/start/bspstart.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/start/memcpy.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-empty.c
 
 # start
-libbsp_a_SOURCES += start/start.S
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/virtex5/start/start.S
 
 # clock & timer
-libbsp_a_SOURCES += ../../powerpc/shared/clock/p_clock.c
+librtemsbsp_a_SOURCES +=../../../../../../bsps/powerpc/shared/clock/p_clock.c
 
 # console
-libbsp_a_SOURCES += startup/dummy_console.c \
-                    ../../shared/dummy_printk_support.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/virtex5/start/dummy_console.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/printk-dummy.c
 
 # irq
-include_bsp_HEADERS += include/irq.h
-libbsp_a_SOURCES += irq/irq_init.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/virtex5/irq/irq_init.c
 
 # mmu
-include_bsp_HEADERS += include/mmu.h
-libbsp_a_SOURCES += mmu/mmu.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/virtex5/start/mmu.c
 
-#vectors
-include_bsp_HEADERS += ../../../libcpu/@RTEMS_CPU@/@exceptions@/bspsupport/vectors.h
-include_bsp_HEADERS += ../../../libcpu/@RTEMS_CPU@/@exceptions@/bspsupport/irq_supp.h
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/cache/cache.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/clock/clock-ppc-dec.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/btimer/btimer-ppc-dec.c
 
-libbsp_a_LIBADD = ../../../libcpu/@RTEMS_CPU@/@exceptions@/rtems-cpu.rel \
-                  ../../../libcpu/@RTEMS_CPU@/@exceptions@/exc_bspsupport.rel \
-                  ../../../libcpu/@RTEMS_CPU@/shared/cache.rel \
-                  ../../../libcpu/@RTEMS_CPU@/shared/cpuIdent.rel \
-                  ../../../libcpu/@RTEMS_CPU@/e500/clock.rel \
-                  ../../../libcpu/@RTEMS_CPU@/e500/timer.rel
 
-EXTRA_DIST = times
-
-include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
+include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
+include $(srcdir)/../../../../../../bsps/powerpc/shared/shared-sources.am
+include $(srcdir)/../../../../../../bsps/powerpc/shared/exceptions-sources.am
+include $(srcdir)/../../../../../../bsps/powerpc/virtex5/headers.am

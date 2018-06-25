@@ -12,7 +12,6 @@
 #include <rtems.h>
 #include <rtems/monitor.h>
 #include <rtems/assoc.h>
-#include <rtems/score/statesimpl.h>
 
 #include <stdio.h>
 #include <ctype.h>
@@ -47,9 +46,9 @@ rtems_monitor_dump_decimal(uint32_t   num)
 }
 
 int
-rtems_monitor_dump_addr(void *addr)
+rtems_monitor_dump_addr(const void *addr)
 {
-    return fprintf(stdout,"0x%p", addr);
+    return fprintf(stdout,"%08" PRIxPTR, (intptr_t) addr);
 }
 
 int
@@ -112,48 +111,13 @@ rtems_monitor_dump_priority(rtems_task_priority priority)
     return fprintf(stdout,"%3" PRId32, priority);
 }
 
-
-static const rtems_assoc_t rtems_monitor_state_assoc[] = {
-    { "DORM",   STATES_DORMANT, 0 },
-    { "SUSP",   STATES_SUSPENDED, 0 },
-    { "DELAY",  STATES_DELAYING, 0 },
-    { "Wtime",  STATES_WAITING_FOR_TIME, 0 },
-    { "Wbuf",   STATES_WAITING_FOR_BUFFER, 0 },
-    { "Wseg",   STATES_WAITING_FOR_SEGMENT, 0 },
-    { "Wmsg" ,  STATES_WAITING_FOR_MESSAGE, 0 },
-    { "Wevnt",  STATES_WAITING_FOR_EVENT, 0 },
-    { "Wsysev", STATES_WAITING_FOR_SYSTEM_EVENT, 0 },
-    { "Wsem",   STATES_WAITING_FOR_SEMAPHORE, 0 },
-    { "Wmutex", STATES_WAITING_FOR_MUTEX, 0 },
-    { "Wcvar",  STATES_WAITING_FOR_CONDITION_VARIABLE, 0 },
-    { "Wjatx",  STATES_WAITING_FOR_JOIN_AT_EXIT, 0 },
-    { "Wjoin",  STATES_WAITING_FOR_JOIN, 0 },
-    { "Wrpc",   STATES_WAITING_FOR_RPC_REPLY, 0 },
-    { "WRATE",  STATES_WAITING_FOR_PERIOD, 0 },
-    { "Wsig",   STATES_WAITING_FOR_SIGNAL, 0 },
-    { "Wbar",   STATES_WAITING_FOR_BARRIER, 0 },
-    { "Wrwlk",  STATES_WAITING_FOR_RWLOCK, 0 },
-    { "Wisig",  STATES_INTERRUPTIBLE_BY_SIGNAL, 0 },
-    { "Wwkup",  STATES_WAITING_FOR_BSD_WAKEUP, 0 },
-    { "Wterm",  STATES_WAITING_FOR_TERMINATION, 0 },
-    { "ZOMBI",  STATES_ZOMBIE, 0 },
-    { "MIGRA",  STATES_MIGRATING, 0 },
-    { "RESTA",  STATES_RESTARTING, 0 },
-    { 0, 0, 0 },
-};
-
 int
 rtems_monitor_dump_state(States_Control state)
 {
-    int   length = 0;
+    char buf[16];
 
-    if (state == STATES_READY)  /* assoc doesn't deal with this as it is 0 */
-        length += fprintf(stdout,"READY");
-
-    length += rtems_monitor_dump_assoc_bitfield(rtems_monitor_state_assoc,
-                                                ":",
-                                                state);
-    return length;
+    rtems_assoc_thread_states_to_string(state, buf, sizeof(buf));
+    return fprintf(stdout, "%s", buf);
 }
 
 static const rtems_assoc_t rtems_monitor_attribute_assoc[] = {
@@ -204,42 +168,6 @@ rtems_monitor_dump_modes(rtems_mode modes)
     return length;
 }
 
-static const rtems_assoc_t rtems_monitor_events_assoc[] = {
-    { "0",   RTEMS_EVENT_0, 0 },
-    { "1",   RTEMS_EVENT_1, 0 },
-    { "2",   RTEMS_EVENT_2, 0 },
-    { "3",   RTEMS_EVENT_3, 0 },
-    { "4",   RTEMS_EVENT_4, 0 },
-    { "5",   RTEMS_EVENT_5, 0 },
-    { "6",   RTEMS_EVENT_6, 0 },
-    { "7",   RTEMS_EVENT_7, 0 },
-    { "8",   RTEMS_EVENT_8, 0 },
-    { "9",   RTEMS_EVENT_9, 0 },
-    { "10",  RTEMS_EVENT_10, 0 },
-    { "11",  RTEMS_EVENT_11, 0 },
-    { "12",  RTEMS_EVENT_12, 0 },
-    { "13",  RTEMS_EVENT_13, 0 },
-    { "14",  RTEMS_EVENT_14, 0 },
-    { "15",  RTEMS_EVENT_15, 0 },
-    { "16",  RTEMS_EVENT_16, 0 },
-    { "17",  RTEMS_EVENT_17, 0 },
-    { "18",  RTEMS_EVENT_18, 0 },
-    { "19",  RTEMS_EVENT_19, 0 },
-    { "20",  RTEMS_EVENT_20, 0 },
-    { "21",  RTEMS_EVENT_21, 0 },
-    { "22",  RTEMS_EVENT_22, 0 },
-    { "23",  RTEMS_EVENT_23, 0 },
-    { "24",  RTEMS_EVENT_24, 0 },
-    { "25",  RTEMS_EVENT_25, 0 },
-    { "26",  RTEMS_EVENT_26, 0 },
-    { "27",  RTEMS_EVENT_27, 0 },
-    { "28",  RTEMS_EVENT_28, 0 },
-    { "29",  RTEMS_EVENT_29, 0 },
-    { "30",  RTEMS_EVENT_30, 0 },
-    { "31",  RTEMS_EVENT_31, 0 },
-    { 0, 0, 0 },
-};
-
 int
 rtems_monitor_dump_events(rtems_event_set events)
 {
@@ -247,20 +175,4 @@ rtems_monitor_dump_events(rtems_event_set events)
         return fprintf(stdout,"  NONE  ");
 
     return fprintf(stdout,"%08" PRIx32, events);
-}
-
-int
-rtems_monitor_dump_notepad(uint32_t   *notepad)
-{
-    int   length = 0;
-
-    if (rtems_configuration_get_notepads_enabled()) {
-      int i;
-
-      for (i=0; i < RTEMS_NUMBER_NOTEPADS; i++)
-          if (notepad[i])
-              length += fprintf(stdout,"%d: 0x%" PRIx32, i, notepad[i]);
-    }
-
-    return length;
 }

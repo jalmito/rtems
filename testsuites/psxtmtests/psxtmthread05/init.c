@@ -38,7 +38,7 @@ void benchmark_pthread_setschedparam(void)
 
   /* make test_thread equal to POSIX_Init() */
   pthread_getschedparam(pthread_self(), &policy, &param);
-  
+
   pthread_setschedparam(thread_ID, policy, &param);
   /* At this point, we've switched to test_thread */
 
@@ -87,7 +87,7 @@ void *POSIX_Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
 
 #define CONFIGURE_MAXIMUM_POSIX_THREADS     2

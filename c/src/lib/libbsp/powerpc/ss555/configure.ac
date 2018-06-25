@@ -2,19 +2,16 @@
 
 AC_PREREQ([2.69])
 AC_INIT([rtems-c-src-lib-libbsp-powerpc-mbx5xx],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
-AC_CONFIG_SRCDIR([bsp_specs])
 RTEMS_TOP(../../../../../..)
+RTEMS_SOURCE_TOP
+RTEMS_BUILD_TOP
+RTEMS_BSP_LINKCMDS
 
 RTEMS_CANONICAL_TARGET_CPU
 AM_INIT_AUTOMAKE([no-define nostdinc foreign 1.12.2])
 RTEMS_BSP_CONFIGURE
 
-RTEMS_PROG_CC_FOR_TARGET
-RTEMS_CANONICALIZE_TOOLS
-RTEMS_PROG_CCAS
 
-RTEMS_CHECK_NETWORKING
-AM_CONDITIONAL(HAS_NETWORKING,test "$HAS_NETWORKING" = "yes")
 
 RTEMS_BSPOPTS_SET([WATCHDOG_TIMEOUT],[*],[0xFFFF])
 RTEMS_BSPOPTS_HELP([WATCHDOG_TIMEOUT],
@@ -42,7 +39,9 @@ RTEMS_BSPOPTS_HELP([PRINTK_MINOR],
  I/O.  Don't open the printk port from RTEMS unless also using polled I/O
  for the SCI ports.])
 
-RTEMS_BSP_CLEANUP_OPTIONS(0, 0)
+AC_DEFINE(mpc555, 1, [PowerPC model option])
+
+RTEMS_BSP_CLEANUP_OPTIONS
 
 # Explicitly list a Makefile here
 AC_CONFIG_FILES([Makefile])

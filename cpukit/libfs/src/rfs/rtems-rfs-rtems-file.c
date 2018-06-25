@@ -21,15 +21,8 @@
 #endif
 
 #include <inttypes.h>
+#include <rtems/inttypes.h>
 #include <string.h>
-
-#if SIZEOF_OFF_T == 8
-#define PRIdoff_t PRId64
-#elif SIZEOF_OFF_T == 4
-#define PRIdoff_t PRId32
-#else
-#error "unsupported size of off_t"
-#endif
 
 #include <rtems/rfs/rtems-rfs-file.h>
 #include "rtems-rfs-rtems.h"
@@ -215,7 +208,7 @@ rtems_rfs_rtems_file_write (rtems_libio_t* iop,
 
     rtems_rfs_file_set_bpos (file, pos);
   }
-  else if (pos < file_size && (iop->flags & LIBIO_FLAGS_APPEND) != 0)
+  else if (pos < file_size && rtems_libio_iop_is_append(iop))
   {
     pos = file_size;
     rc = rtems_rfs_file_seek (file, pos, &pos);
@@ -355,6 +348,7 @@ const rtems_filesystem_file_handlers_r rtems_rfs_rtems_file_handlers = {
   .fdatasync_h = rtems_rfs_rtems_fdatasync,
   .fcntl_h     = rtems_filesystem_default_fcntl,
   .kqfilter_h  = rtems_filesystem_default_kqfilter,
+  .mmap_h      = rtems_filesystem_default_mmap,
   .poll_h      = rtems_filesystem_default_poll,
   .readv_h     = rtems_filesystem_default_readv,
   .writev_h    = rtems_filesystem_default_writev

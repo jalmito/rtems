@@ -19,6 +19,7 @@
 #endif
 
 #include <sys/stat.h>
+#include <string.h>
 
 #include <rtems/libio_.h>
 
@@ -66,15 +67,15 @@ int fchmod( int fd, mode_t mode )
   int rv;
   rtems_libio_t *iop;
 
-  rtems_libio_check_fd( fd );
-  iop = rtems_libio_iop( fd );
-  rtems_libio_check_is_open(iop);
+  LIBIO_GET_IOP( fd, iop );
 
   rtems_filesystem_instance_lock( &iop->pathinfo );
 
   rv = rtems_filesystem_chmod( &iop->pathinfo, mode );
 
   rtems_filesystem_instance_unlock( &iop->pathinfo );
+
+  rtems_libio_iop_drop( iop );
 
   return rv;
 }

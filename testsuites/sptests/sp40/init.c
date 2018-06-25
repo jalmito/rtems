@@ -17,6 +17,8 @@
 
 #include <tmacros.h>
 
+#include <rtems/ioimpl.h>
+
 const char rtems_test_name[] = "SP 40";
 
 /* forward declarations to avoid warnings */
@@ -176,11 +178,11 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 /* more one more driver slot than are statically configured */
-#define CONFIGURE_MAXIMUM_DRIVERS 3
+#define CONFIGURE_MAXIMUM_DRIVERS 2
 
 #define CONFIGURE_MAXIMUM_TASKS  1
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION

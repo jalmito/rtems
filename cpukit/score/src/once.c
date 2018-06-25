@@ -20,7 +20,7 @@
 #define ONCE_STATE_RUNNING  1
 #define ONCE_STATE_COMPLETE 2
 
-int _Once( int *once_state, void ( *init_routine )( void ) )
+int _Once( unsigned char *once_state, void ( *init_routine )( void ) )
 {
   int eno = 0;
 
@@ -53,4 +53,16 @@ int _Once( int *once_state, void ( *init_routine )( void ) )
   }
 
   return eno;
+}
+
+static API_Mutex_Control _Once_Mutex = API_MUTEX_INITIALIZER( "_Once" );
+
+void _Once_Lock( void )
+{
+  _API_Mutex_Lock( &_Once_Mutex );
+}
+
+void _Once_Unlock( void )
+{
+  _API_Mutex_Unlock( &_Once_Mutex );
 }

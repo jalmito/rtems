@@ -161,12 +161,22 @@ static void test_send_message_flood(
   }
 
   for (cpu_index = 0; cpu_index < cpu_count; ++cpu_index) {
+    rtems_test_assert(
+      _Processor_mask_Is_set(_SMP_Get_online_processors(), cpu_index)
+    );
+
     printf(
       "inter-processor interrupts for processor %"
         PRIu32 "%s: %" PRIu32 "\n",
       cpu_index,
       cpu_index == cpu_index_self ? " (main)" : "",
       ctx->counters[cpu_index].value
+    );
+  }
+
+  for (; cpu_index < CPU_COUNT; ++cpu_index) {
+    rtems_test_assert(
+      !_Processor_mask_Is_set(_SMP_Get_online_processors(), cpu_index)
     );
   }
 }
@@ -190,11 +200,9 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
-#define CONFIGURE_SMP_APPLICATION
-
-#define CONFIGURE_SMP_MAXIMUM_PROCESSORS CPU_COUNT
+#define CONFIGURE_MAXIMUM_PROCESSORS CPU_COUNT
 
 #define CONFIGURE_MAXIMUM_TASKS 1
 

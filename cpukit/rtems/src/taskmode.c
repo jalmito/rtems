@@ -21,6 +21,7 @@
 #include <rtems/rtems/tasks.h>
 #include <rtems/rtems/asrimpl.h>
 #include <rtems/rtems/modesimpl.h>
+#include <rtems/rtems/signalimpl.h>
 #include <rtems/score/schedulerimpl.h>
 #include <rtems/score/threadimpl.h>
 #include <rtems/config.h>
@@ -31,6 +32,7 @@ rtems_status_code rtems_task_mode(
   rtems_mode *previous_mode_set
 )
 {
+  ISR_lock_Context    lock_context;
   Thread_Control     *executing;
   RTEMS_API_Control  *api;
   ASR_Information    *asr;
@@ -41,6 +43,31 @@ rtems_status_code rtems_task_mode(
   if ( !previous_mode_set )
     return RTEMS_INVALID_ADDRESS;
 
+#if defined( RTEMS_SMP )
+  /*
+   * When in SMP, you cannot disable preemption for a thread or 
+   * alter its interrupt level. It must be fully preemptible with
+   * all interrupts enabled.
+   */
+  if ( rtems_configuration_is_smp_enabled() ) {
+    if ( mask & RTEMS_PREEMPT_MASK ) {
+      if ( !_Modes_Is_preempt( mode_set ) ) {
+        return RTEMS_NOT_IMPLEMENTED;
+      }
+    }
+
+    if ( mask & RTEMS_INTERRUPT_MASK ) {
+      return RTEMS_NOT_IMPLEMENTED;
+    }
+  }
+#endif
+
+  /*
+   * Complete all error checking before doing any operations which
+   * impact the executing thread. There should be no errors returned
+   * past this point.
+   */
+ 
   executing     = _Thread_Get_executing();
   api = executing->API_Extensions[ THREAD_API_RTEMS ];
   asr = &api->Signal;
@@ -62,12 +89,6 @@ rtems_status_code rtems_task_mode(
    */
   preempt_enabled = false;
   if ( mask & RTEMS_PREEMPT_MASK ) {
-#if defined( RTEMS_SMP )
-    if ( rtems_configuration_is_smp_enabled() &&
-         !_Modes_Is_preempt( mode_set ) ) {
-      return RTEMS_NOT_IMPLEMENTED;
-    }
-#endif
     bool is_preempt_enabled = _Modes_Is_preempt( mode_set );
 
     preempt_enabled = !executing->is_preemptible && is_preempt_enabled;
@@ -86,8 +107,9 @@ rtems_status_code rtems_task_mode(
   /*
    *  Set the new interrupt level
    */
-  if ( mask & RTEMS_INTERRUPT_MASK )
+  if ( mask & RTEMS_INTERRUPT_MASK ) {
     _Modes_Set_interrupt_level( mode_set );
+  }
 
   /*
    *  This is specific to the RTEMS API
@@ -96,27 +118,32 @@ rtems_status_code rtems_task_mode(
   if ( mask & RTEMS_ASR_MASK ) {
     bool is_asr_enabled = !_Modes_Is_asr_disabled( mode_set );
 
+    _Thread_State_acquire( executing, &lock_context );
+
     if ( is_asr_enabled != asr->is_enabled ) {
       asr->is_enabled = is_asr_enabled;
-      _ASR_Swap_signals( asr );
-      if ( _ASR_Are_signals_pending( asr ) ) {
+
+      if ( _ASR_Swap_signals( asr ) != 0 ) {
         needs_asr_dispatching = true;
         _Thread_Add_post_switch_action(
           executing,
-          &api->Signal_action
+          &api->Signal_action,
+          _Signal_Action_handler
         );
       }
     }
+
+    _Thread_State_release( executing, &lock_context );
   }
 
   if ( preempt_enabled || needs_asr_dispatching ) {
-    ISR_lock_Context lock_context;
+    Per_CPU_Control  *cpu_self;
 
-    _Thread_Disable_dispatch();
-    _Scheduler_Acquire( executing, &lock_context );
+    cpu_self = _Thread_Dispatch_disable();
+    _Thread_State_acquire( executing, &lock_context );
     _Scheduler_Schedule( executing );
-    _Scheduler_Release( executing, &lock_context );
-    _Thread_Enable_dispatch();
+    _Thread_State_release( executing, &lock_context );
+    _Thread_Dispatch_direct( cpu_self );
   }
 
   return RTEMS_SUCCESSFUL;

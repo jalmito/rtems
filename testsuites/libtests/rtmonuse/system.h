@@ -33,7 +33,7 @@ void Get_all_counters( void );
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS               6
@@ -47,6 +47,8 @@ void Get_all_counters( void );
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
 
 #define CONFIGURE_EXTRA_TASK_STACKS           (20 * RTEMS_MINIMUM_STACK_SIZE)
+
+#define CONFIGURE_DISABLE_SMP_CONFIGURATION
 #include <rtems/confdefs.h>
 
 /* global variables */

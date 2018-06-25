@@ -35,7 +35,6 @@ int scan_objects(
 {
   Objects_Control  *o[MAX_SCAN];
   int               i;
-  Objects_Locations location;
   Objects_Id        id;
 
   memset( o, 1, sizeof(o) );
@@ -43,18 +42,13 @@ int scan_objects(
   id = start;
   for (i=0 ; i<MAX_SCAN ; i++ ) {
     o[i] = _Objects_Get_next(
-      information,
       id,
-      &location,
+      information,
       &id
     );
     if ( !o[i] )
       break;
-    if ( location == OBJECTS_ERROR )
-      break;
     /* XXX check dispatch level with macros */
-
-    _Thread_Enable_dispatch();
 
     /* XXX should be able to check that next Id is not one we have seen */
   }
@@ -68,26 +62,22 @@ rtems_task Init(
   rtems_id              main_task;
   int                   count;
   Objects_Control      *o;
-  Objects_Locations     location;
   Objects_Id            id;
   Objects_Information  *info;
   Objects_Maximum       active_count;
 
   TEST_BEGIN();
 
-  info      = &_RTEMS_tasks_Information;
+  info      = &_RTEMS_tasks_Information.Objects;
   main_task = rtems_task_self();
 
   puts( "Init - _Objects_Get_next - NULL object information" );
-  o = _Objects_Get_next( NULL, main_task, &location, &id );
+  o = _Objects_Get_next( main_task, NULL, &id );
   rtems_test_assert( o == NULL );
-
-  puts( "Init - _Objects_Get_next - NULL location" );
-  o = _Objects_Get_next( info, main_task, NULL, &id );
   rtems_test_assert( o == NULL );
 
   puts( "Init - _Objects_Get_next - NULL id" );
-  o = _Objects_Get_next( info, main_task, &location, NULL );
+  o = _Objects_Get_next( main_task, info, NULL );
   rtems_test_assert( o == NULL );
 
   /* XXX push the three NULL error cases */

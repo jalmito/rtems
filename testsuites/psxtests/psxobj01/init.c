@@ -29,11 +29,12 @@ rtems_task Init(
   rtems_task_argument ignored
 )
 {
-  Objects_Name_or_id_lookup_errors namerc;
-  Objects_Information              TestClass;
-  Objects_Id                       id;
-  char                             name[64];
-  bool                             bc;
+  Objects_Get_by_name_error  error;
+  Objects_Information        TestClass;
+  Objects_Control           *the_object;
+  char                       name[64];
+  size_t                     name_len;
+  bool                       bc;
 
   TEST_BEGIN();
 
@@ -45,35 +46,35 @@ rtems_task Init(
     0,           /* maximum */
     4,           /* size */
     true,        /* is_string */
-    10           /* maximum_name_length */
-    #if defined(RTEMS_MULTIPROCESSING)
-      ,
-      false,       /* supports_global */
-      NULL         /* Objects_Thread_queue_Extract_callout extract */
-    #endif
+    10,          /* maximum_name_length */
+    NULL         /* Objects_Thread_queue_Extract_callout extract */
   );
 
-  puts( "INIT - _Objects_Name_to_id_string - NULL name" );
-  namerc = _Objects_Name_to_id_string( &TestClass, NULL, &id );
-  if ( namerc != OBJECTS_INVALID_NAME ) {
-    printf( "ERROR - Status = %d\n", namerc );
-    rtems_test_exit(0);
-  }
 
-  puts( "INIT - _Objects_Name_to_id_string - NULL ID" );
-  namerc = _Objects_Name_to_id_string( &TestClass, name, NULL );
-  if ( namerc != OBJECTS_INVALID_ADDRESS ) {
-    printf( "ERROR - Status = %d\n", namerc );
-    rtems_test_exit(0);
-  }
+  puts( "INIT - _Objects_Get_by_name - NULL name" );
+  _Objects_Allocator_lock();
+  the_object = _Objects_Get_by_name( &TestClass, NULL, NULL, &error );
+  _Objects_Allocator_unlock();
+  rtems_test_assert( the_object == NULL );
+  rtems_test_assert( error == OBJECTS_GET_BY_NAME_INVALID_NAME );
 
-  puts( "INIT - _Objects_Name_to_id_string - name of non-existent object" );
+  puts( "INIT - _Objects_Get_by_name - name too long" );
+  strcpy( name, "TOOOOOOOOOOOOOOOOOO LONG" );
+  _Objects_Allocator_lock();
+  the_object = _Objects_Get_by_name( &TestClass, name, NULL, &error );
+  _Objects_Allocator_unlock();
+  rtems_test_assert( the_object == NULL );
+  rtems_test_assert( error == OBJECTS_GET_BY_NAME_NAME_TOO_LONG );
+
+  puts( "INIT - _Objects_Get_by_name - name of non-existent object" );
   strcpy( name, "NOT FOUND" );
-  namerc = _Objects_Name_to_id_string( &TestClass, name, &id );
-  if ( namerc != OBJECTS_INVALID_NAME ) {
-    printf( "ERROR - Status = %d\n", namerc );
-    rtems_test_exit(0);
-  }
+  name_len = 123;
+  _Objects_Allocator_lock();
+  the_object = _Objects_Get_by_name( &TestClass, name, &name_len, &error );
+  _Objects_Allocator_unlock();
+  rtems_test_assert( the_object == NULL );
+  rtems_test_assert( error == OBJECTS_GET_BY_NAME_NO_OBJECT );
+  rtems_test_assert( name_len == 9 );
 
   /* out of memory error ONLY when POSIX is enabled */
   puts( "INIT - _Objects_Set_name fails - out of memory" );
@@ -88,7 +89,7 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS  1

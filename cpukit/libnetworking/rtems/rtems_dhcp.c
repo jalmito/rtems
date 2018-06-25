@@ -80,8 +80,9 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 
-#include <sys/ioctl.h>
+#include <sys/sockio.h>
 #include <sys/param.h>		/* for MAXHOSTNAMELEN */
 #include <sys/systm.h>
 #include <sys/socketvar.h>	/* for socreat() soclose() */
@@ -759,7 +760,8 @@ dhcp_task (rtems_task_argument _sdl)
       /*
        * Send the Request.
        */
-      error = bootpc_call ((struct bootp_packet *)&call, (struct bootp_packet *)&dhcp_req, procp);
+      error = bootpc_call ((struct bootp_packet *)&call,
+                           (struct bootp_packet *)&dhcp_req, procp, NULL, 0);
       if (error) {
         rtems_bsdnet_semaphore_release ();
         printf ("DHCP call failed -- error %d", error);
@@ -900,6 +902,7 @@ dhcp_init (int update_files)
   struct ifaddr        *ifa;
   struct sockaddr_dl   *sdl = NULL;
   struct proc          *procp = NULL;
+  char expected_dhcp_payload[7];
 
   clean_dns_entries();
 
@@ -956,15 +959,26 @@ dhcp_init (int update_files)
     return -1;
   }
 
+
   /*
    * Build the DHCP Discover
    */
   dhcp_discover_req (&call, sdl, &xid);
 
   /*
+   * Expect a DHCP offer as response to DHCP discover
+   */
+  memcpy(expected_dhcp_payload, dhcp_magic_cookie, sizeof(dhcp_magic_cookie));
+  expected_dhcp_payload[sizeof(dhcp_magic_cookie)  ]=0x35; /* DHCP */
+  expected_dhcp_payload[sizeof(dhcp_magic_cookie)+1]=0x01; /* Length : 1 */
+  expected_dhcp_payload[sizeof(dhcp_magic_cookie)+2]=0x02; /* DHCP_OFFER */
+
+  /*
    * Send the Discover.
    */
-  error = bootpc_call ((struct bootp_packet *)&call, (struct bootp_packet *)&reply, procp);
+  error = bootpc_call ((struct bootp_packet *)&call,
+                       (struct bootp_packet *)&reply, procp,
+                       expected_dhcp_payload, sizeof(expected_dhcp_payload));
   if (error) {
     printf ("BOOTP call failed -- %s\n", strerror(error));
     soclose (so);
@@ -989,11 +1003,20 @@ dhcp_init (int update_files)
   }
 
   /*
+   * Expect a DHCP_ACK as response to the DHCP REQUEST
+   * No need to reinitialize the whole expected_dhcp_payload variable,
+   * header and first two bytes of the payload are filled from DHCP offer
+   */
+  expected_dhcp_payload[sizeof(dhcp_magic_cookie)+2]=0x05; /* DHCP_ACK */
+
+  /*
    * Send a DHCP REQUEST
    */
   dhcp_request_req (&call, &reply, sdl, true);
 
-  error = bootpc_call ((struct bootp_packet *)&call, (struct bootp_packet *)&reply, procp);
+  error = bootpc_call ((struct bootp_packet *)&call,
+                       (struct bootp_packet *)&reply, procp,
+                       expected_dhcp_payload, sizeof(expected_dhcp_payload));
   if (error) {
     printf ("BOOTP call failed -- %s\n", strerror(error));
     soclose (so);
@@ -1131,8 +1154,9 @@ dhcp_init (int update_files)
       }
 
       for (i = 0; i < rtems_bsdnet_nameserver_count; i++) {
+        char addrbuf[INET_ADDRSTRLEN];
         strcpy(buf, "nameserver ");
-        strcat(buf, inet_ntoa(rtems_bsdnet_ntpserver[i]));
+        strcat(buf, inet_ntoa_r(rtems_bsdnet_ntpserver[i], addrbuf));
         strcat(buf, "\n");
         if (rtems_rootfs_file_append ("/etc/resolv.conf", MKFILE_MODE, 1, bufl))
           break;

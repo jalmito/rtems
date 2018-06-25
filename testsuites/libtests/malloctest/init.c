@@ -2,7 +2,7 @@
  *  COPYRIGHT (c) 1989-2011, 2014.
  *  On-Line Applications Research Corporation (OAR).
  *
- *  Copyright (c) 2009, 2010 embedded brains GmbH.
+ *  Copyright (c) 2009, 2016 embedded brains GmbH.
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <rtems/score/protectedheap.h>
 #include <rtems/malloc.h>
+#include <rtems/sysinit.h>
 
 const char rtems_test_name[] = "MALLOCTEST";
 
@@ -94,10 +95,10 @@ static void test_realloc(void)
   rtems_test_assert( malloc_walk_ok );
 
   puts( "malloc_walk - in critical section path" );
-  _Thread_Disable_dispatch();
+  _Thread_Dispatch_disable();
   malloc_walk_ok = malloc_walk( 1234, false );
   rtems_test_assert( malloc_walk_ok );
-  _Thread_Enable_dispatch();
+  _Thread_Dispatch_enable( _Per_CPU_Get() );
 
   /*
    *  Realloc with a bad pointer to force a point
@@ -1141,9 +1142,9 @@ static void test_rtems_heap_allocate_aligned_with_boundary(void)
   rtems_test_assert( p != NULL );
   free(p);
 
-  _Thread_Disable_dispatch();
+  _Thread_Dispatch_disable();
   p = rtems_heap_allocate_aligned_with_boundary(1, 1, 1);
-  _Thread_Enable_dispatch();
+  _Thread_Dispatch_enable( _Per_CPU_Get() );
   rtems_test_assert( p == NULL );
 }
 
@@ -1172,7 +1173,7 @@ static void test_heap_size_with_overhead(void)
 static void test_posix_memalign(void)
 {
   void *p1;
-  int i;
+  size_t i;
   int sc;
   int maximumShift;
 
@@ -1198,14 +1199,16 @@ static void test_posix_memalign(void)
 
   maximumShift = (sizeof(size_t) * CHAR_BIT) - 1;
   for ( i=sizeof(void *) ; i<maximumShift ; i++ ) {
-    size_t alignment = 1 << i;
+    size_t alignment = 1;
+
+    alignment <<= i;
 
     p1 = NULL; /* Initialize p1 to aovid used uninitialized */
 
-    printf( "posix_memalign - alignment of %zd -- OK\n", alignment);
+    printf( "posix_memalign - alignment of %zu -- OK\n", alignment);
     sc = posix_memalign( &p1, alignment, 8 );
     if ( sc == ENOMEM ) {
-      printf( "posix_memalign - ran out of memory trying %zd\n", alignment );
+      printf( "posix_memalign - ran out of memory trying %zu\n", alignment );
       break;
     }
     posix_service_failed( sc, "posix_memalign alignment OK" );
@@ -1259,7 +1262,10 @@ rtems_task Init(
   /*
    * Verify case where block is too large to calloc.
    */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Walloc-size-larger-than=N"
   p1 = calloc( 1, SIZE_MAX );
+#pragma GCC diagnostic pop
   if (p1) {
     printf("ERROR on attempt to calloc SIZE_MAX block expected failure.");
     free( p1 );
@@ -1369,3 +1375,44 @@ rtems_task Init(
   status = rtems_task_delete( RTEMS_SELF );
   directive_failed( status, "rtems_task_delete of RTEMS_SELF" );
 }
+
+static void test_early_malloc( void )
+{
+  void *p;
+  char *q;
+  void *r;
+  void *s;
+  void *t;
+
+  p = malloc( 1 );
+  rtems_test_assert( p != NULL );
+
+  free( p );
+
+  q = calloc( 1, 1 );
+  rtems_test_assert( q != NULL );
+  rtems_test_assert( p != q );
+  rtems_test_assert( q[0] == 0 );
+
+  free( q );
+
+  r = realloc( q, 128 );
+  rtems_test_assert( r == q );
+
+  s = malloc( 1 );
+  rtems_test_assert( s != NULL );
+
+  free( s );
+
+  t = realloc( r, 256 );
+  rtems_test_assert( t != NULL );
+  rtems_test_assert( t != r );
+
+  free( t );
+}
+
+RTEMS_SYSINIT_ITEM(
+  test_early_malloc,
+  RTEMS_SYSINIT_INITIAL_EXTENSIONS,
+  RTEMS_SYSINIT_ORDER_FIRST
+);

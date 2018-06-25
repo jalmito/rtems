@@ -2,19 +2,16 @@
 
 AC_PREREQ([2.69])
 AC_INIT([rtems-c-src-lib-libbsp-m68k-mvme167],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
-AC_CONFIG_SRCDIR([bsp_specs])
 RTEMS_TOP(../../../../../..)
+RTEMS_SOURCE_TOP
+RTEMS_BUILD_TOP
+RTEMS_BSP_LINKCMDS
 
 RTEMS_CANONICAL_TARGET_CPU
 AM_INIT_AUTOMAKE([no-define nostdinc foreign 1.12.2])
 RTEMS_BSP_CONFIGURE
 
-RTEMS_PROG_CC_FOR_TARGET
-RTEMS_CANONICALIZE_TOOLS
-RTEMS_PROG_CCAS
 
-RTEMS_CHECK_NETWORKING
-AM_CONDITIONAL(HAS_NETWORKING,test "$HAS_NETWORKING" = "yes")
 
 # HACK: Propagate #define mvme167 into bspopts.h
 # Used inside ../mvme162/include/mvme16x_hw.h
@@ -49,7 +46,7 @@ RTEMS_BSPOPTS_HELP([PRINTK_MINOR],
       2 - /dev/tty2, Serial Port 3 on the MVME712M.
       3 - /dev/tty3, Serial Port 4 on the MVME712M.])
 
-RTEMS_BSP_CLEANUP_OPTIONS(0, 0)
+RTEMS_BSP_CLEANUP_OPTIONS
 
 # Explicitly list all Makefiles here
 AC_CONFIG_FILES([Makefile])

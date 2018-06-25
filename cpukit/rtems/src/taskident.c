@@ -26,7 +26,6 @@
 #include <rtems/rtems/tasksimpl.h>
 #include <rtems/score/thread.h>
 #include <rtems/score/wkspace.h>
-#include <rtems/score/apiext.h>
 
 rtems_status_code rtems_task_ident(
   rtems_name    name,
@@ -44,7 +43,12 @@ rtems_status_code rtems_task_ident(
     return RTEMS_SUCCESSFUL;
    }
 
-  status = _Objects_Name_to_id_u32( &_RTEMS_tasks_Information, name, node, id );
+  status = _Objects_Name_to_id_u32(
+    &_RTEMS_tasks_Information.Objects,
+    name,
+    node,
+    id
+  );
 
   return _Status_Object_name_errors_to_status[ status ];
 }

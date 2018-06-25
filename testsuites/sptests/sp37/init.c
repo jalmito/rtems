@@ -159,29 +159,33 @@ static void test_isr_level( void )
   test_isr_level_for_new_threads( last_proper_level );
 }
 
-#if defined(RTEMS_SMP) && defined(RTEMS_PROFILING)
-static const size_t lock_size =
-  offsetof( ISR_lock_Control, Lock.Stats.name )
-    + sizeof( ((ISR_lock_Control *) 0)->Lock.Stats.name );
-#else
-static const size_t lock_size = sizeof( ISR_lock_Control );
-#endif
-
 static void test_isr_locks( void )
 {
   ISR_Level normal_interrupt_level = _ISR_Get_level();
   ISR_lock_Control initialized = ISR_LOCK_INITIALIZER("test");
-  ISR_lock_Control lock;
+  union {
+    ISR_lock_Control lock;
+    uint8_t bytes[ sizeof( ISR_lock_Control ) ];
+  } container;
   ISR_lock_Context lock_context;
+  size_t i;
+  const uint8_t *initialized_bytes;
 
-  _ISR_lock_Initialize( &lock, "test" );
-  rtems_test_assert( memcmp( &lock, &initialized, lock_size ) == 0 );
+  memset( &container, 0xff, sizeof( container ) );
+  _ISR_lock_Initialize( &container.lock, "test" );
+  initialized_bytes = (const uint8_t *) &initialized;
 
-  _ISR_lock_ISR_disable_and_acquire( &lock, &lock_context );
+  for ( i = 0; i < sizeof( container ); ++i ) {
+    if ( container.bytes[ i ] != 0xff ) {
+      rtems_test_assert( container.bytes[ i ] == initialized_bytes[ i] );
+    }
+  }
+
+  _ISR_lock_ISR_disable_and_acquire( &container.lock, &lock_context );
   rtems_test_assert( normal_interrupt_level != _ISR_Get_level() );
-  _ISR_lock_Flash( &lock, &lock_context );
+  _ISR_lock_Flash( &container.lock, &lock_context );
   rtems_test_assert( normal_interrupt_level != _ISR_Get_level() );
-  _ISR_lock_Release_and_ISR_enable( &lock, &lock_context );
+  _ISR_lock_Release_and_ISR_enable( &container.lock, &lock_context );
 
   rtems_test_assert( normal_interrupt_level == _ISR_Get_level() );
 
@@ -191,13 +195,13 @@ static void test_isr_locks( void )
 
   rtems_test_assert( normal_interrupt_level == _ISR_Get_level() );
 
-  _ISR_lock_Acquire( &lock, &lock_context );
+  _ISR_lock_Acquire( &container.lock, &lock_context );
   rtems_test_assert( normal_interrupt_level == _ISR_Get_level() );
-  _ISR_lock_Release( &lock, &lock_context );
+  _ISR_lock_Release( &container.lock, &lock_context );
 
   rtems_test_assert( normal_interrupt_level == _ISR_Get_level() );
 
-  _ISR_lock_Destroy( &lock );
+  _ISR_lock_Destroy( &container.lock );
   _ISR_lock_Destroy( &initialized );
 }
 
@@ -216,25 +220,36 @@ static void test_interrupt_locks( void )
 {
   rtems_mode normal_interrupt_level = get_interrupt_level();
   rtems_interrupt_lock initialized = RTEMS_INTERRUPT_LOCK_INITIALIZER("test");
-  rtems_interrupt_lock lock;
+  union {
+    rtems_interrupt_lock lock;
+    uint8_t bytes[ sizeof( rtems_interrupt_lock ) ];
+  } container;
   rtems_interrupt_lock_context lock_context;
+  size_t i;
+  const uint8_t *initialized_bytes;
 
-  rtems_interrupt_lock_initialize( &lock, "test" );
-  rtems_test_assert( memcmp( &lock, &initialized, lock_size ) == 0 );
+  rtems_interrupt_lock_initialize( &container.lock, "test" );
+  initialized_bytes = (const uint8_t *) &initialized;
 
-  rtems_interrupt_lock_acquire( &lock, &lock_context );
+  for ( i = 0; i < sizeof( container ); ++i ) {
+    if ( container.bytes[ i ] != 0xff ) {
+      rtems_test_assert( container.bytes[ i ] == initialized_bytes[ i] );
+    }
+  }
+
+  rtems_interrupt_lock_acquire( &container.lock, &lock_context );
   rtems_test_assert( normal_interrupt_level != get_interrupt_level() );
-  rtems_interrupt_lock_release( &lock, &lock_context );
+  rtems_interrupt_lock_release( &container.lock, &lock_context );
 
   rtems_test_assert( normal_interrupt_level == get_interrupt_level() );
 
-  rtems_interrupt_lock_acquire_isr( &lock, &lock_context );
+  rtems_interrupt_lock_acquire_isr( &container.lock, &lock_context );
   rtems_test_assert( normal_interrupt_level == get_interrupt_level() );
-  rtems_interrupt_lock_release_isr( &lock, &lock_context );
+  rtems_interrupt_lock_release_isr( &container.lock, &lock_context );
 
   rtems_test_assert( normal_interrupt_level == get_interrupt_level() );
 
-  rtems_interrupt_lock_destroy( &lock );
+  rtems_interrupt_lock_destroy( &container.lock );
   rtems_interrupt_lock_destroy( &initialized );
 }
 
@@ -324,10 +339,12 @@ void test_interrupt_inline(void)
   rtems_interrupt_local_disable( level );
   isr_level_1 = _ISR_Get_level();
   rtems_test_assert( isr_level_1 != isr_level_0 );
+  rtems_test_assert( _ISR_Is_enabled( level ) );
 
   rtems_interrupt_local_disable( level_1 );
   isr_level_2 = _ISR_Get_level();
   rtems_test_assert( isr_level_2 == isr_level_1 );
+  rtems_test_assert( !_ISR_Is_enabled( level_1 ) );
 
   rtems_interrupt_local_enable( level_1 );
   rtems_test_assert( _ISR_Get_level() == isr_level_1 );
@@ -402,8 +419,9 @@ rtems_timer_service_routine test_unblock_task(
   void     *arg
 )
 {
-  bool              in_isr;
-  rtems_status_code status;
+  bool               in_isr;
+  rtems_status_code  status;
+  Per_CPU_Control   *cpu_self;
 
   in_isr = rtems_interrupt_is_in_progress();
   status = rtems_task_is_suspended( blocked_task_id );
@@ -420,9 +438,9 @@ rtems_timer_service_routine test_unblock_task(
   }
 
   blocked_task_status = 2;
-  _Thread_Disable_dispatch();
+  cpu_self = _Thread_Dispatch_disable();
   status = rtems_task_resume( blocked_task_id );
-  _Thread_Unnest_dispatch();
+  _Thread_Dispatch_enable( cpu_self );
   directive_failed( status, "rtems_task_resume" );
 }
 
@@ -438,26 +456,27 @@ extern bool rtems_interrupt_is_in_progress(void);
 static void test_interrupt_body(void)
 {
 #if !defined(RTEMS_SMP)
-  rtems_interrupt_level level;
+  rtems_interrupt_level level_0;
+  rtems_interrupt_level level_1;
   rtems_mode            level_mode_body;
   rtems_mode            level_mode_macro;
   bool                  in_isr;
 
   puts( "interrupt disable (use body)" );
-  level = rtems_interrupt_disable();
+  level_0 = rtems_interrupt_disable();
 
   puts( "interrupt disable (use body)" );
-  level = rtems_interrupt_disable();
+  level_1 = rtems_interrupt_disable();
 
   puts( "interrupt flash (use body)" );
-  rtems_interrupt_flash( level );
+  rtems_interrupt_flash( level_1 );
 
   puts( "interrupt enable (use body)" );
-  rtems_interrupt_enable( level );
+  rtems_interrupt_enable( level_1 );
 
   puts( "interrupt level mode (use body)" );
-  level_mode_body = rtems_interrupt_level_body( level );
-  level_mode_macro = RTEMS_INTERRUPT_LEVEL(level);
+  level_mode_body = rtems_interrupt_level_body( level_0 );
+  level_mode_macro = RTEMS_INTERRUPT_LEVEL( level_0 );
   if ( level_mode_macro == level_mode_body ) {
     puts("test seems to work");
   }
@@ -467,6 +486,10 @@ static void test_interrupt_body(void)
    */
   puts( "interrupt is in progress (use body)" );
   in_isr = rtems_interrupt_is_in_progress();
+
+  puts( "interrupt enable (use body)" );
+  rtems_interrupt_enable( level_0 );
+
   if ( in_isr ) {
     puts( "interrupt reported to be is in progress (body)" );
     rtems_test_exit( 0 );

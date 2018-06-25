@@ -26,16 +26,14 @@
 
 static int duplicate_iop( rtems_libio_t *iop )
 {
-  int rv = 0;
+  int            rv;
+  int            oflag;
+  rtems_libio_t *diop;
 
-  rtems_libio_t *diop = rtems_libio_allocate();
+  oflag = rtems_libio_to_fcntl_flags( rtems_libio_iop_flags( iop ) );
+  diop = rtems_libio_allocate();
 
   if (diop != NULL) {
-    int oflag = rtems_libio_to_fcntl_flags( iop->flags );
-
-    oflag &= ~O_CREAT;
-    diop->flags |= rtems_libio_fcntl_flags( oflag );
-
     rtems_filesystem_instance_lock( &iop->pathinfo );
     rtems_filesystem_location_clone( &diop->pathinfo, &iop->pathinfo );
     rtems_filesystem_instance_unlock( &iop->pathinfo );
@@ -47,6 +45,10 @@ static int duplicate_iop( rtems_libio_t *iop )
      */
     rv = (*diop->pathinfo.handlers->open_h)( diop, NULL, oflag, 0 );
     if ( rv == 0 ) {
+      rtems_libio_iop_flags_initialize(
+        diop,
+        rtems_libio_fcntl_flags( oflag )
+      );
       rv = rtems_libio_iop_to_descriptor( diop );
     } else {
       rtems_libio_free( diop );
@@ -63,21 +65,23 @@ static int duplicate2_iop( rtems_libio_t *iop, int fd2 )
   rtems_libio_t *iop2;
   int            rv = 0;
 
-  rtems_libio_check_fd( fd2 );
+  if ( (uint32_t) fd2 >= rtems_libio_number_iops ) {
+    rtems_set_errno_and_return_minus_one( EBADF );
+  }
+
   iop2 = rtems_libio_iop( fd2 );
 
   if (iop != iop2)
   {
     int oflag;
 
-    if ((iop2->flags & LIBIO_FLAGS_OPEN) != 0) {
+    if ((rtems_libio_iop_flags( iop2 ) & LIBIO_FLAGS_OPEN) != 0) {
       rv = (*iop2->pathinfo.handlers->close_h)( iop2 );
     }
 
     if (rv == 0) {
-      oflag = rtems_libio_to_fcntl_flags( iop->flags );
-      oflag &= ~O_CREAT;
-      iop2->flags |= rtems_libio_fcntl_flags( oflag );
+      oflag = rtems_libio_to_fcntl_flags( rtems_libio_iop_flags( iop ) );
+      rtems_libio_iop_flags_set( iop2, rtems_libio_fcntl_flags( oflag ) );
 
       rtems_filesystem_instance_lock( &iop->pathinfo );
       rtems_filesystem_location_clone( &iop2->pathinfo, &iop->pathinfo );
@@ -111,9 +115,7 @@ static int vfcntl(
   int            mask;
   int            ret = 0;
 
-  rtems_libio_check_fd( fd );
-  iop = rtems_libio_iop( fd );
-  rtems_libio_check_is_open(iop);
+  LIBIO_GET_IOP( fd, iop );
 
   /*
    *  Now process the fcntl().
@@ -134,7 +136,7 @@ static int vfcntl(
       break;
 
     case F_GETFD:        /* get f_flags */
-      ret = ((iop->flags & LIBIO_FLAGS_CLOSE_ON_EXEC) != 0);
+      ret = ((rtems_libio_iop_flags(iop) & LIBIO_FLAGS_CLOSE_ON_EXEC) != 0);
       break;
 
     case F_SETFD:        /* set f_flags */
@@ -147,13 +149,13 @@ static int vfcntl(
        */
 
       if ( va_arg( ap, int ) )
-        iop->flags |= LIBIO_FLAGS_CLOSE_ON_EXEC;
+        rtems_libio_iop_flags_set( iop, LIBIO_FLAGS_CLOSE_ON_EXEC );
       else
-        iop->flags &= ~LIBIO_FLAGS_CLOSE_ON_EXEC;
+        rtems_libio_iop_flags_clear( iop, LIBIO_FLAGS_CLOSE_ON_EXEC );
       break;
 
     case F_GETFL:        /* more flags (cloexec) */
-      ret = rtems_libio_to_fcntl_flags( iop->flags );
+      ret = rtems_libio_to_fcntl_flags( rtems_libio_iop_flags( iop ) );
       break;
 
     case F_SETFL:
@@ -164,7 +166,8 @@ static int vfcntl(
        *  XXX If we are turning on append, should we seek to the end?
        */
 
-      iop->flags = (iop->flags & ~mask) | (flags & mask);
+      rtems_libio_iop_flags_clear( iop, mask );
+      rtems_libio_iop_flags_set( iop, flags & mask );
       break;
 
     case F_GETLK:
@@ -210,6 +213,8 @@ static int vfcntl(
       ret = -1;
     }
   }
+
+  rtems_libio_iop_drop( iop );
   return ret;
 }
 
@@ -239,7 +244,7 @@ int fcntl(
 #include <reent.h>
 
 int _fcntl_r(
-  struct _reent *ptr __attribute__((unused)),
+  struct _reent *ptr RTEMS_UNUSED,
   int fd,
   int cmd,
   int arg

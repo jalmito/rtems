@@ -9,6 +9,8 @@
  *  COPYRIGHT (c) 1989-2007.
  *  On-Line Applications Research Corporation (OAR).
  *
+ *  Copyright (c) 2017 embedded brains GmbH
+ *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
  *  http://www.rtems.org/license/LICENSE.
@@ -18,56 +20,46 @@
 #include "config.h"
 #endif
 
-#include <pthread.h>
-#include <errno.h>
-
 #include <rtems/posix/barrierimpl.h>
-#include <rtems/score/thread.h>
+#include <rtems/posix/posixapi.h>
 
-/**
- * This directive allows a thread to wait at a barrier.
- *
- * @param[in] barrier is the barrier id
- *
- * @retval 0 if successful
- * @retval PTHREAD_BARRIER_SERIAL_THREAD if successful
- * @retval error_code if unsuccessful
- */
-
-int pthread_barrier_wait(
-  pthread_barrier_t *barrier
-)
+int pthread_barrier_wait( pthread_barrier_t *_barrier )
 {
-  POSIX_Barrier_Control   *the_barrier = NULL;
-  Objects_Locations        location;
-  Thread_Control          *executing;
+  POSIX_Barrier_Control *barrier;
+  Thread_queue_Context   queue_context;
+  Thread_Control        *executing;
+  unsigned int           waiting_threads;
 
-  if ( !barrier )
-    return EINVAL;
+  POSIX_BARRIER_VALIDATE_OBJECT( _barrier );
 
-  the_barrier = _POSIX_Barrier_Get( barrier, &location );
-  switch ( location ) {
+  barrier = _POSIX_Barrier_Get( _barrier );
 
-    case OBJECTS_LOCAL:
-      executing = _Thread_Executing;
-      _CORE_barrier_Wait(
-        &the_barrier->Barrier,
-        executing,
-        the_barrier->Object.id,
-        true,
-        0,
-        NULL
-      );
-      _Objects_Put( &the_barrier->Object );
-      return _POSIX_Barrier_Translate_core_barrier_return_code(
-                executing->Wait.return_code );
+  executing = _POSIX_Barrier_Queue_acquire( barrier, &queue_context );
+  waiting_threads = barrier->waiting_threads;
+  ++waiting_threads;
 
-#if defined(RTEMS_MULTIPROCESSING)
-    case OBJECTS_REMOTE:
-#endif
-    case OBJECTS_ERROR:
-      break;
+  if ( waiting_threads == barrier->count ) {
+    barrier->waiting_threads = 0;
+    _Thread_queue_Flush_critical(
+      &barrier->Queue.Queue,
+      POSIX_BARRIER_TQ_OPERATIONS,
+      _Thread_queue_Flush_default_filter,
+      &queue_context
+    );
+    return PTHREAD_BARRIER_SERIAL_THREAD;
+  } else {
+    barrier->waiting_threads = waiting_threads;
+    _Thread_queue_Context_set_thread_state(
+      &queue_context,
+      STATES_WAITING_FOR_BARRIER
+    );
+    _Thread_queue_Context_set_enqueue_do_nothing_extra( &queue_context );
+    _Thread_queue_Enqueue(
+      &barrier->Queue.Queue,
+      POSIX_BARRIER_TQ_OPERATIONS,
+      executing,
+      &queue_context
+    );
+    return 0;
   }
-
-  return EINVAL;
 }

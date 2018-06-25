@@ -36,9 +36,7 @@ long fpathconf(
   rtems_libio_t                          *iop;
   const rtems_filesystem_limits_and_options_t *the_limits;
 
-  rtems_libio_check_fd(fd);
-  iop = rtems_libio_iop(fd);
-  rtems_libio_check_is_open(iop);
+  LIBIO_GET_IOP( fd, iop );
 
   /*
    *  Now process the information request.
@@ -84,9 +82,11 @@ long fpathconf(
       return_value = the_limits->posix_sync_io;
       break;
     default:
-      rtems_set_errno_and_return_minus_one( EINVAL );
+      errno = EINVAL;
+      return_value = -1;
       break;
   }
 
+  rtems_libio_iop_drop( iop );
   return return_value;
 }

@@ -23,11 +23,11 @@
 #define __DOSFS_FAT_H__
 
 #include <sys/param.h>
+#include <sys/endian.h>
 #include <string.h>
 
 #include <rtems/seterr.h>
 
-#include <rtems/score/cpu.h>
 #include <errno.h>
 #include <rtems/bdbuf.h>
 
@@ -56,18 +56,10 @@ extern "C" {
  * Naming: Ca_b_c, where a: F = from, T = to, b: LE = little-endian,
  * BE = big-endian, c: W = word (16 bits), L = longword (32 bits)
  */
-
-#if (CPU_BIG_ENDIAN == TRUE)
-#    define CF_LE_W(v) CPU_swap_u16((uint16_t)(v))
-#    define CF_LE_L(v) CPU_swap_u32((uint32_t)(v))
-#    define CT_LE_W(v) CPU_swap_u16((uint16_t)(v))
-#    define CT_LE_L(v) CPU_swap_u32((uint32_t)(v))
-#else
-#    define CF_LE_W(v) (v)
-#    define CF_LE_L(v) (v)
-#    define CT_LE_W(v) (v)
-#    define CT_LE_L(v) (v)
-#endif
+#define CF_LE_W(v) le16toh(v)
+#define CF_LE_L(v) le32toh(v)
+#define CT_LE_W(v) htole16(v)
+#define CT_LE_L(v) htole32(v)
 
 #define FAT_HASH_SIZE   2
 #define FAT_HASH_MODULE FAT_HASH_SIZE
@@ -282,7 +274,7 @@ extern "C" {
 
 #define FAT_TOTAL_FSINFO_SIZE               512
 
-#define MS_BYTES_PER_CLUSTER_LIMIT           0x8000     /* 32K */
+#define MS_BYTES_PER_CLUSTER_LIMIT           0x10000    /* 64K */
 #define MS_BYTES_PER_CLUSTER_LIMIT_FAT12     0x1000     /*  4K */
 
 #define FAT_BR_EXT_FLAGS_MIRROR              0x0080
@@ -308,10 +300,10 @@ typedef struct fat_vol_s
     uint8_t            sec_mul;        /* log2 of 512bts sectors number per sector */
     uint8_t            spc;            /* sectors per cluster */
     uint8_t            spc_log2;       /* log2 of spc */
-    uint16_t           bpc;            /* bytes per cluster */
+    uint32_t           bpc;            /* bytes per cluster */
     uint8_t            bpc_log2;       /* log2 of bytes per cluster */
     uint8_t            sectors_per_block;    /* sectors per bdbuf block */
-    uint16_t           bytes_per_block;      /* number of bytes for the bduf block device handling */
+    uint32_t           bytes_per_block;      /* number of bytes for the bduf block device handling */
     uint8_t            bytes_per_block_log2; /* log2 of bytes_per_block */
     uint8_t            fats;           /* number of FATs */
     uint8_t            type;           /* FAT type */

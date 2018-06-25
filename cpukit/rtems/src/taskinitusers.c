@@ -23,12 +23,11 @@
 #include <rtems/rtems/status.h>
 #include <rtems/rtems/support.h>
 #include <rtems/rtems/modes.h>
-#include <rtems/rtems/rtemsapi.h>
+#include <rtems/score/assert.h>
 #include <rtems/score/stack.h>
 #include <rtems/rtems/tasksimpl.h>
 #include <rtems/score/thread.h>
 #include <rtems/score/wkspace.h>
-#include <rtems/score/apiext.h>
 
 /*
  *  _RTEMS_tasks_Initialize_user_tasks_body
@@ -48,7 +47,6 @@ void _RTEMS_tasks_Initialize_user_tasks_body( void )
   rtems_id                          id;
   rtems_status_code                 return_value;
   rtems_initialization_tasks_table *user_tasks;
-  bool                              register_global_construction;
   rtems_task_entry                  entry_point;
 
   /*
@@ -63,8 +61,6 @@ void _RTEMS_tasks_Initialize_user_tasks_body( void )
   if ( !user_tasks )
     return;
 
-  register_global_construction = true;
-
   /*
    *  Now iterate over the initialization tasks and create/start them.
    */
@@ -77,14 +73,13 @@ void _RTEMS_tasks_Initialize_user_tasks_body( void )
       user_tasks[ index ].attribute_set,
       &id
     );
-    if ( !rtems_is_status_successful( return_value ) )
-      _Terminate( INTERNAL_ERROR_RTEMS_API, true, return_value );
+    if ( !rtems_is_status_successful( return_value ) ) {
+      _Internal_error( INTERNAL_ERROR_RTEMS_INIT_TASK_CREATE_FAILED );
+    }
 
     entry_point = user_tasks[ index ].entry_point;
-
-    if ( register_global_construction && entry_point != NULL ) {
-      register_global_construction = false;
-      entry_point = (rtems_task_entry) _Thread_Global_construction;
+    if ( entry_point == NULL ) {
+      _Internal_error( INTERNAL_ERROR_RTEMS_INIT_TASK_ENTRY_IS_NULL );
     }
 
     return_value = rtems_task_start(
@@ -92,7 +87,11 @@ void _RTEMS_tasks_Initialize_user_tasks_body( void )
       entry_point,
       user_tasks[ index ].argument
     );
-    if ( !rtems_is_status_successful( return_value ) )
-      _Terminate( INTERNAL_ERROR_RTEMS_API, true, return_value );
+    _Assert( rtems_is_status_successful( return_value ) );
+    (void) return_value;
+
+    if ( _Thread_Global_constructor == 0 ) {
+      _Thread_Global_constructor = id;
+    }
   }
 }

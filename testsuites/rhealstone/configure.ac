@@ -5,10 +5,12 @@ AC_INIT([rtems-c-src-tests-rhealstone],[_RTEMS_VERSION],[https://devel.rtems.org
 AC_CONFIG_SRCDIR([rhtaskswitch])
 AC_CONFIG_HEADER([config.h])
 RTEMS_TOP([../..],[..])
+RTEMS_SOURCE_TOP
+RTEMS_BUILD_TOP
 
 RTEMS_CANONICAL_TARGET_CPU
 
-AM_INIT_AUTOMAKE([no-define foreign 1.12.2])
+AM_INIT_AUTOMAKE([no-define foreign subdir-objects 1.12.2])
 AM_MAINTAINER_MODE
 
 RTEMS_ENV_RTEMSBSP
@@ -23,13 +25,13 @@ RTEMS_CANONICALIZE_TOOLS
 
 RTEMS_CHECK_CUSTOM_BSP(RTEMS_BSP)
 
-# Explicitly list all Makefiles here
-AC_CONFIG_FILES([Makefile
-rhtaskswitch/Makefile
-rhtaskpreempt/Makefile
-rhilatency/Makefile
-rhmlatency/Makefile
-rhsemshuffle/Makefile
-rhdeadlockbrk/Makefile
-])
+# BSP Test configuration
+RTEMS_TEST_CHECK([rhdeadlockbrk])
+RTEMS_TEST_CHECK([rhilatency])
+RTEMS_TEST_CHECK([rhmlatency])
+RTEMS_TEST_CHECK([rhsemshuffle])
+RTEMS_TEST_CHECK([rhtaskpreempt])
+RTEMS_TEST_CHECK([rhtaskswitch])
+
+AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

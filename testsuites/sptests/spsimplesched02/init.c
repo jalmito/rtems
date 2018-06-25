@@ -81,7 +81,7 @@ rtems_task Init(
   TEST_BEGIN();
 
   status = _Objects_Name_to_id_u32(
-    &_Thread_Internal_information,
+    &_Thread_Internal_information.Objects,
     rtems_build_name( 'I', 'D', 'L', 'E' ),
     RTEMS_SEARCH_LOCAL_NODE,
     &Idle_id
@@ -144,7 +144,7 @@ rtems_task Init(
 
 #define CONFIGURE_SCHEDULER_SIMPLE
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS             3
 #define CONFIGURE_MAXIMUM_SEMAPHORES        2
@@ -155,6 +155,8 @@ rtems_task Init(
 
 #define CONFIGURE_EXTRA_TASK_STACKS         (3 * RTEMS_MINIMUM_STACK_SIZE)
 #define CONFIGURE_INIT_TASK_PRIORITY        4
+
+#define CONFIGURE_DISABLE_SMP_CONFIGURATION
 
 #define CONFIGURE_INIT
 #include <rtems/confdefs.h>

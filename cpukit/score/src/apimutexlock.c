@@ -20,29 +20,18 @@
 #endif
 
 #include <rtems/score/apimutex.h>
-#include <rtems/score/coremuteximpl.h>
 #include <rtems/score/threadimpl.h>
 
 void _API_Mutex_Lock( API_Mutex_Control *the_mutex )
 {
-  bool previous_thread_life_protection;
-  ISR_lock_Context lock_context;
+  Thread_Life_state previous_thread_life_state;
 
-  previous_thread_life_protection = _Thread_Set_life_protection( true );
+  previous_thread_life_state =
+    _Thread_Set_life_protection( THREAD_LIFE_PROTECTED );
 
-  _ISR_lock_ISR_disable( &lock_context );
+  _Mutex_recursive_Acquire( &the_mutex->Mutex );
 
-  _CORE_mutex_Seize(
-    &the_mutex->Mutex,
-    _Thread_Executing,
-    the_mutex->Object.id,
-    true,
-    0,
-    &lock_context
-  );
-
-  if ( the_mutex->Mutex.nest_count == 1 ) {
-    the_mutex->previous_thread_life_protection =
-      previous_thread_life_protection;
+  if ( the_mutex->Mutex._nest_level == 0 ) {
+    the_mutex->previous_thread_life_state = previous_thread_life_state;
   }
 }

@@ -1,53 +1,45 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
+include $(top_srcdir)/../../bsp.am
 
-include_bspdir = $(includedir)/bsp
+dist_project_lib_DATA = ../../../../../../bsps/m68k/gen68340/start/bsp_specs
 
-dist_project_lib_DATA = bsp_specs
-
-include_HEADERS = include/bsp.h
-include_HEADERS += ../../shared/include/tm27.h
-
-nodist_include_HEADERS = include/bspopts.h
-nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
-DISTCLEANFILES = include/bspopts.h
 noinst_PROGRAMS =
 
-include_HEADERS += include/coverhd.h
-include_HEADERS += include/m340uart.h
-include_HEADERS += include/m340timer.h
-include_HEADERS += include/m68340.h
-include_HEADERS += include/m68340.inc
-include_HEADERS += include/m68349.inc
 
-noinst_LIBRARIES = libbspstart.a
-libbspstart_a_SOURCES = start/start.S
+start.$(OBJEXT): ../../../../../../bsps/m68k/gen68340/start/start.S
+	$(CPPASCOMPILE) -o $@ -c $<
 project_lib_DATA = start.$(OBJEXT)
 
-dist_project_lib_DATA += startup/linkcmds
+project_lib_DATA += linkcmds
 
-noinst_LIBRARIES += libbsp.a
-libbsp_a_SOURCES =
+project_lib_LIBRARIES = librtemsbsp.a
+librtemsbsp_a_SOURCES =
 
 # startup
-libbsp_a_SOURCES += ../../shared/bspclean.c ../../shared/bsplibc.c \
-    ../../shared/bsppredriverhook.c ../../shared/bspgetworkarea.c \
-    ../../shared/bsppost.c ../../shared/bspstart.c startup/init68340.c \
-    ../../shared/bootcard.c ../../shared/bsppretaskinghook.c \
-    ../../shared/sbrk.c ../../shared/setvec.c \
-    startup/dumpanic.c ../../shared/gnatinstallhandler.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspstart-empty.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/gen68340/start/init68340.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/setvec.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/gen68340/start/dumpanic.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-empty.c
 # clock
-libbsp_a_SOURCES += clock/ckinit.c
+librtemsbsp_a_SOURCES +=../../../../../../bsps/m68k/gen68340/clock/ckinit.c
 # console
-libbsp_a_SOURCES += console/console.c console/m340uart.c \
-    ../../shared/dummy_printk_support.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/gen68340/console/console.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/gen68340/console/m340uart.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/printk-dummy.c
 # timer
-libbsp_a_SOURCES += timer/timer.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/gen68340/btimer/btimer.c
 
-libbsp_a_LIBADD = \
-    ../../../libcpu/@RTEMS_CPU@/shared/cache.rel \
-    ../../../libcpu/@RTEMS_CPU@/shared/misc.rel
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/shared/cache/cache.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/shared/m68kidle.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/shared/memProbe.c
 
-include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
+include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
+include $(srcdir)/../../../../../../bsps/m68k/gen68340/headers.am

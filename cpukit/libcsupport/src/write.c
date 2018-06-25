@@ -33,17 +33,18 @@ ssize_t write(
   size_t      count
 )
 {
-  rtems_libio_t     *iop;
+  rtems_libio_t *iop;
+  ssize_t        n;
 
-  rtems_libio_check_fd( fd );
-  iop = rtems_libio_iop( fd );
-  rtems_libio_check_is_open( iop );
   rtems_libio_check_buffer( buffer );
   rtems_libio_check_count( count );
-  rtems_libio_check_permissions_with_error( iop, LIBIO_FLAGS_WRITE, EBADF );
+
+  LIBIO_GET_IOP_WITH_ACCESS( fd, iop, LIBIO_FLAGS_WRITE, EBADF );
 
   /*
    *  Now process the write() request.
    */
-  return (*iop->pathinfo.handlers->write_h)( iop, buffer, count );
+  n = (*iop->pathinfo.handlers->write_h)( iop, buffer, count );
+  rtems_libio_iop_drop( iop );
+  return n;
 }

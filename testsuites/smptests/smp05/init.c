@@ -27,7 +27,7 @@ rtems_task Test_task(
 
 static void success(void)
 {
-  rtems_test_end_with_plugin(locked_printf_plugin, NULL);
+  TEST_END();
   rtems_test_exit( 0 );
 }
 
@@ -50,7 +50,7 @@ rtems_task Init(
   rtems_status_code  status;
 
   locked_print_initialize();
-  rtems_test_begin_with_plugin(locked_printf_plugin, NULL);
+  TEST_BEGIN();
 
   if ( rtems_get_processor_count() == 1 ) {
     success();
@@ -82,14 +82,13 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
 
-#define CONFIGURE_SMP_APPLICATION
-#define CONFIGURE_SMP_MAXIMUM_PROCESSORS   2
+#define CONFIGURE_MAXIMUM_PROCESSORS   2
 
 #define CONFIGURE_MAXIMUM_TASKS            \
-    (1 + CONFIGURE_SMP_MAXIMUM_PROCESSORS)
+    (1 + CONFIGURE_MAXIMUM_PROCESSORS)
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE

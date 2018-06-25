@@ -26,6 +26,7 @@ int fstat(
 )
 {
   rtems_libio_t *iop;
+  int            rv;
 
   /*
    *  Check to see if we were passed a valid pointer.
@@ -36,9 +37,7 @@ int fstat(
   /*
    *  Now process the stat() request.
    */
-  iop = rtems_libio_iop( fd );
-  rtems_libio_check_fd( fd );
-  rtems_libio_check_is_open(iop);
+  LIBIO_GET_IOP( fd, iop );
 
   /*
    *  Zero out the stat structure so the various support
@@ -46,7 +45,9 @@ int fstat(
    */
   memset( sbuf, 0, sizeof(struct stat) );
 
-  return (*iop->pathinfo.handlers->fstat_h)( &iop->pathinfo, sbuf );
+  rv = (*iop->pathinfo.handlers->fstat_h)( &iop->pathinfo, sbuf );
+  rtems_libio_iop_drop( iop );
+  return rv;
 }
 
 /*
@@ -60,7 +61,7 @@ int fstat(
 #include <reent.h>
 
 int _fstat_r(
-  struct _reent *ptr __attribute__((unused)),
+  struct _reent *ptr RTEMS_UNUSED,
   int            fd,
   struct stat   *buf
 )

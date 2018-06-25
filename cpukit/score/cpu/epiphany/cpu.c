@@ -29,20 +29,16 @@
  * SUCH DAMAGE.
  */
 
-#include <rtems/system.h>
-#include <rtems/score/isr.h>
-#include <rtems/score/wkspace.h>
-#include <bsp/linker-symbols.h>
 #include <rtems/score/cpu.h>
 
-void init(void);
-void fini(void);
+void _init(void);
+void _fini(void);
 
-void _init()
+void _init(void)
 {
 }
 
-void _fini()
+void _fini(void)
 {
 }
 

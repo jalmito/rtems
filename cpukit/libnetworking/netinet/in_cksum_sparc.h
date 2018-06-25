@@ -82,6 +82,7 @@
 #include <sys/systm.h>
 #include <sys/mbuf.h>
 #include <netinet/in.h>
+#include <rtems/rtems_netinet_in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
@@ -266,43 +267,3 @@ in_cksum(struct mbuf *m, int len)
 
 	return (in_cksum_internal(m, 0, len, 0));
 }
-
-int
-in4_cksum(struct mbuf *m, uint8_t nxt, int off, int len)
-{
-	u_char *w;
-	u_int sum = 0;
-	struct ipovly ipov;
-
-	/*
-	 * Declare two temporary registers for use by the asm code.  We
-	 * allow the compiler to pick which specific machine registers to
-	 * use, instead of hard-coding this in the asm code above.
-	 */
-	u_int tmp1, tmp2;
-
-	if (nxt != 0) {
-		/* pseudo header */
-		memset(&ipov, 0, sizeof(ipov));
-		ipov.ih_len = htons(len);
-		ipov.ih_pr = nxt;
-		ipov.ih_src = mtod(m, struct ip *)->ip_src;
-		ipov.ih_dst = mtod(m, struct ip *)->ip_dst;
-		w = (u_char *)&ipov;
-		/* assumes sizeof(ipov) == 20 */
-		ADD16;
-		w += 16;
-		ADD4;
-	}
-
-	/* skip unnecessary part */
-	while (m && off > 0) {
-		if (m->m_len > off)
-			break;
-		off -= m->m_len;
-		m = m->m_next;
-	}
-
-	return (in_cksum_internal(m, off, len, sum));
-}
-

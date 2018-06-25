@@ -1,85 +1,77 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
+include $(top_srcdir)/../../bsp.am
 
-include_bspdir = $(includedir)/bsp
+dist_project_lib_DATA = ../../../../../../bsps/powerpc/psim/start/bsp_specs
 
-dist_project_lib_DATA = bsp_specs
 
-include_HEADERS = include/bsp.h
-include_HEADERS += include/tm27.h
-include_HEADERS += include/psim.h
 
-include_bsp_HEADERS = ../shared/include/linker-symbols.h
-
-nodist_include_HEADERS = include/bspopts.h
-nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
-nodist_include_bsp_HEADERS += ../../shared/include/console-polled.h
-DISTCLEANFILES = include/bspopts.h
-
-include_HEADERS += include/coverhd.h
-
-noinst_LIBRARIES = libbspstart.a
-libbspstart_a_SOURCES = start/start.S
+start.$(OBJEXT): ../../../../../../bsps/powerpc/psim/start/start.S
+	$(CPPASCOMPILE) -o $@ -c $<
 project_lib_DATA = start.$(OBJEXT)
 
-libbspstart_a_SOURCES += ../../powerpc/shared/start/rtems_crti.S
+rtems_crti.$(OBJEXT): ../../../../../../bsps/powerpc/shared/start/rtems_crti.S
+	$(CPPASCOMPILE) -o $@ -c $<
 project_lib_DATA += rtems_crti.$(OBJEXT)
 
-dist_project_lib_DATA += ../shared/startup/linkcmds.base
-dist_project_lib_DATA += startup/linkcmds
+project_lib_DATA += linkcmds
+dist_project_lib_DATA += ../../../../../../bsps/powerpc/shared/start/linkcmds.base
 
-noinst_LIBRARIES += libbsp.a
-libbsp_a_SOURCES =
+project_lib_LIBRARIES = librtemsbsp.a
+librtemsbsp_a_SOURCES =
 
 # startup
-libbsp_a_SOURCES += ../../shared/bspclean.c ../../shared/bsplibc.c \
-    ../../shared/bsppost.c ../../shared/bsppretaskinghook.c \
-    ../../shared/bsppredriverhook.c startup/bspstart.c \
-    ../../shared/bspgetworkarea.c ../../shared/bootcard.c \
-    ../../powerpc/shared/startup/sbrk.c ../../shared/gnatinstallhandler.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/psim/start/bspstart.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/start/sbrk.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-empty.c
 
 # pclock
-libbsp_a_SOURCES += ../shared/clock/p_clock.c
+librtemsbsp_a_SOURCES +=../../../../../../bsps/powerpc/shared/clock/p_clock.c
 # console
-libbsp_a_SOURCES += ../../shared/console-polled.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/console-polled.c
 # debugio
-libbsp_a_SOURCES += console/console-io.c console/consupp.S
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/psim/console/console-io.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/psim/console/consupp.S
 
 # irq
-include_bsp_HEADERS += irq/irq.h ../shared/openpic/openpic.h \
-    ../../shared/include/irq-generic.h
-libbsp_a_SOURCES += irq/irq_init.c ../shared/irq/openpic_i8259_irq.c \
-    ../shared/openpic/openpic.c ../../shared/src/irq-server.c  \
-    ../../shared/src/irq-generic.c ../../shared/src/irq-default-handler.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/psim/irq/irq_init.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/irq/openpic_i8259_irq.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/irq/openpic.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/irq/irq-default-handler.c
 
-EXTRA_DIST = vectors/README
 # vectors
-libbsp_a_SOURCES += vectors/align_h.S
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/psim/start/align_h.S
 
-include_bsp_HEADERS += ../../../libcpu/@RTEMS_CPU@/@exceptions@/bspsupport/irq_supp.h
-
-EXTRA_DIST += shmsupp/README
 if HAS_MP
 # shmdr
-libbsp_a_SOURCES += \
-    shmsupp/addrconv.c shmsupp/getcfg.c shmsupp/lock.c shmsupp/mpisr.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/psim/mpci/addrconv.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/psim/mpci/getcfg.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/psim/mpci/lock.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/psim/mpci/mpisr.c
 endif
 
 if HAS_NETWORKING
-libbsp_a_SOURCES += network/if_sim.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/psim/net/if_sim.c
 endif
 
-libbsp_a_LIBADD = ../../../libcpu/@RTEMS_CPU@/shared/cpuIdent.rel \
-    ../../../libcpu/@RTEMS_CPU@/shared/cache.rel \
-    ../../../libcpu/@RTEMS_CPU@/shared/stack.rel \
-    ../../../libcpu/@RTEMS_CPU@/@exceptions@/rtems-cpu.rel \
-    ../../../libcpu/@RTEMS_CPU@/mpc6xx/clock.rel \
-    ../../../libcpu/@RTEMS_CPU@/@exceptions@/exc_bspsupport.rel \
-    ../../../libcpu/@RTEMS_CPU@/@exceptions@/irq_bspsupport.rel \
-    ../../../libcpu/@RTEMS_CPU@/mpc6xx/mmu.rel \
-    ../../../libcpu/@RTEMS_CPU@/mpc6xx/timer.rel \
-    ../../../libcpu/@RTEMS_CPU@/mpc6xx/altivec.rel
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/altivec/vec_sup.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/altivec/vec_sup_asm.S
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/cache/cache.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/clock/clock-ppc-dec.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/btimer/btimer-ppc-dec.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/mmu/bat.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/mmu/mmuAsm.S
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/mmu/pte121.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/irq/ppc-irq-legacy.c
 
-include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
+include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
+include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
+include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
+include $(srcdir)/../../../../../../bsps/powerpc/shared/shared-sources.am
+include $(srcdir)/../../../../../../bsps/powerpc/shared/exceptions-sources.am
+include $(srcdir)/../../../../../../bsps/powerpc/psim/headers.am

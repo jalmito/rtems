@@ -42,7 +42,7 @@ static RTEMS_CHAIN_DEFINE_EMPTY(message_chain);
 
 static rtems_id server_id = RTEMS_ID_NONE;
 
-static void media_server(rtems_task_argument arg __attribute__((unused)))
+static void media_server(rtems_task_argument arg RTEMS_UNUSED)
 {
   rtems_status_code sc = RTEMS_SUCCESSFUL;
 
@@ -134,6 +134,7 @@ rtems_status_code rtems_media_server_post_event(
     msg->src = s;
     msg->worker = worker;
     msg->worker_arg = worker_arg;
+    rtems_chain_initialize_node(&msg->node);
 
     sc = rtems_chain_append_with_notification(
       &message_chain,

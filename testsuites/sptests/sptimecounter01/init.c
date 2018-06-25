@@ -16,18 +16,18 @@
   #include "config.h"
 #endif
 
+#include "tmacros.h"
+
 #include <assert.h>
 
 #include <bsp/bootcard.h>
 
-#include <rtems/test.h>
-
 #include <rtems/score/timecounterimpl.h>
-#include <rtems/score/watchdogimpl.h>
+#include <rtems/score/todimpl.h>
 #include <rtems/timecounter.h>
 #include <rtems/bsd.h>
 
-const char rtems_test_name[] = "SPTIMECOUNTER_1";
+const char rtems_test_name[] = "SPTIMECOUNTER 1";
 
 typedef struct {
   struct timecounter tc_soft;
@@ -51,16 +51,65 @@ void boot_card(const char *cmdline)
   struct timecounter *tc_soft = &ctx->tc_soft;
   uint64_t soft_freq = 1000000;
   struct bintime bt;
+  struct timeval tv;
+  struct timespec ts;
 
-  rtems_test_begink();
+  TEST_BEGIN();
 
-  _Timecounter_Initialize();
-  _Watchdog_Handler_initialization();
+  assert(time(NULL) == TOD_SECONDS_1970_THROUGH_1988);
+
+  rtems_bsd_bintime(&bt);
+  assert(bt.sec == TOD_SECONDS_1970_THROUGH_1988);
+  assert(bt.frac == 0);
+
+  rtems_bsd_getbintime(&bt);
+  assert(bt.sec == TOD_SECONDS_1970_THROUGH_1988);
+  assert(bt.frac == 0);
+
+  rtems_bsd_microtime(&tv);
+  assert(tv.tv_sec == TOD_SECONDS_1970_THROUGH_1988);
+  assert(tv.tv_usec == 0);
+
+  rtems_bsd_getmicrotime(&tv);
+  assert(tv.tv_sec == TOD_SECONDS_1970_THROUGH_1988);
+  assert(tv.tv_usec == 0);
+
+  rtems_bsd_nanotime(&ts);
+  assert(ts.tv_sec == TOD_SECONDS_1970_THROUGH_1988);
+  assert(ts.tv_nsec == 0);
+
+  rtems_bsd_getnanotime(&ts);
+  assert(ts.tv_sec == TOD_SECONDS_1970_THROUGH_1988);
+  assert(ts.tv_nsec == 0);
+
+  assert(rtems_clock_get_uptime_seconds() == 0);
+  assert(rtems_clock_get_uptime_nanoseconds() == 0);
 
   rtems_bsd_binuptime(&bt);
   assert(bt.sec == 1);
-  assert(bt.frac== 0);
+  assert(bt.frac == 0);
 
+  rtems_bsd_getbinuptime(&bt);
+  assert(bt.sec == 1);
+  assert(bt.frac == 0);
+
+  rtems_bsd_microuptime(&tv);
+  assert(tv.tv_sec == 1);
+  assert(tv.tv_usec == 0);
+
+  rtems_bsd_getmicrouptime(&tv);
+  assert(tv.tv_sec == 1);
+  assert(tv.tv_usec == 0);
+
+  rtems_bsd_nanouptime(&ts);
+  assert(ts.tv_sec == 1);
+  assert(ts.tv_nsec == 0);
+
+  rtems_bsd_getnanouptime(&ts);
+  assert(ts.tv_sec == 1);
+  assert(ts.tv_nsec == 0);
+
+  /* On RTEMS time does not advance using the dummy timecounter */
   rtems_bsd_binuptime(&bt);
   assert(bt.sec == 1);
   assert(bt.frac == 0);
@@ -99,9 +148,9 @@ void boot_card(const char *cmdline)
   assert(bt.sec == 1);
   assert(bt.frac == 18446742522092);
 
-  rtems_test_endk();
+  TEST_END();
 
-  _Terminate(RTEMS_FATAL_SOURCE_EXIT, false, 0);
+  _Terminate(RTEMS_FATAL_SOURCE_EXIT, 0);
 }
 
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
@@ -112,9 +161,9 @@ void boot_card(const char *cmdline)
 
 #define CONFIGURE_SCHEDULER_USER
 
-#define CONFIGURE_SCHEDULER_CONTEXT
+#define CONFIGURE_SCHEDULER
 
-#define CONFIGURE_SCHEDULER_CONTROLS { }
+#define CONFIGURE_SCHEDULER_TABLE_ENTRIES { }
 
 #define CONFIGURE_MEMORY_PER_TASK_FOR_SCHEDULER 0
 

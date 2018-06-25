@@ -1,50 +1,45 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
+include $(top_srcdir)/../../bsp.am
 
-include_bspdir = $(includedir)/bsp
+dist_project_lib_DATA = ../../../../../../bsps/sh/gensh4/start/bsp_specs
 
-dist_project_lib_DATA = bsp_specs
 
-include_HEADERS = include/bsp.h
-include_HEADERS += include/tm27.h
-
-nodist_include_HEADERS = include/bspopts.h
-nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
-DISTCLEANFILES = include/bspopts.h
-
-include_HEADERS += include/sdram.h
-include_HEADERS += ../../shared/include/coverhd.h
-
-noinst_LIBRARIES = libbspstart.a
-libbspstart_a_SOURCES = start/start.S
+start.$(OBJEXT): ../../../../../../bsps/sh/gensh4/start/start.S
+	$(CPPASCOMPILE) -o $@ -c $<
 project_lib_DATA = start.$(OBJEXT)
 
-dist_project_lib_DATA += startup/linkcmds startup/linkcmds.rom \
-    startup/linkcmds.rom2ram
+project_lib_DATA += linkcmds
+dist_project_lib_DATA += ../../../../../../bsps/sh/gensh4/start/linkcmds.rom
+dist_project_lib_DATA += ../../../../../../bsps/sh/gensh4/start/linkcmds.rom2ram
 
-noinst_LIBRARIES += libbsp.a
-libbsp_a_SOURCES =
+project_lib_LIBRARIES = librtemsbsp.a
+librtemsbsp_a_SOURCES =
 
 # startup
-libbsp_a_SOURCES += ../../shared/bsplibc.c ../../shared/bsppost.c \
-    ../../shared/bsppredriverhook.c ../shared/startup/bspstart.c \
-    ../../shared/bsppretaskinghook.c ../../shared/bspgetworkarea.c \
-    ../../shared/bspclean.c ../../shared/sbrk.c ../../shared/bootcard.c \
-    ../../shared/gnatinstallhandler.c ../shared/bsphwinit.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/sh/shared/start/bspstart.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/sh/shared/start/bsphwinit.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-empty.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/sh/gensh4/start/cpu_asm.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/sh/gensh4/start/ispsh7750.c
+librtemsbsp_a_SOURCES +=../../../../../../bsps/sh/gensh4/clock/ckinit.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/sh/gensh4/btimer/btimer.c
 # console
-libbsp_a_SOURCES += console/console.c ../../shared/dummy_printk_support.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/sh/gensh4/console/console.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/printk-dummy.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/sh/gensh4/console/sh4uart.c
 # hw_init
-libbsp_a_SOURCES += hw_init/hw_init.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/sh/gensh4/start/hw_init.c
 
-libbsp_a_LIBADD = \
-    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/clock.rel \
-    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/timer.rel \
-    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/sci.rel \
-    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/score.rel \
-    ../../../libcpu/@RTEMS_CPU@/cache.rel
+# Cache
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/cache/nocache.c
 
-EXTRA_DIST = times
 
-include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
+include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
+include $(srcdir)/../../../../../../bsps/sh/gensh4/headers.am

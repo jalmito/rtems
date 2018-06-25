@@ -2,16 +2,15 @@
 
 AC_PREREQ([2.69])
 AC_INIT([rtems-c-src-lib-libbsp-sh-gensh4],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
-AC_CONFIG_SRCDIR([bsp_specs])
 RTEMS_TOP(../../../../../..)
+RTEMS_SOURCE_TOP
+RTEMS_BUILD_TOP
+RTEMS_BSP_LINKCMDS
 
 RTEMS_CANONICAL_TARGET_CPU
 AM_INIT_AUTOMAKE([no-define nostdinc foreign 1.12.2])
 RTEMS_BSP_CONFIGURE
 
-RTEMS_PROG_CC_FOR_TARGET
-RTEMS_CANONICALIZE_TOOLS
-RTEMS_PROG_CCAS
 
 ## bsp-specific options
 CPU_CLOCK_RATE_HZ=${CPU_CLOCK_RATE_HZ-96000000}
@@ -31,7 +30,7 @@ RTEMS_BSPOPTS_SET([COPY_DATA_FROM_ROM],[*],[0])
 RTEMS_BSPOPTS_HELP([COPY_DATA_FROM_ROM],
    [Whether to copy data from ROM to RAM in start.S])
 
-RTEMS_BSP_CLEANUP_OPTIONS(0, 0)
+RTEMS_BSP_CLEANUP_OPTIONS
 
 # Explicitly list all Makefiles here
 AC_CONFIG_FILES([Makefile])

@@ -10,6 +10,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include <errno.h>
 #include <timesys.h>
 #include <rtems/btimer.h>
@@ -267,11 +268,10 @@ void *POSIX_Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
 
 #define CONFIGURE_MAXIMUM_POSIX_THREADS     1
-#define CONFIGURE_MAXIMUM_POSIX_RWLOCKS     1
 #define CONFIGURE_POSIX_INIT_THREAD_TABLE
 
 #define CONFIGURE_INIT

@@ -18,22 +18,24 @@
 #include "config.h"
 #endif
 
-#include <stdarg.h>
+#include <rtems/printer.h>
 #include <rtems/bspIo.h>
 
-int printk_plugin(
-  void *ignored __attribute__((unused)),
+int rtems_printk_printer(
+  void *ignored,
   const char *format,
-  ...
+  va_list ap
 )
 {
-  va_list arg_pointer;
-
-  va_start (arg_pointer, format);
-
-  vprintk( format, arg_pointer );
-
-  va_end(arg_pointer); /* clean up when done */
-
+  (void) ignored;
+  vprintk( format, ap );
   return 0;
+}
+
+void rtems_print_printer_printk(
+  rtems_printer *printer
+)
+{
+  printer->context = NULL;
+  printer->printer = rtems_printk_printer;
 }

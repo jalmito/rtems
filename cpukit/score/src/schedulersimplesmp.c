@@ -7,7 +7,7 @@
  */
 
 /*
- * Copyright (c) 2013-2014 embedded brains GmbH.
+ * Copyright (c) 2013, 2016 embedded brains GmbH.
  *
  * The license and distribution terms for this file may be
  * found in the file LICENSE in this distribution or at
@@ -44,37 +44,37 @@ void _Scheduler_simple_SMP_Initialize( const Scheduler_Control *scheduler )
 
 void _Scheduler_simple_SMP_Node_initialize(
   const Scheduler_Control *scheduler,
-  Thread_Control          *the_thread
+  Scheduler_Node          *node,
+  Thread_Control          *the_thread,
+  Priority_Control         priority
 )
 {
-  Scheduler_SMP_Node *node = _Scheduler_SMP_Thread_get_own_node( the_thread );
+  Scheduler_SMP_Node *smp_node;
 
-  _Scheduler_SMP_Node_initialize( node, the_thread );
+  smp_node = _Scheduler_SMP_Node_downcast( node );
+  _Scheduler_SMP_Node_initialize( scheduler, smp_node, the_thread, priority );
 }
 
 static void _Scheduler_simple_SMP_Do_update(
   Scheduler_Context *context,
-  Scheduler_Node    *node_to_update,
+  Scheduler_Node    *node,
   Priority_Control   new_priority
 )
 {
-  Scheduler_SMP_Node *node = _Scheduler_SMP_Node_downcast( node_to_update );
+  Scheduler_SMP_Node *smp_node;
 
   (void) context;
 
-  _Scheduler_SMP_Node_update_priority( node, new_priority );
+  smp_node = _Scheduler_SMP_Node_downcast( node );
+  _Scheduler_SMP_Node_update_priority( smp_node, new_priority );
 }
 
-void _Scheduler_simple_SMP_Update_priority(
-  const Scheduler_Control *scheduler,
-  Thread_Control          *thread,
-  Priority_Control         new_priority
-)
+static bool _Scheduler_simple_SMP_Has_ready( Scheduler_Context *context )
 {
-  Scheduler_Context *context = _Scheduler_Get_context( scheduler );
-  Scheduler_Node *node = _Scheduler_Thread_get_node( thread );
+  Scheduler_simple_SMP_Context *self =
+    _Scheduler_simple_SMP_Get_self( context );
 
-  _Scheduler_simple_SMP_Do_update( context, node, new_priority );
+  return !_Chain_Is_empty( &self->Ready );
 }
 
 static Scheduler_Node *_Scheduler_simple_SMP_Get_highest_ready(
@@ -88,7 +88,7 @@ static Scheduler_Node *_Scheduler_simple_SMP_Get_highest_ready(
 
   (void) node;
 
-  _Assert( &first->Node != _Chain_Tail( &self->Ready ) );
+  _Assert( &first->Node.Chain != _Chain_Tail( &self->Ready ) );
 
   return first;
 }
@@ -98,14 +98,18 @@ static void _Scheduler_simple_SMP_Move_from_scheduled_to_ready(
   Scheduler_Node    *scheduled_to_ready
 )
 {
-  Scheduler_simple_SMP_Context *self =
-    _Scheduler_simple_SMP_Get_self( context );
+  Scheduler_simple_SMP_Context *self;
+  Priority_Control              insert_priority;
 
-  _Chain_Extract_unprotected( &scheduled_to_ready->Node );
+  self = _Scheduler_simple_SMP_Get_self( context );
+
+  _Chain_Extract_unprotected( &scheduled_to_ready->Node.Chain );
+  insert_priority = _Scheduler_SMP_Node_priority( scheduled_to_ready );
   _Chain_Insert_ordered_unprotected(
     &self->Ready,
-    &scheduled_to_ready->Node,
-    _Scheduler_SMP_Insert_priority_lifo_order
+    &scheduled_to_ready->Node.Chain,
+    &insert_priority,
+    _Scheduler_SMP_Priority_less_equal
   );
 }
 
@@ -114,44 +118,37 @@ static void _Scheduler_simple_SMP_Move_from_ready_to_scheduled(
   Scheduler_Node    *ready_to_scheduled
 )
 {
-  Scheduler_simple_SMP_Context *self =
-    _Scheduler_simple_SMP_Get_self( context );
+  Scheduler_simple_SMP_Context *self;
+  Priority_Control              insert_priority;
 
-  _Chain_Extract_unprotected( &ready_to_scheduled->Node );
+  self = _Scheduler_simple_SMP_Get_self( context );
+
+  _Chain_Extract_unprotected( &ready_to_scheduled->Node.Chain );
+  insert_priority = _Scheduler_SMP_Node_priority( ready_to_scheduled );
+  insert_priority = SCHEDULER_PRIORITY_APPEND( insert_priority );
   _Chain_Insert_ordered_unprotected(
     &self->Base.Scheduled,
-    &ready_to_scheduled->Node,
-    _Scheduler_SMP_Insert_priority_fifo_order
+    &ready_to_scheduled->Node.Chain,
+    &insert_priority,
+    _Scheduler_SMP_Priority_less_equal
   );
 }
 
-static void _Scheduler_simple_SMP_Insert_ready_lifo(
+static void _Scheduler_simple_SMP_Insert_ready(
   Scheduler_Context *context,
-  Scheduler_Node    *node_to_insert
+  Scheduler_Node    *node_to_insert,
+  Priority_Control   insert_priority
 )
 {
-  Scheduler_simple_SMP_Context *self =
-    _Scheduler_simple_SMP_Get_self( context );
+  Scheduler_simple_SMP_Context *self;
+
+  self = _Scheduler_simple_SMP_Get_self( context );
 
   _Chain_Insert_ordered_unprotected(
     &self->Ready,
-    &node_to_insert->Node,
-    _Scheduler_SMP_Insert_priority_lifo_order
-  );
-}
-
-static void _Scheduler_simple_SMP_Insert_ready_fifo(
-  Scheduler_Context *context,
-  Scheduler_Node    *node_to_insert
-)
-{
-  Scheduler_simple_SMP_Context *self =
-    _Scheduler_simple_SMP_Get_self( context );
-
-  _Chain_Insert_ordered_unprotected(
-    &self->Ready,
-    &node_to_insert->Node,
-    _Scheduler_SMP_Insert_priority_fifo_order
+    &node_to_insert->Node.Chain,
+    &insert_priority,
+    _Scheduler_SMP_Priority_less_equal
   );
 }
 
@@ -162,12 +159,13 @@ static void _Scheduler_simple_SMP_Extract_from_ready(
 {
   (void) context;
 
-  _Chain_Extract_unprotected( &node_to_extract->Node );
+  _Chain_Extract_unprotected( &node_to_extract->Node.Chain );
 }
 
 void _Scheduler_simple_SMP_Block(
   const Scheduler_Control *scheduler,
-  Thread_Control *thread
+  Thread_Control          *thread,
+  Scheduler_Node          *node
 )
 {
   Scheduler_Context *context = _Scheduler_Get_context( scheduler );
@@ -175,6 +173,7 @@ void _Scheduler_simple_SMP_Block(
   _Scheduler_SMP_Block(
     context,
     thread,
+    node,
     _Scheduler_simple_SMP_Extract_from_ready,
     _Scheduler_simple_SMP_Get_highest_ready,
     _Scheduler_simple_SMP_Move_from_ready_to_scheduled,
@@ -182,174 +181,194 @@ void _Scheduler_simple_SMP_Block(
   );
 }
 
-static Thread_Control *_Scheduler_simple_SMP_Enqueue_ordered(
-  Scheduler_Context    *context,
-  Scheduler_Node       *node,
-  Thread_Control       *needs_help,
-  Chain_Node_order      order,
-  Scheduler_SMP_Insert  insert_ready,
-  Scheduler_SMP_Insert  insert_scheduled
+static bool _Scheduler_simple_SMP_Enqueue(
+  Scheduler_Context *context,
+  Scheduler_Node    *node,
+  Priority_Control   insert_priority
 )
 {
-  return _Scheduler_SMP_Enqueue_ordered(
+  return _Scheduler_SMP_Enqueue(
     context,
     node,
-    needs_help,
-    order,
-    insert_ready,
-    insert_scheduled,
+    insert_priority,
+    _Scheduler_SMP_Priority_less_equal,
+    _Scheduler_simple_SMP_Insert_ready,
+    _Scheduler_SMP_Insert_scheduled,
     _Scheduler_simple_SMP_Move_from_scheduled_to_ready,
     _Scheduler_SMP_Get_lowest_scheduled,
     _Scheduler_SMP_Allocate_processor_lazy
   );
 }
 
-static Thread_Control *_Scheduler_simple_SMP_Enqueue_lifo(
+static bool _Scheduler_simple_SMP_Enqueue_scheduled(
   Scheduler_Context *context,
   Scheduler_Node    *node,
-  Thread_Control    *needs_help
+  Priority_Control   insert_priority
 )
 {
-  return _Scheduler_simple_SMP_Enqueue_ordered(
+  return _Scheduler_SMP_Enqueue_scheduled(
     context,
     node,
-    needs_help,
-    _Scheduler_SMP_Insert_priority_lifo_order,
-    _Scheduler_simple_SMP_Insert_ready_lifo,
-    _Scheduler_SMP_Insert_scheduled_lifo
-  );
-}
-
-static Thread_Control *_Scheduler_simple_SMP_Enqueue_fifo(
-  Scheduler_Context *context,
-  Scheduler_Node    *node,
-  Thread_Control    *needs_help
-)
-{
-  return _Scheduler_simple_SMP_Enqueue_ordered(
-    context,
-    node,
-    needs_help,
-    _Scheduler_SMP_Insert_priority_fifo_order,
-    _Scheduler_simple_SMP_Insert_ready_fifo,
-    _Scheduler_SMP_Insert_scheduled_fifo
-  );
-}
-
-static Thread_Control *_Scheduler_simple_SMP_Enqueue_scheduled_ordered(
-  Scheduler_Context *context,
-  Scheduler_Node *node,
-  Chain_Node_order order,
-  Scheduler_SMP_Insert insert_ready,
-  Scheduler_SMP_Insert insert_scheduled
-)
-{
-  return _Scheduler_SMP_Enqueue_scheduled_ordered(
-    context,
-    node,
-    order,
+    insert_priority,
+    _Scheduler_SMP_Priority_less_equal,
     _Scheduler_simple_SMP_Extract_from_ready,
     _Scheduler_simple_SMP_Get_highest_ready,
-    insert_ready,
-    insert_scheduled,
+    _Scheduler_simple_SMP_Insert_ready,
+    _Scheduler_SMP_Insert_scheduled,
     _Scheduler_simple_SMP_Move_from_ready_to_scheduled,
     _Scheduler_SMP_Allocate_processor_lazy
   );
 }
 
-static Thread_Control *_Scheduler_simple_SMP_Enqueue_scheduled_lifo(
-  Scheduler_Context *context,
-  Scheduler_Node *node
-)
-{
-  return _Scheduler_simple_SMP_Enqueue_scheduled_ordered(
-    context,
-    node,
-    _Scheduler_SMP_Insert_priority_lifo_order,
-    _Scheduler_simple_SMP_Insert_ready_lifo,
-    _Scheduler_SMP_Insert_scheduled_lifo
-  );
-}
-
-static Thread_Control *_Scheduler_simple_SMP_Enqueue_scheduled_fifo(
-  Scheduler_Context *context,
-  Scheduler_Node *node
-)
-{
-  return _Scheduler_simple_SMP_Enqueue_scheduled_ordered(
-    context,
-    node,
-    _Scheduler_SMP_Insert_priority_fifo_order,
-    _Scheduler_simple_SMP_Insert_ready_fifo,
-    _Scheduler_SMP_Insert_scheduled_fifo
-  );
-}
-
-Thread_Control *_Scheduler_simple_SMP_Unblock(
-  const Scheduler_Control *scheduler,
-  Thread_Control *thread
-)
-{
-  Scheduler_Context *context = _Scheduler_Get_context( scheduler );
-
-  return _Scheduler_SMP_Unblock(
-    context,
-    thread,
-    _Scheduler_simple_SMP_Enqueue_fifo
-  );
-}
-
-Thread_Control *_Scheduler_simple_SMP_Change_priority(
+void _Scheduler_simple_SMP_Unblock(
   const Scheduler_Control *scheduler,
   Thread_Control          *thread,
-  Priority_Control         new_priority,
-  bool                     prepend_it
+  Scheduler_Node          *node
 )
 {
   Scheduler_Context *context = _Scheduler_Get_context( scheduler );
 
-  return _Scheduler_SMP_Change_priority(
+  _Scheduler_SMP_Unblock(
     context,
     thread,
-    new_priority,
-    prepend_it,
-    _Scheduler_simple_SMP_Extract_from_ready,
+    node,
     _Scheduler_simple_SMP_Do_update,
-    _Scheduler_simple_SMP_Enqueue_fifo,
-    _Scheduler_simple_SMP_Enqueue_lifo,
-    _Scheduler_simple_SMP_Enqueue_scheduled_fifo,
-    _Scheduler_simple_SMP_Enqueue_scheduled_lifo
+    _Scheduler_simple_SMP_Enqueue
   );
 }
 
-Thread_Control *_Scheduler_simple_SMP_Ask_for_help(
-  const Scheduler_Control *scheduler,
-  Thread_Control          *offers_help,
-  Thread_Control          *needs_help
+static bool _Scheduler_simple_SMP_Do_ask_for_help(
+  Scheduler_Context *context,
+  Thread_Control    *the_thread,
+  Scheduler_Node    *node
 )
 {
-  Scheduler_Context *context = _Scheduler_Get_context( scheduler );
-
   return _Scheduler_SMP_Ask_for_help(
     context,
-    offers_help,
-    needs_help,
-    _Scheduler_simple_SMP_Enqueue_fifo
+    the_thread,
+    node,
+    _Scheduler_SMP_Priority_less_equal,
+    _Scheduler_simple_SMP_Insert_ready,
+    _Scheduler_SMP_Insert_scheduled,
+    _Scheduler_simple_SMP_Move_from_scheduled_to_ready,
+    _Scheduler_SMP_Get_lowest_scheduled,
+    _Scheduler_SMP_Allocate_processor_lazy
   );
 }
 
-Thread_Control *_Scheduler_simple_SMP_Yield(
+void _Scheduler_simple_SMP_Update_priority(
   const Scheduler_Control *scheduler,
-  Thread_Control *thread
+  Thread_Control          *thread,
+  Scheduler_Node          *node
 )
 {
   Scheduler_Context *context = _Scheduler_Get_context( scheduler );
 
-  return _Scheduler_SMP_Yield(
+  _Scheduler_SMP_Update_priority(
     context,
     thread,
+    node,
     _Scheduler_simple_SMP_Extract_from_ready,
-    _Scheduler_simple_SMP_Enqueue_fifo,
-    _Scheduler_simple_SMP_Enqueue_scheduled_fifo
+    _Scheduler_simple_SMP_Do_update,
+    _Scheduler_simple_SMP_Enqueue,
+    _Scheduler_simple_SMP_Enqueue_scheduled,
+    _Scheduler_simple_SMP_Do_ask_for_help
+  );
+}
+
+bool _Scheduler_simple_SMP_Ask_for_help(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *the_thread,
+  Scheduler_Node          *node
+)
+{
+  Scheduler_Context *context = _Scheduler_Get_context( scheduler );
+
+  return _Scheduler_simple_SMP_Do_ask_for_help( context, the_thread, node );
+}
+
+void _Scheduler_simple_SMP_Reconsider_help_request(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *the_thread,
+  Scheduler_Node          *node
+)
+{
+  Scheduler_Context *context = _Scheduler_Get_context( scheduler );
+
+  _Scheduler_SMP_Reconsider_help_request(
+    context,
+    the_thread,
+    node,
+    _Scheduler_simple_SMP_Extract_from_ready
+  );
+}
+
+void _Scheduler_simple_SMP_Withdraw_node(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *the_thread,
+  Scheduler_Node          *node,
+  Thread_Scheduler_state   next_state
+)
+{
+  Scheduler_Context *context = _Scheduler_Get_context( scheduler );
+
+  _Scheduler_SMP_Withdraw_node(
+    context,
+    the_thread,
+    node,
+    next_state,
+    _Scheduler_simple_SMP_Extract_from_ready,
+    _Scheduler_simple_SMP_Get_highest_ready,
+    _Scheduler_simple_SMP_Move_from_ready_to_scheduled,
+    _Scheduler_SMP_Allocate_processor_lazy
+  );
+}
+
+void _Scheduler_simple_SMP_Add_processor(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *idle
+)
+{
+  Scheduler_Context *context = _Scheduler_Get_context( scheduler );
+
+  _Scheduler_SMP_Add_processor(
+    context,
+    idle,
+    _Scheduler_simple_SMP_Has_ready,
+    _Scheduler_simple_SMP_Enqueue_scheduled,
+    _Scheduler_SMP_Do_nothing_register_idle
+  );
+}
+
+Thread_Control *_Scheduler_simple_SMP_Remove_processor(
+  const Scheduler_Control *scheduler,
+  Per_CPU_Control         *cpu
+)
+{
+  Scheduler_Context *context = _Scheduler_Get_context( scheduler );
+
+  return _Scheduler_SMP_Remove_processor(
+    context,
+    cpu,
+    _Scheduler_simple_SMP_Extract_from_ready,
+    _Scheduler_simple_SMP_Enqueue
+  );
+}
+
+void _Scheduler_simple_SMP_Yield(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *thread,
+  Scheduler_Node          *node
+)
+{
+  Scheduler_Context *context = _Scheduler_Get_context( scheduler );
+
+  _Scheduler_SMP_Yield(
+    context,
+    thread,
+    node,
+    _Scheduler_simple_SMP_Extract_from_ready,
+    _Scheduler_simple_SMP_Enqueue,
+    _Scheduler_simple_SMP_Enqueue_scheduled
   );
 }

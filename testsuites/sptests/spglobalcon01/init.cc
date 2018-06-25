@@ -16,7 +16,6 @@
   #include "config.h"
 #endif
 
-#define TESTS_USE_PRINTK
 #include "tmacros.h"
 
 const char rtems_test_name[] = "SPGLOBALCON 1";
@@ -48,7 +47,7 @@ static void *idle_body(uintptr_t ignored)
 }
 
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_IDLE_TASK_INITIALIZES_APPLICATION
 

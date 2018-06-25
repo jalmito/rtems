@@ -20,13 +20,14 @@
 
 #include <rtems/system.h>
 #include <rtems/config.h>
+#include <rtems/sysinit.h>
 #include <rtems/rtems/status.h>
 #include <rtems/rtems/support.h>
-#include <rtems/score/address.h>
 #include <rtems/rtems/dpmemimpl.h>
-#include <rtems/score/thread.h>
 
-void _Dual_ported_memory_Manager_initialization(void)
+Objects_Information _Dual_ported_memory_Information;
+
+static void _Dual_ported_memory_Manager_initialization(void)
 {
   _Objects_Initialize_information(
     &_Dual_ported_memory_Information, /* object information table */
@@ -37,11 +38,13 @@ void _Dual_ported_memory_Manager_initialization(void)
     sizeof( Dual_ported_memory_Control ),
                                   /* size of this object's control block */
     false,                        /* true if names of this object are strings */
-    RTEMS_MAXIMUM_NAME_LENGTH     /* maximum length of each object's name */
-#if defined(RTEMS_MULTIPROCESSING)
-    ,
-    false,                        /* true if this is a global object class */
+    RTEMS_MAXIMUM_NAME_LENGTH,    /* maximum length of each object's name */
     NULL                          /* Proxy extraction support callout */
-#endif
   );
 }
+
+RTEMS_SYSINIT_ITEM(
+  _Dual_ported_memory_Manager_initialization,
+  RTEMS_SYSINIT_CLASSIC_DUAL_PORTED_MEMORY,
+  RTEMS_SYSINIT_ORDER_MIDDLE
+);

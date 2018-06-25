@@ -68,7 +68,6 @@ rtems_task Task_1(
   rtems_mode                 in_mode RTEMS_GCC_NOWARN_UNUSED;
   rtems_mode                 mask RTEMS_GCC_NOWARN_UNUSED;
   rtems_mode                 out_mode RTEMS_GCC_NOWARN_UNUSED;
-  uint32_t                   note RTEMS_GCC_NOWARN_UNUSED;
   rtems_time_of_day          time RTEMS_GCC_NOWARN_UNUSED;
   rtems_interval             timeout RTEMS_GCC_NOWARN_UNUSED;
   rtems_signal_set           signals RTEMS_GCC_NOWARN_UNUSED;
@@ -80,19 +79,17 @@ rtems_task Task_1(
   rtems_device_minor_number  minor RTEMS_GCC_NOWARN_UNUSED;
   uint32_t                   io_result RTEMS_GCC_NOWARN_UNUSED;
   uint32_t                   error RTEMS_GCC_NOWARN_UNUSED;
-  rtems_clock_get_options    options RTEMS_GCC_NOWARN_UNUSED;
+  rtems_time_of_day          tod RTEMS_GCC_NOWARN_UNUSED;
 
   name        = rtems_build_name( 'N', 'A', 'M', 'E' );
   in_priority = 250;
   in_mode     = RTEMS_NO_PREEMPT;
   mask        = RTEMS_PREEMPT_MASK;
-  note        = 8;
   timeout     = 100;
   signals     = RTEMS_SIGNAL_1 | RTEMS_SIGNAL_3;
   major       = 10;
   minor       = 0;
   error       = 100;
-  options     = 0;
 
 /* rtems_shutdown_executive */
 
@@ -251,36 +248,6 @@ rtems_task Task_1(
          0
       );
 
-/* rtems_task_get_note */
-
-      benchmark_timer_initialize();
-         for ( index = 1 ; index <= OPERATION_COUNT ; index ++ )
-            (void) rtems_task_get_note( id, 1, note );
-      end_time = benchmark_timer_read();
-
-      put_time(
-         "overhead: rtems_task_get_note",
-         end_time,
-         OPERATION_COUNT,
-         overhead,
-         0
-      );
-
-/* rtems_task_set_note */
-
-      benchmark_timer_initialize();
-         for ( index = 1 ; index <= OPERATION_COUNT ; index ++ )
-            (void) rtems_task_set_note( id, 1, note );
-      end_time = benchmark_timer_read();
-
-      put_time(
-         "overhead: rtems_task_set_note",
-         end_time,
-         OPERATION_COUNT,
-         overhead,
-         0
-      );
-
 /* rtems_task_wake_when */
 
       benchmark_timer_initialize();
@@ -326,15 +293,15 @@ rtems_task Task_1(
          0
       );
 
-/* rtems_clock_get */
+/* rtems_clock_get_tod */
 
       benchmark_timer_initialize();
          for ( index = 1 ; index <= OPERATION_COUNT ; index ++ )
-            (void) rtems_clock_get( options, time );
+            (void) rtems_clock_get_tod( &tod );
       end_time = benchmark_timer_read();
 
       put_time(
-         "overhead: rtems_clock_get",
+         "overhead: rtems_clock_get_tod",
          end_time,
          OPERATION_COUNT,
          overhead,

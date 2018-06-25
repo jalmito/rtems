@@ -22,20 +22,10 @@
 #include <rtems/score/threadqimpl.h>
 
 void _CORE_RWLock_Initialize(
-  CORE_RWLock_Control       *the_rwlock,
-  CORE_RWLock_Attributes    *the_rwlock_attributes
+  CORE_RWLock_Control *the_rwlock
 )
 {
-
-  the_rwlock->Attributes                = *the_rwlock_attributes;
-/*
-  the_rwlock->number_of_waiting_threads = 0;
-*/
   the_rwlock->number_of_readers = 0;
   the_rwlock->current_state = CORE_RWLOCK_UNLOCKED;
-
-  _Thread_queue_Initialize(
-    &the_rwlock->Wait_queue,
-    THREAD_QUEUE_DISCIPLINE_FIFO
-  );
+  _Thread_queue_Queue_initialize( &the_rwlock->Queue.Queue, NULL );
 }

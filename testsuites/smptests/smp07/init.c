@@ -18,7 +18,7 @@ const char rtems_test_name[] = "SMP 7";
 
 volatile bool TaskRan = false;
 volatile bool TSRFired = false;
-rtems_id      Semaphore; 
+rtems_id      Semaphore;
 
 rtems_task Init(
   rtems_task_argument argument
@@ -30,7 +30,7 @@ rtems_task Test_task(
 
 static void success(void)
 {
-  rtems_test_end_with_plugin(locked_printf_plugin, NULL);
+  TEST_END( );
   rtems_test_exit( 0 );
 }
 
@@ -63,13 +63,12 @@ rtems_task Test_task(
 
   /* Print that the task is up and running. */
   locked_printf(
-    " CPU %" PRIu32 " running Task %s after semaphore release\n", 
-    cpu_num, 
+    " CPU %" PRIu32 " running Task %s after semaphore release\n",
+    cpu_num,
     name
   );
 
-  /* FIXME: Task deletion currently not supported */
-  (void) rtems_task_suspend( RTEMS_SELF );
+  (void) rtems_task_delete( RTEMS_SELF );
 }
 
 
@@ -98,7 +97,7 @@ rtems_task Init(
   rtems_id           Timer;
 
   locked_print_initialize();
-  rtems_test_begin_with_plugin(locked_printf_plugin, NULL);
+  TEST_BEGIN();
 
   if ( rtems_get_processor_count() == 1 ) {
     success();
@@ -107,7 +106,7 @@ rtems_task Init(
   /* Create/verify semaphore */
   status = rtems_semaphore_create(
     rtems_build_name ('S', 'E', 'M', '1'),
-    1,                                             
+    1,
     RTEMS_LOCAL                   |
     RTEMS_SIMPLE_BINARY_SEMAPHORE |
     RTEMS_PRIORITY,
@@ -157,7 +156,7 @@ rtems_task Init(
     if ( TSRFired && TaskRan )
       break;
   };
-  
+
   /* Validate the timer fired and that the task ran */
   if ( !TSRFired )
     locked_printf( "*** ERROR TSR DID NOT FIRE ***" );
@@ -173,11 +172,10 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
-#define CONFIGURE_SMP_APPLICATION
-#define CONFIGURE_SMP_MAXIMUM_PROCESSORS   2
+#define CONFIGURE_MAXIMUM_PROCESSORS   2
 #define CONFIGURE_MAXIMUM_TIMERS           1
 
 #define CONFIGURE_MAXIMUM_TASKS            2

@@ -16,7 +16,6 @@
   #include "config.h"
 #endif
 
-#define TESTS_USE_PRINTF
 #include "tmacros.h"
 
 #include <stdio.h>
@@ -225,6 +224,7 @@ static void test(void)
 
 static void Init(rtems_task_argument arg)
 {
+  rtems_print_printer_fprintf_putc(&rtems_test_printer);
   TEST_BEGIN();
 
   if (rtems_get_processor_count() >= 2) {
@@ -236,11 +236,9 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
-#define CONFIGURE_SMP_APPLICATION
-
-#define CONFIGURE_SMP_MAXIMUM_PROCESSORS CPU_COUNT
+#define CONFIGURE_MAXIMUM_PROCESSORS CPU_COUNT
 
 #define CONFIGURE_MAXIMUM_TASKS (2 + RUNNER_COUNT)
 

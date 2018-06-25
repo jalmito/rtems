@@ -2,30 +2,18 @@
 
 AC_PREREQ([2.69])
 AC_INIT([rtems-c-src-lib-libbsp-i386-pc386],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
-AC_CONFIG_SRCDIR([bsp_specs])
 RTEMS_TOP(../../../../../..)
+RTEMS_SOURCE_TOP
+RTEMS_BUILD_TOP
+RTEMS_BSP_LINKCMDS
 
 RTEMS_CANONICAL_TARGET_CPU
 AM_INIT_AUTOMAKE([no-define nostdinc foreign 1.12.2])
 RTEMS_BSP_CONFIGURE
 
-RTEMS_PROG_CC_FOR_TARGET
-RTEMS_CANONICALIZE_TOOLS
 RTEMS_CHECK_TOOL(OBJCOPY,objcopy,:)
-RTEMS_PROG_CCAS
 
-RTEMS_CHECK_NETWORKING
-RTEMS_CHECK_SMP
 
-# Is this an Intel Edison?
-# NOTE: As we learn more, this could be trimmed if more issues
-#       turn out fo lack of legacy peripherals
-RTEMS_BSPOPTS_SET([BSP_IS_EDISON],[edison],[1])
-RTEMS_BSPOPTS_SET([BSP_IS_EDISON],[*],[0])
-RTEMS_BSPOPTS_HELP([BSP_IS_EDISON],[Set if the BSP variant is Intel Edison.])
-AM_CONDITIONAL(RTEMS_EDISON,[test "$BSP_IS_EDISON" = "1"])
-
-RTEMS_BSPOPTS_SET([BSP_ENABLE_VGA],[edison],[0])
 RTEMS_BSPOPTS_SET([BSP_ENABLE_VGA],[*],[1])
 RTEMS_BSPOPTS_HELP([BSP_ENABLE_VGA],
 [Set if the VGA and keyboard console support is enabled.])
@@ -34,9 +22,7 @@ AM_CONDITIONAL(RTEMS_VGA,[test "$BSP_ENABLE_VGA" = "1"])
 RTEMS_BSPOPTS_SET([BSP_ENABLE_COM1_COM4],[*],[1])
 RTEMS_BSPOPTS_HELP([BSP_ENABLE_COM1_COM4],
 [Set if COM1..COM4 support is enabled.])
-AM_CONDITIONAL(RTEMS_VGA,[test "$BSP_ENABLE_COM1_COM4" = "1"])
 
-RTEMS_BSPOPTS_SET([BSP_ENABLE_IDE],[edison],[0])
 RTEMS_BSPOPTS_SET([BSP_ENABLE_IDE],[*],[1])
 RTEMS_BSPOPTS_HELP([BSP_ENABLE_IDE],
 [Set if IDE support is enabled.])
@@ -143,20 +129,22 @@ RTEMS_BSPOPTS_HELP([BSP_HAS_SMP],
 [Always defined when on a pc386 to enable the pc386 support for
  determining the CPU core number in an SMP configuration.])
 
+RTEMS_BSPOPTS_SET([BSP_GDB_STUB],[*],[1])
+RTEMS_BSPOPTS_HELP([BSP_GDB_STUB],
+[Defined by default. Enables use of the GDB stub for debugging via a
+ serial port.])
+AM_CONDITIONAL(BSP_GDB_STUB, test "$BSP_GDB_STUB" = "1")
+
 ## if this is an i386, does gas have good code16 support?
 RTEMS_I386_GAS_CODE16
 AM_CONDITIONAL(RTEMS_GAS_CODE16,[test "$RTEMS_GAS_CODE16" = "yes"])
 
-AM_CONDITIONAL(HAS_NETWORKING,[test "$HAS_NETWORKING" = "yes"])
-AM_CONDITIONAL(HAS_SMP,[test "$rtems_cv_HAS_SMP" = "yes"])
 
 AC_SUBST([RTEMS_ROOT],[${rtems_updir}'$(top_builddir)'])
 
-RTEMS_CONFIG_BUILD_SUBDIRS(tools)
-
 AC_SUBST(RTEMS_BSP)
 
-RTEMS_BSP_CLEANUP_OPTIONS(1, 1)
+RTEMS_BSP_CLEANUP_OPTIONS
 
 # Explicitly list all Makefiles here
 AC_CONFIG_FILES([Makefile])

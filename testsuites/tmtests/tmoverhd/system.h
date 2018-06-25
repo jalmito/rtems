@@ -11,7 +11,6 @@
  */
 
 
-#include <coverhd.h>
 #include <tmacros.h>
 
 /* functions */
@@ -42,7 +41,7 @@ extern rtems_status_code Empty_directive(void);
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS              2

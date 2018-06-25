@@ -29,15 +29,20 @@
 
 void rtems_blkdev_print_stats(
   const rtems_blkdev_stats *stats,
-  rtems_printk_plugin_t print,
-  void *print_arg
+  uint32_t media_block_size,
+  uint32_t media_block_count,
+  uint32_t block_size,
+  const rtems_printer* printer
 )
 {
-  (*print)(
-     print_arg,
+  rtems_printf(
+     printer,
      "-------------------------------------------------------------------------------\n"
      "                               DEVICE STATISTICS\n"
      "----------------------+--------------------------------------------------------\n"
+     " MEDIA BLOCK SIZE     | %" PRIu32 "\n"
+     " MEDIA BLOCK COUNT    | %" PRIu32 "\n"
+     " BLOCK SIZE           | %" PRIu32 "\n"
      " READ HITS            | %" PRIu32 "\n"
      " READ MISSES          | %" PRIu32 "\n"
      " READ AHEAD TRANSFERS | %" PRIu32 "\n"
@@ -47,6 +52,9 @@ void rtems_blkdev_print_stats(
      " WRITE BLOCKS         | %" PRIu32 "\n"
      " WRITE ERRORS         | %" PRIu32 "\n"
      "----------------------+--------------------------------------------------------\n",
+     media_block_size,
+     media_block_count,
+     block_size,
      stats->read_hits,
      stats->read_misses,
      stats->read_ahead_transfers,

@@ -19,7 +19,6 @@
 #endif
 
 #include <rtems/score/corebarrierimpl.h>
-#include <rtems/score/threadqimpl.h>
 
 void _CORE_barrier_Initialize(
   CORE_barrier_Control       *the_barrier,
@@ -30,8 +29,5 @@ void _CORE_barrier_Initialize(
   the_barrier->Attributes                = *the_barrier_attributes;
   the_barrier->number_of_waiting_threads = 0;
 
-  _Thread_queue_Initialize(
-    &the_barrier->Wait_queue,
-    THREAD_QUEUE_DISCIPLINE_FIFO
-  );
+  _Thread_queue_Object_initialize( &the_barrier->Wait_queue );
 }

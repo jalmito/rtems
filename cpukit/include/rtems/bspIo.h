@@ -18,6 +18,10 @@
 #ifndef _RTEMS_BSPIO_H
 #define _RTEMS_BSPIO_H
 
+#include <rtems/score/basedefs.h>
+
+#include <stdarg.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -51,6 +55,9 @@ typedef int 	(*BSP_polling_getchar_function_type) 	(void);
 /**
  * This variable points to the BSP provided method to output a
  * character for the purposes of debug output.
+ *
+ * It must output only the specific character.  It must not perform character
+ * translations, e.g. "\n" to "\r\n".
  */
 extern 	BSP_output_char_function_type 		BSP_output_char;
 
@@ -59,8 +66,6 @@ extern 	BSP_output_char_function_type 		BSP_output_char;
  * character for the purposes of debug input.
  */
 extern 	BSP_polling_getchar_function_type 	BSP_poll_char;
-
-#include <stdarg.h>
 
 /**
  * @brief Get Character (kernel I/O)
@@ -84,17 +89,28 @@ extern int getchark(void);
  *
  * @param[in] fmt is a printf()-style format string
  * @param[in] ap is a va_list pointer to arguments
+ *
+ * @return The number of characters output.
  */
-extern void vprintk(const char *fmt, va_list ap);
+extern int vprintk(const char *fmt, va_list ap);
+
+int rtems_printk_printer(
+  void *ignored,
+  const char *format,
+  va_list ap
+);
 
 /**
  * @brief Kernel Print
  *
- * This method allows the user to perform a debug printk().
+ * This method allows the user to perform a debug printk().  It performs a
+ * character translation from "\n" to "\r\n".
  *
  * @param[in] fmt is a printf()-style format string
+ *
+ * @return The number of characters output.
  */
-extern void printk(const char *fmt, ...);
+extern int printk(const char *fmt, ...) RTEMS_PRINTFLIKE(1, 2);
 
 /**
  * @brief Kernel Put String
@@ -102,54 +118,20 @@ extern void printk(const char *fmt, ...);
  * This method allows the user to perform a debug puts().
  *
  * @param[in] s is the string to print
+ *
+ * @return The number of characters output.
  */
-extern void putk(const char *s);
+extern int putk(const char *s);
 
 /**
  * @brief Kernel Put Character
  *
- * This method allows the user to perform a debug putc().
+ * This method allows the user to perform a debug putc().  It performs a
+ * character translation from "\n" to "\r\n".
  *
  * @param[in] c is the character to print
  */
 extern void rtems_putc(char c);
-
-/**
- * Type definition for function which can be plugged in to
- * certain reporting routines to redirect the output.
- *
- * Methods following this prototype may be passed into RTEMS reporting
- * functions that allow their output to be redirected.  In particular,
- * the cpu usage, period usage, and stack usage reporting
- * functions use this.
- *
- * If the user provides their own "printf plugin", then they may
- * redirect those reports as they see fit.
- */
-typedef int (*rtems_printk_plugin_t)(void *, const char *format, ...);
-
-/**
- * @brief Reporting Methods printk() Plugin
- *
- * @param[in] context points to a user defined context.
- * @param[in] fmt is a printf()-style format string
- *
- * @return The number of characters printed.
- */
-extern int printk_plugin(void *context, const char *fmt, ...);
-
-/**
- * @brief Reporting Methods printf() Plugin
- *
- * This is a standard plug-in to support using printf() for output
- * instead of printk().
- *
- * @param[in] context points to a user defined context.
- * @param[in] fmt is a printf()-style format string
- *
- * @return The number of characters printed.
- */
-extern int rtems_printf_plugin(void *context, const char *fmt, ...);
 
 /**@}*/
 

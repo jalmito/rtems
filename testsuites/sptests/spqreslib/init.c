@@ -19,6 +19,8 @@
 #define CONFIGURE_INIT
 #include "system.h"
 
+#include <rtems/score/scheduleredfimpl.h>
+
 const char rtems_test_name[] = "SPQRESLIB";
 
 rtems_id   Task_id;
@@ -34,7 +36,7 @@ rtems_task Init(
   rtems_status_code status;
   qres_sid_t server_id, server_id2;
   time_t approved_budget, exec_time, abs_time, current_budget;
-  qres_params_t params, params1, params2, params3, params4;
+  qres_params_t params, params1, params3;
 
   Priority = 30;
   Period    = 30;
@@ -44,11 +46,9 @@ rtems_task Init(
   params.P = 1;
   params.Q = 1;
 
-  params1 = params2 = params3 = params4 = params;
+  params1 = params3 = params;
   params1.Q = -1;
-  params2.Q = SCHEDULER_EDF_PRIO_MSB + 1;
   params3.P = -1;
-  params4.P = SCHEDULER_EDF_PRIO_MSB + 1;
 
   TEST_BEGIN();
 
@@ -80,13 +80,7 @@ rtems_task Init(
   if ( qres_create_server( &params1, &server_id ) !=
        QOS_E_INVALID_PARAM )
     printf( "ERROR: CREATE SERVER PASSED UNEXPECTEDLY\n" );
-  if ( qres_create_server( &params2, &server_id ) !=
-       QOS_E_INVALID_PARAM )
-    printf( "ERROR: CREATE SERVER PASSED UNEXPECTEDLY\n" );
   if ( qres_create_server( &params3, &server_id ) !=
-       QOS_E_INVALID_PARAM )
-    printf( "ERROR: CREATE SERVER PASSED UNEXPECTEDLY\n" );
-  if ( qres_create_server( &params4, &server_id ) !=
        QOS_E_INVALID_PARAM )
     printf( "ERROR: CREATE SERVER PASSED UNEXPECTEDLY\n" );
   if ( qres_create_server( &params, &server_id2 ) )
@@ -162,13 +156,7 @@ rtems_task Init(
   if ( qres_set_params( server_id, &params1 ) !=
        QOS_E_INVALID_PARAM )
     printf( "ERROR: SET PARAMS PASSED UNEXPECTEDLY\n" );
-  if ( qres_set_params( server_id, &params2 ) !=
-       QOS_E_INVALID_PARAM )
-    printf( "ERROR: SET PARAMS PASSED UNEXPECTEDLY\n" );
   if ( qres_set_params( server_id, &params3 ) !=
-       QOS_E_INVALID_PARAM )
-    printf( "ERROR: SET PARAMS PASSED UNEXPECTEDLY\n" );
-  if ( qres_set_params( server_id, &params4 ) !=
        QOS_E_INVALID_PARAM )
     printf( "ERROR: SET PARAMS PASSED UNEXPECTEDLY\n" );
 

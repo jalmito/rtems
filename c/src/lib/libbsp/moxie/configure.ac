@@ -4,11 +4,12 @@
 
 AC_PREREQ(2.60)
 AC_INIT([rtems-c-src-lib-libbsp-moxie],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
-AC_CONFIG_SRCDIR([moxiesim])
 RTEMS_TOP(../../../../..)
+RTEMS_SOURCE_TOP
+RTEMS_BUILD_TOP
 
 RTEMS_CANONICAL_TARGET_CPU
-AM_INIT_AUTOMAKE([no-define foreign 1.10])
+AM_INIT_AUTOMAKE([no-define foreign subdir-objects 1.12.2])
 AM_MAINTAINER_MODE
 
 RTEMS_ENV_RTEMSBSP

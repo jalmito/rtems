@@ -27,10 +27,10 @@ const char rtems_test_name[] = "libdl (RTL) 1";
 /* forward declarations to avoid warnings */
 static rtems_task Init(rtems_task_argument argument);
 
-#include "dl-tar.h"
+#include "dl01-tar.h"
 
-#define TARFILE_START dl_tar
-#define TARFILE_SIZE  dl_tar_size
+#define TARFILE_START dl01_tar
+#define TARFILE_SIZE  dl01_tar_size
 
 static int test(void)
 {
@@ -63,7 +63,7 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 4
 
@@ -78,6 +78,8 @@ static void Init(rtems_task_argument arg)
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
+
+#define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
 
 #define CONFIGURE_INIT
 

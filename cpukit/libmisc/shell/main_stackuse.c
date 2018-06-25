@@ -16,19 +16,19 @@
 #include <stdio.h>
 
 #include <rtems.h>
+#include <rtems/printer.h>
 #include <rtems/stackchk.h>
 #include <rtems/shell.h>
 #include "internal.h"
 
 static int rtems_shell_main_stackuse(
-  int   argc __attribute__((unused)),
-  char *argv[] __attribute__((unused))
+  int   argc RTEMS_UNUSED,
+  char *argv[] RTEMS_UNUSED
 )
 {
-  rtems_stack_checker_report_usage_with_plugin(
-    stdout,
-    (rtems_printk_plugin_t)fprintf
-  );
+  rtems_printer printer;
+  rtems_print_printer_printf(&printer);
+  rtems_stack_checker_report_usage_with_plugin( &printer );
   return 0;
 }
 

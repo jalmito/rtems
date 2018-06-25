@@ -199,11 +199,13 @@
 #include <errno.h>
 #include <ctype.h>
 #include <inttypes.h>
+#include <sched.h>
 
 #include <rtems.h>
-#include <rtems/rtems_bsdnet.h>
 #include <rtems/error.h>
+#include <rtems/ftpd.h>
 #include <rtems/libio.h>
+#include <rtems/thread.h>
 #include <rtems/userenv.h>
 #include <syslog.h>
 
@@ -211,8 +213,6 @@
 #include <sys/socket.h>
 #include <arpa/ftp.h>
 #include <netinet/in.h>
-
-#include "ftpd.h"
 
 
 #ifdef __GNUC__
@@ -242,7 +242,7 @@ enum
 };
 
 /* Configuration table */
-extern struct rtems_ftpd_configuration rtems_ftpd_configuration;
+static struct rtems_ftpd_configuration *ftpd_config;
 
 /* this is not prototyped in strict ansi mode */
 FILE *fdopen (int fildes, const char *mode);
@@ -275,13 +275,13 @@ typedef struct
  */
 typedef struct
 {
-  FTPD_SessionInfo_t    *info;
-  FTPD_SessionInfo_t    **queue;
-  int                   count;
-  int                   head;
-  int                   tail;
-  rtems_id              mutex;
-  rtems_id              sem;
+  FTPD_SessionInfo_t       *info;
+  FTPD_SessionInfo_t       **queue;
+  int                      count;
+  int                      head;
+  int                      tail;
+  rtems_mutex              mutex;
+  rtems_counting_semaphore sem;
 } FTPD_TaskPool_t;
 
 /*
@@ -304,6 +304,19 @@ static int ftpd_timeout = 0;
  * Global access flags.
  */
 static int ftpd_access = 0;
+
+static void
+yield(void)
+{
+/*
+ * If we build not for the legacy network stack, then we use the libbsd.  In
+ * the libbsd there is no global network stack semaphore which provides round
+ * robin fairness for threads of equal priority.
+ */
+#ifndef RTEMS_NETWORKING
+  sched_yield();
+#endif
+}
 
 /*
  * serr
@@ -364,15 +377,11 @@ task_pool_done(int count)
     free(task_pool.info);
   if(task_pool.queue)
     free(task_pool.queue);
-  if(task_pool.mutex != (rtems_id)-1)
-    rtems_semaphore_delete(task_pool.mutex);
-  if(task_pool.sem != (rtems_id)-1)
-    rtems_semaphore_delete(task_pool.sem);
+  rtems_mutex_destroy(&task_pool.mutex);
+  rtems_counting_semaphore_destroy(&task_pool.sem);
   task_pool.info = 0;
   task_pool.queue = 0;
   task_pool.count = 0;
-  task_pool.sem = -1;
-  task_pool.mutex = -1;
 }
 
 /*
@@ -399,32 +408,9 @@ task_pool_init(int count, rtems_task_priority priority)
 
   task_pool.count = 0;
   task_pool.head = task_pool.tail = 0;
-  task_pool.mutex = (rtems_id)-1;
-  task_pool.sem   = (rtems_id)-1;
 
-  sc = rtems_semaphore_create(
-    rtems_build_name('F', 'T', 'P', 'M'),
-    1,
-    RTEMS_DEFAULT_ATTRIBUTES
-    | RTEMS_BINARY_SEMAPHORE
-    | RTEMS_INHERIT_PRIORITY
-    | RTEMS_PRIORITY,
-    RTEMS_NO_PRIORITY,
-    &task_pool.mutex);
-
-  if(sc == RTEMS_SUCCESSFUL)
-    sc = rtems_semaphore_create(
-      rtems_build_name('F', 'T', 'P', 'S'),
-      count,
-      RTEMS_DEFAULT_ATTRIBUTES,
-      RTEMS_NO_PRIORITY,
-      &task_pool.sem);
-
-  if(sc != RTEMS_SUCCESSFUL) {
-    task_pool_done(0);
-    syslog(LOG_ERR, "ftpd: Can not create semaphores");
-    return 0;
-  }
+  rtems_mutex_init(&task_pool.mutex, "FTPD");
+  rtems_counting_semaphore_init(&task_pool.sem, "FTPD", (unsigned int) count);
 
   task_pool.info = (FTPD_SessionInfo_t*)
     malloc(sizeof(FTPD_SessionInfo_t) * count);
@@ -444,7 +430,7 @@ task_pool_init(int count, rtems_task_priority priority)
       priority, FTPD_STACKSIZE,
       RTEMS_PREEMPT | RTEMS_NO_TIMESLICE |
       RTEMS_NO_ASR | RTEMS_INTERRUPT_LEVEL(0),
-      RTEMS_NO_FLOATING_POINT | RTEMS_LOCAL,
+      RTEMS_FLOATING_POINT | RTEMS_LOCAL,
       &info->tid);
     if (sc == RTEMS_SUCCESSFUL)
     {
@@ -486,16 +472,12 @@ static FTPD_SessionInfo_t*
 task_pool_obtain(void)
 {
   FTPD_SessionInfo_t* info = 0;
-  rtems_status_code sc;
-  sc = rtems_semaphore_obtain(task_pool.sem, RTEMS_NO_WAIT, RTEMS_NO_TIMEOUT);
-  if (sc == RTEMS_SUCCESSFUL)
-  {
-    rtems_semaphore_obtain(task_pool.mutex, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
-    info = task_pool.queue[task_pool.head];
-    if(++task_pool.head >= task_pool.count)
-      task_pool.head = 0;
-    rtems_semaphore_release(task_pool.mutex);
-  }
+  rtems_counting_semaphore_wait(&task_pool.sem);
+  rtems_mutex_lock(&task_pool.mutex);
+  info = task_pool.queue[task_pool.head];
+  if(++task_pool.head >= task_pool.count)
+    task_pool.head = 0;
+  rtems_mutex_unlock(&task_pool.mutex);
   return info;
 }
 
@@ -514,12 +496,12 @@ task_pool_obtain(void)
 static void
 task_pool_release(FTPD_SessionInfo_t* info)
 {
-  rtems_semaphore_obtain(task_pool.mutex, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
+  rtems_mutex_lock(&task_pool.mutex);
   task_pool.queue[task_pool.tail] = info;
   if(++task_pool.tail >= task_pool.count)
     task_pool.tail = 0;
-  rtems_semaphore_release(task_pool.mutex);
-  rtems_semaphore_release(task_pool.sem);
+  rtems_mutex_unlock(&task_pool.mutex);
+  rtems_counting_semaphore_post(&task_pool.sem);
 }
 
 /*
@@ -817,6 +799,7 @@ command_retrieve(FTPD_SessionInfo_t  *info, char const *filename)
       {
         if(send(s, buf, n, 0) != n)
           break;
+        yield();
       }
     }
     else if (info->xfer_mode == TYPE_A)
@@ -852,6 +835,7 @@ command_retrieve(FTPD_SessionInfo_t  *info, char const *filename)
           }
         }
         while((rest -= i) > 0);
+        yield();
       }
     }
 
@@ -949,7 +933,7 @@ command_store(FTPD_SessionInfo_t *info, char const *filename)
     wrt = &discard;
   }
 
-  if (!null && rtems_ftpd_configuration.hooks != NULL)
+  if (!null && ftpd_config->hooks != NULL)
   {
 
     /* Search our list of hooks to see if we need to do something special. */
@@ -957,7 +941,7 @@ command_store(FTPD_SessionInfo_t *info, char const *filename)
     int i;
 
     i = 0;
-    hook = &rtems_ftpd_configuration.hooks[i++];
+    hook = &ftpd_config->hooks[i++];
     while (hook->filename != NULL)
     {
       if (!strcmp(hook->filename, filename))
@@ -965,7 +949,7 @@ command_store(FTPD_SessionInfo_t *info, char const *filename)
         usehook = hook;
         break;
       }
-      hook = &rtems_ftpd_configuration.hooks[i++];
+      hook = &ftpd_config->hooks[i++];
     }
   }
 
@@ -978,8 +962,8 @@ command_store(FTPD_SessionInfo_t *info, char const *filename)
      * given name.
      */
 
-    char                *bigBufr;
-    size_t filesize = rtems_ftpd_configuration.max_hook_filesize + 1;
+    char   *bigBufr;
+    size_t  filesize = ftpd_config->max_hook_filesize + 1;
 
     /*
      * Allocate space for our "file".
@@ -1045,6 +1029,7 @@ command_store(FTPD_SessionInfo_t *info, char const *filename)
           res = 0;
           break;
         }
+        yield();
       }
     }
     else if(info->xfer_mode == TYPE_A)
@@ -1106,6 +1091,7 @@ command_store(FTPD_SessionInfo_t *info, char const *filename)
             res = 0;
         }
         while((rest -= i) > 0);
+        yield();
       }
     }
 
@@ -1760,8 +1746,8 @@ exec_command(FTPD_SessionInfo_t *info, char* cmd, char* args)
       free(info->pass);
     info->pass = NULL;
     info->user = strdup(fname);
-    if (rtems_ftpd_configuration.login &&
-      !rtems_ftpd_configuration.login(info->user, NULL)) {
+    if (ftpd_config->login &&
+      !ftpd_config->login(info->user, NULL)) {
       info->auth = false;
       send_reply(info, 331, "User name okay, need password.");
     } else {
@@ -1778,8 +1764,8 @@ exec_command(FTPD_SessionInfo_t *info, char* cmd, char* args)
     if (!info->user) {
       send_reply(info, 332, "Need account to log in");
     } else {
-      if (rtems_ftpd_configuration.login &&
-        !rtems_ftpd_configuration.login(info->user, info->pass)) {
+      if (ftpd_config->login &&
+        !ftpd_config->login(info->user, info->pass)) {
         info->auth = false;
         send_reply(info, 530, "Not logged in.");
       } else {
@@ -1977,7 +1963,7 @@ session(rtems_task_argument arg)
 
 
 /*
- * daemon
+ * ftpd_daemon
  *
  * This task runs forever.  It waits for service requests on the FTP port
  * (port 21 by default).  When a request is received, it opens a new session
@@ -1990,7 +1976,7 @@ session(rtems_task_argument arg)
  *   NONE
  */
 static void
-daemon(rtems_task_argument args __attribute__((unused)))
+ftpd_daemon(rtems_task_argument args RTEMS_UNUSED)
 {
   int                 s;
   socklen_t	      addrLen;
@@ -2003,7 +1989,7 @@ daemon(rtems_task_argument args __attribute__((unused)))
     syslog(LOG_ERR, "ftpd: Error creating socket: %s", serr());
 
   addr.sin_family      = AF_INET;
-  addr.sin_port        = htons(rtems_ftpd_configuration.port);
+  addr.sin_port        = htons(ftpd_config->port);
   addr.sin_addr.s_addr = htonl(INADDR_ANY);
   memset(addr.sin_zero, 0, sizeof(addr.sin_zero));
 
@@ -2058,7 +2044,7 @@ daemon(rtems_task_argument args __attribute__((unused)))
             info->idle = ftpd_timeout;
             info->user = NULL;
             info->pass = NULL;
-            if (rtems_ftpd_configuration.login)
+            if (ftpd_config->login)
               info->auth = false;
             else
               info->auth = true;
@@ -2082,46 +2068,54 @@ daemon(rtems_task_argument args __attribute__((unused)))
  *
  *
  * Input parameters:
- *
+ *    config: constant initial setup.
  * Output parameters:
  *    returns RTEMS_SUCCESSFUL on successful start of the daemon.
  */
 int
-rtems_initialize_ftpd(void)
+rtems_ftpd_start(const struct rtems_ftpd_configuration* config)
 {
   rtems_status_code   sc;
   rtems_id            tid;
   rtems_task_priority priority;
   int count;
 
-  if (rtems_ftpd_configuration.port == 0)
+  if (ftpd_config != NULL)
+    return RTEMS_RESOURCE_IN_USE;
+
+  ftpd_config = malloc(sizeof(*ftpd_config));
+  if (ftpd_config == NULL)
+    return RTEMS_NO_MEMORY;
+
+  *ftpd_config = *config;
+
+  if (ftpd_config->port == 0)
   {
-    rtems_ftpd_configuration.port = FTPD_CONTROL_PORT;
+    ftpd_config->port = FTPD_CONTROL_PORT;
   }
 
-  if (rtems_ftpd_configuration.priority == 0)
+  if (ftpd_config->priority == 0)
   {
-    rtems_ftpd_configuration.priority = 40;
+    ftpd_config->priority = 40;
   }
-  priority = rtems_ftpd_configuration.priority;
+  priority = ftpd_config->priority;
 
-  ftpd_timeout = rtems_ftpd_configuration.idle;
+  ftpd_timeout = ftpd_config->idle;
   if (ftpd_timeout < 0)
     ftpd_timeout = 0;
-  rtems_ftpd_configuration.idle = ftpd_timeout;
+  ftpd_config->idle = ftpd_timeout;
 
-  ftpd_access = rtems_ftpd_configuration.access;
+  ftpd_access = ftpd_config->access;
 
   ftpd_root = "/";
-  if ( rtems_ftpd_configuration.root &&
-       rtems_ftpd_configuration.root[0] == '/' )
-    ftpd_root = rtems_ftpd_configuration.root;
+  if (ftpd_config->root && ftpd_config->root[0] == '/' )
+    ftpd_root = ftpd_config->root;
 
-  rtems_ftpd_configuration.root = ftpd_root;
+  ftpd_config->root = ftpd_root;
 
-  if (rtems_ftpd_configuration.tasks_count <= 0)
-    rtems_ftpd_configuration.tasks_count = 1;
-  count = rtems_ftpd_configuration.tasks_count;
+  if (ftpd_config->tasks_count <= 0)
+    ftpd_config->tasks_count = 1;
+  count = ftpd_config->tasks_count;
 
   if (!task_pool_init(count, priority))
   {
@@ -2133,12 +2127,12 @@ rtems_initialize_ftpd(void)
     priority, RTEMS_MINIMUM_STACK_SIZE,
     RTEMS_PREEMPT | RTEMS_NO_TIMESLICE | RTEMS_NO_ASR |
     RTEMS_INTERRUPT_LEVEL(0),
-    RTEMS_NO_FLOATING_POINT | RTEMS_LOCAL,
+    RTEMS_FLOATING_POINT | RTEMS_LOCAL,
     &tid);
 
   if (sc == RTEMS_SUCCESSFUL)
   {
-    sc = rtems_task_start(tid, daemon, 0);
+    sc = rtems_task_start(tid, ftpd_daemon, 0);
     if (sc != RTEMS_SUCCESSFUL)
       rtems_task_delete(tid);
   }
@@ -2151,8 +2145,9 @@ rtems_initialize_ftpd(void)
     return RTEMS_UNSATISFIED;
   }
 
-  syslog(LOG_INFO, "ftpd: FTP daemon started (%d session%s max)",
-    count, ((count > 1) ? "s" : ""));
+  if (ftpd_config->verbose)
+    syslog(LOG_INFO, "ftpd: FTP daemon started (%d session%s max)",
+           count, ((count > 1) ? "s" : ""));
 
   return RTEMS_SUCCESSFUL;
 }

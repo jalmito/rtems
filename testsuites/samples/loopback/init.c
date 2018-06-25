@@ -8,13 +8,11 @@
 #include "config.h"
 #endif
 
-#include <rtems/test.h>
-
-#include <bsp.h>
+#include <tmacros.h>
 
 const char rtems_test_name[] = "LOOPBACK";
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
 
@@ -32,6 +30,7 @@ const char rtems_test_name[] = "LOOPBACK";
                                            RTEMS_NO_TIMESLICE | \
                                            RTEMS_NO_ASR | \
                                            RTEMS_INTERRUPT_LEVEL(0))
+#define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
 
 #define CONFIGURE_INIT
 rtems_task Init(rtems_task_argument argument);
@@ -72,21 +71,6 @@ struct rtems_bsdnet_config rtems_bsdnet_config = {
     0,
     0
 };
-
-/*
- * Thread-safe output routines
- */
-static rtems_id printMutex;
-static void printSafe(const char *fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    rtems_semaphore_obtain(printMutex, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
-    vprintf(fmt, args);
-    rtems_semaphore_release(printMutex);
-    va_end(args);
-}
-#define printf printSafe
 
 /*
  * Spawn a task
@@ -245,18 +229,10 @@ static rtems_task clientTask(rtems_task_argument arg)
 rtems_task
 Init (rtems_task_argument ignored)
 {
-    rtems_status_code sc;
+    rtems_print_printer_fprintf_putc(&rtems_test_printer);
 
-    rtems_test_begin();
+    TEST_BEGIN();
 
-    sc = rtems_semaphore_create(rtems_build_name('P','m','t','x'),
-                1,
-                RTEMS_PRIORITY|RTEMS_BINARY_SEMAPHORE|RTEMS_INHERIT_PRIORITY|
-                                    RTEMS_NO_PRIORITY_CEILING|RTEMS_LOCAL,
-                0,
-                &printMutex);
-    if (sc != RTEMS_SUCCESSFUL)
-        rtems_panic("Can't create printf mutex:", rtems_status_text(sc));
     printf("\"Network\" initializing!\n");
     rtems_bsdnet_initialize_network();
     printf("\"Network\" initialized!\n");
@@ -283,6 +259,6 @@ Init (rtems_task_argument ignored)
     spawnTask(clientTask, 120, 6);
 
     rtems_task_wake_after(500);
-    rtems_test_end();
+    TEST_END();
     exit( 0 );
 }

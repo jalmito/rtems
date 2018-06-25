@@ -16,13 +16,14 @@
   #include "config.h"
 #endif
 
+#include "tmacros.h"
+
 #include <stdlib.h>
 
 /* Use assert() not rtems_test_assert() since it uses exit() */
 #include <assert.h>
 
 #include <rtems.h>
-#include <rtems/test.h>
 
 const char rtems_test_name[] = "EXIT 1";
 
@@ -50,17 +51,17 @@ static void atexit_2(void)
 
 static void fatal_extension(
   rtems_fatal_source source,
-  bool is_internal,
+  bool always_set_to_false,
   rtems_fatal_code error
 )
 {
   if (
     source == RTEMS_FATAL_SOURCE_EXIT
-      && !is_internal
+      && !always_set_to_false
       && error == EXIT_STATUS
       && counter == 3
   ) {
-    rtems_test_endk();
+    TEST_END();
   }
 }
 
@@ -85,7 +86,7 @@ static void Init(rtems_task_argument arg)
   rtems_status_code sc;
   rtems_id id;
 
-  rtems_test_begink();
+  TEST_BEGIN();
 
   sc = rtems_task_create(
     rtems_build_name('E', 'X', 'I', 'T'),
@@ -105,7 +106,7 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_INITIAL_EXTENSIONS \
   { .fatal = fatal_extension }, \

@@ -23,44 +23,33 @@
 #include <rtems/score/userextimpl.h>
 #include <rtems/score/wkspace.h>
 
-CHAIN_DEFINE_EMPTY( _User_extensions_Switches_list );
-
-typedef struct {
-  User_extensions_Switch_control *switch_control;
-} User_extensions_Switch_context;
-
-static void _User_extensions_Switch_visitor(
-  Thread_Control              *executing,
-  void                        *arg,
-  const User_extensions_Table *callouts
-)
-{
-  User_extensions_thread_switch_extension callout = callouts->thread_switch;
-
-  if ( callout != NULL ) {
-    User_extensions_Switch_context *ctx = arg;
-    User_extensions_Switch_control *ctrl = ctx->switch_control;
-
-    _Chain_Append_unprotected( &_User_extensions_Switches_list, &ctrl->Node );
-    ctrl->thread_switch = callout;
-
-    ctx->switch_control = ctrl + 1;
-  }
-}
-
 void _User_extensions_Handler_initialization(void)
 {
-  uint32_t number_of_initial_extensions =
-    rtems_configuration_get_number_of_initial_extensions();
+  User_extensions_Switch_control *initial_extension_switch_controls;
+  const User_extensions_Table    *initial_table;
+  uint32_t                        n;
+  uint32_t                        i;
 
-  if ( number_of_initial_extensions > 0 ) {
-    User_extensions_Switch_control *initial_extension_switch_controls =
-      _Workspace_Allocate_or_fatal_error(
-        number_of_initial_extensions
-          * sizeof( *initial_extension_switch_controls )
-      );
-    User_extensions_Switch_context ctx = { initial_extension_switch_controls };
+  n = rtems_configuration_get_number_of_initial_extensions();
 
-    _User_extensions_Iterate( &ctx, _User_extensions_Switch_visitor );
+  initial_extension_switch_controls = _Workspace_Allocate_or_fatal_error(
+    n * sizeof( *initial_extension_switch_controls )
+  );
+
+  initial_table = rtems_configuration_get_user_extension_table();
+
+  for ( i = 0 ; i < n ; ++i ) {
+    User_extensions_thread_switch_extension callout;
+
+    callout = initial_table[ i ].thread_switch;
+
+    if ( callout != NULL ) {
+      User_extensions_Switch_control *c;
+
+      c = &initial_extension_switch_controls[ i ];
+      c->thread_switch = callout;
+      _Chain_Initialize_node( &c->Node );
+      _Chain_Append_unprotected( &_User_extensions_Switches_list, &c->Node );
+    }
   }
 }

@@ -14,6 +14,8 @@
 #include <drvmgr/drvmgr.h>
 #include <drvmgr/drvmgr_confdefs.h>
 
+#include <rtems/sysinit.h>
+
 #include "drvmgr_internal.h"
 
 /* Enable debugging */
@@ -28,7 +30,7 @@
 struct drvmgr drvmgr = {
 	.level =		0,
 	.initializing_objs =	0,
-	.lock =                 0,
+	.lock =			API_MUTEX_INITIALIZER("_Drvmgr"),
 	.root_dev =		{0},
 	.root_drv =		NULL,
 
@@ -84,11 +86,6 @@ void _DRV_Manager_init_level(int level)
 void _DRV_Manager_initialization(void)
 {
 	drvmgr_drv_reg_func *drvreg;
-
-	/* drvmgr is already initialized statically by compiler except
-	 * the lock
-	 */
-	DRVMGR_LOCK_INIT();
 
 	/* Call driver register functions. */
 	drvreg = &drvmgr_drivers[0];
@@ -642,3 +639,91 @@ void drvmgr_bus_res_add(struct drvmgr_bus *bus,
 	bres->next = bus->reslist;
 	bus->reslist = bres;
 }
+
+#ifdef RTEMS_DRVMGR_STARTUP
+
+RTEMS_SYSINIT_ITEM(
+  _DRV_Manager_initialization,
+  RTEMS_SYSINIT_DRVMGR,
+  RTEMS_SYSINIT_ORDER_MIDDLE
+);
+
+/* BSPs has already registered their "root bus" driver in the
+ * bsp_predriver hook or so.
+ *
+ * Init Drivers to Level 1, constraints:
+ *   - Interrupts and system clock timer does not work.
+ *   - malloc() work, however other memory services may not
+ *     have been initialized yet.
+ *   - initializes most basic stuff
+ *
+ * Typical setup in Level 1:
+ *   - Find most devices in system, do PCI scan and configuration.
+ *   - Reset hardware if needed.
+ *   - Install IRQ driver
+ *   - Install Timer driver
+ *   - Install console driver and debug printk()
+ *   - Install extra memory.
+ */
+static void _DRV_Manager_init_level_1(void)
+{
+  _DRV_Manager_init_level(1);
+}
+
+RTEMS_SYSINIT_ITEM(
+  _DRV_Manager_init_level_1,
+  RTEMS_SYSINIT_DRVMGR_LEVEL_1,
+  RTEMS_SYSINIT_ORDER_MIDDLE
+);
+
+/* Init Drivers to Level 2, constraints:
+ *  - Interrupts can be registered and enabled.
+ *  - System Clock is running
+ *  - Console may be used.
+ *
+ * This is typically where drivers are initialized
+ * for the first time.
+ */
+static void _DRV_Manager_init_level_2(void)
+{
+  _DRV_Manager_init_level(2);
+}
+
+RTEMS_SYSINIT_ITEM(
+  _DRV_Manager_init_level_2,
+  RTEMS_SYSINIT_DRVMGR_LEVEL_2,
+  RTEMS_SYSINIT_ORDER_MIDDLE
+);
+
+/* Init Drivers to Level 3
+ *
+ * This is typically where normal drivers are initialized
+ * for the second time, they may depend on other drivers
+ * API inited in level 2
+ */
+static void _DRV_Manager_init_level_3(void)
+{
+  _DRV_Manager_init_level(3);
+}
+
+RTEMS_SYSINIT_ITEM(
+  _DRV_Manager_init_level_3,
+  RTEMS_SYSINIT_DRVMGR_LEVEL_3,
+  RTEMS_SYSINIT_ORDER_MIDDLE
+);
+
+/* Init Drivers to Level 4,
+ * Init drivers that depend on services initialized in Level 3
+ */
+static void _DRV_Manager_init_level_4(void)
+{
+  _DRV_Manager_init_level(4);
+}
+
+RTEMS_SYSINIT_ITEM(
+  _DRV_Manager_init_level_4,
+  RTEMS_SYSINIT_DRVMGR_LEVEL_4,
+  RTEMS_SYSINIT_ORDER_MIDDLE
+);
+
+#endif /* RTEMS_DRVMGR_STARTUP */

@@ -21,10 +21,24 @@
 #include <pthread.h>
 #include <errno.h>
 
-#include <rtems/system.h>
 #include <rtems/posix/pthreadimpl.h>
-#include <rtems/posix/priorityimpl.h>
-#include <rtems/posix/time.h>
+
+int _POSIX_Thread_Translate_to_sched_policy(
+  Thread_CPU_budget_algorithms budget_algorithm
+)
+{
+  switch ( budget_algorithm ) {
+    case THREAD_CPU_BUDGET_ALGORITHM_RESET_TIMESLICE:
+      return SCHED_OTHER;
+    case THREAD_CPU_BUDGET_ALGORITHM_EXHAUST_TIMESLICE:
+      return SCHED_RR;
+    case THREAD_CPU_BUDGET_ALGORITHM_CALLOUT:
+      return SCHED_SPORADIC;
+    default:
+      _Assert( budget_algorithm == THREAD_CPU_BUDGET_ALGORITHM_NONE );
+      return SCHED_FIFO;
+  }
+}
 
 int _POSIX_Thread_Translate_sched_param(
   int                                  policy,
@@ -33,9 +47,6 @@ int _POSIX_Thread_Translate_sched_param(
   Thread_CPU_budget_algorithm_callout *budget_callout
 )
 {
-  if ( !_POSIX_Priority_Is_valid( param->sched_priority ) )
-    return EINVAL;
-
   *budget_algorithm = THREAD_CPU_BUDGET_ALGORITHM_NONE;
   *budget_callout = NULL;
 
@@ -65,9 +76,6 @@ int _POSIX_Thread_Translate_sched_param(
 
     if ( _Timespec_To_ticks( &param->sched_ss_repl_period ) <
 	 _Timespec_To_ticks( &param->sched_ss_init_budget ) )
-      return EINVAL;
-
-    if ( !_POSIX_Priority_Is_valid( param->sched_ss_low_priority ) )
       return EINVAL;
 
     *budget_algorithm  = THREAD_CPU_BUDGET_ALGORITHM_CALLOUT;

@@ -9,14 +9,15 @@
  *  http://www.rtems.org/license/LICENSE.
  */
 
+#include <rtems/bspIo.h>
+
 #define CONFIGURE_MAXIMUM_SEMAPHORES 10
 
 #define FATAL_ERROR_TEST_NAME            "3"
 #define FATAL_ERROR_DESCRIPTION          "Core Mutex obtain in critical section"
 #define FATAL_ERROR_EXPECTED_SOURCE      INTERNAL_ERROR_CORE
-#define FATAL_ERROR_EXPECTED_IS_INTERNAL FALSE
 #define FATAL_ERROR_EXPECTED_ERROR       \
-          INTERNAL_ERROR_MUTEX_OBTAIN_FROM_BAD_STATE
+          INTERNAL_ERROR_BAD_THREAD_DISPATCH_DISABLE_LEVEL
 
 void force_error(void)
 {
@@ -26,7 +27,7 @@ void force_error(void)
 
   status = rtems_semaphore_create(
     rtems_build_name( 'S','0',' ',' '),
-    1,
+    0,
     RTEMS_LOCAL|
     RTEMS_SIMPLE_BINARY_SEMAPHORE,
     0,
@@ -36,12 +37,10 @@ void force_error(void)
   printk("Create semaphore S0\n");
 
   printk("Obtain semaphore in dispatching critical section\n");
-  _Thread_Disable_dispatch();
-  status = rtems_semaphore_obtain( mutex, RTEMS_DEFAULT_OPTIONS, 0 );
+  _Thread_Dispatch_disable();
+  status = rtems_semaphore_obtain( mutex, RTEMS_WAIT, RTEMS_NO_TIMEOUT );
   /* !!! SHOULD NOT RETURN FROM THE ABOVE CALL */
 
-  _Thread_Enable_dispatch();
-  printk("ERROR -- Obtain semaphore should not have returned\n");
-
+  rtems_test_assert( 0 );
   /* we will not run this far */
 }

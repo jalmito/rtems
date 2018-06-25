@@ -76,6 +76,7 @@ static void add_to_chain(
   rtems_rbheap_chunk *chunk
 )
 {
+  rtems_chain_initialize_node(&chunk->chain_node);
   rtems_chain_prepend_unprotected(chain, &chunk->chain_node);
 }
 
@@ -210,13 +211,17 @@ static rtems_rbheap_chunk *find(rtems_rbtree_control *chunk_tree, uintptr_t key)
   );
 }
 
-static rtems_rbheap_chunk *get_next(
-  const rtems_rbheap_chunk *chunk,
-  RBTree_Direction dir
-)
+static rtems_rbheap_chunk *pred(const rtems_rbheap_chunk *chunk)
 {
   return rtems_rbheap_chunk_of_node(
-    _RBTree_Next(&chunk->tree_node, dir)
+    rtems_rbtree_predecessor(&chunk->tree_node)
+  );
+}
+
+static rtems_rbheap_chunk *succ(const rtems_rbheap_chunk *chunk)
+{
+  return rtems_rbheap_chunk_of_node(
+    rtems_rbtree_successor(&chunk->tree_node)
   );
 }
 
@@ -247,9 +252,15 @@ rtems_status_code rtems_rbheap_free(rtems_rbheap_control *control, void *ptr)
         rtems_rbheap_chunk *other;
 
         add_to_chain(&control->free_chunk_chain, chunk);
+<<<<<<< HEAD
         other = get_next(chunk, RBT_RIGHT);
         check_and_merge(control, chunk, other, other);
         other = get_next(chunk, RBT_LEFT);
+=======
+        other = succ(chunk);
+        check_and_merge(control, chunk, other, other);
+        other = pred(chunk);
+>>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
         check_and_merge(control, other, chunk, other);
       } else {
         sc = RTEMS_INCORRECT_STATE;

@@ -4,16 +4,12 @@ AC_DEFUN([RTEMS_CHECK_BSPDIR],
   case "$1" in
   beatnik )
     AC_CONFIG_SUBDIRS([beatnik]);;
-  ep1a )
-    AC_CONFIG_SUBDIRS([ep1a]);;
   gen5200 )
     AC_CONFIG_SUBDIRS([gen5200]);;
   gen83xx )
     AC_CONFIG_SUBDIRS([gen83xx]);;
   haleakala )
     AC_CONFIG_SUBDIRS([haleakala]);;
-  mbx8xx )
-    AC_CONFIG_SUBDIRS([mbx8xx]);;
   motorola_powerpc )
     AC_CONFIG_SUBDIRS([motorola_powerpc]);;
   mpc55xxevb )
@@ -30,8 +26,6 @@ AC_DEFUN([RTEMS_CHECK_BSPDIR],
     AC_CONFIG_SUBDIRS([qemuppc]);;
   qoriq )
     AC_CONFIG_SUBDIRS([qoriq]);;
-  score603e )
-    AC_CONFIG_SUBDIRS([score603e]);;
   ss555 )
     AC_CONFIG_SUBDIRS([ss555]);;
   t32mppc )

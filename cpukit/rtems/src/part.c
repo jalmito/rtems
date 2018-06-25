@@ -20,13 +20,14 @@
 
 #include <rtems/system.h>
 #include <rtems/config.h>
+#include <rtems/sysinit.h>
 #include <rtems/rtems/status.h>
 #include <rtems/rtems/support.h>
-#include <rtems/score/address.h>
 #include <rtems/rtems/partimpl.h>
-#include <rtems/score/thread.h>
 
-void _Partition_Manager_initialization(void)
+Objects_Information _Partition_Information;
+
+static void _Partition_Manager_initialization(void)
 {
   _Objects_Initialize_information(
     &_Partition_Information,     /* object information table */
@@ -36,12 +37,8 @@ void _Partition_Manager_initialization(void)
                                  /* maximum objects of this class */
     sizeof( Partition_Control ), /* size of this object's control block */
     false,                       /* true if the name is a string */
-    RTEMS_MAXIMUM_NAME_LENGTH    /* maximum length of an object name */
-#if defined(RTEMS_MULTIPROCESSING)
-    ,
-    true,                        /* true if this is a global object class */
+    RTEMS_MAXIMUM_NAME_LENGTH,   /* maximum length of an object name */
     _Partition_MP_Send_extract_proxy  /* Proxy extraction support callout */
-#endif
   );
 
   /*
@@ -56,3 +53,9 @@ void _Partition_Manager_initialization(void)
 #endif
 
 }
+
+RTEMS_SYSINIT_ITEM(
+  _Partition_Manager_initialization,
+  RTEMS_SYSINIT_CLASSIC_PARTITION,
+  RTEMS_SYSINIT_ORDER_MIDDLE
+);

@@ -28,15 +28,15 @@ int fdatasync(
 )
 {
   rtems_libio_t *iop;
+  int            rv;
 
-  rtems_libio_check_fd( fd );
-  iop = rtems_libio_iop( fd );
-  rtems_libio_check_is_open(iop);
-  rtems_libio_check_permissions_with_error( iop, LIBIO_FLAGS_WRITE, EBADF );
+  LIBIO_GET_IOP_WITH_ACCESS( fd, iop, LIBIO_FLAGS_WRITE, EBADF );
 
   /*
    *  Now process the fdatasync().
    */
 
-  return (*iop->pathinfo.handlers->fdatasync_h)( iop );
+  rv = (*iop->pathinfo.handlers->fdatasync_h)( iop );
+  rtems_libio_iop_drop( iop );
+  return rv;
 }

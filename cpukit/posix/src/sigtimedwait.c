@@ -18,15 +18,14 @@
 #include "config.h"
 #endif
 
-#include <pthread.h>
 #include <signal.h>
-#include <errno.h>
 
 #include <rtems/posix/pthreadimpl.h>
 #include <rtems/posix/psignalimpl.h>
+#include <rtems/posix/posixapi.h>
 #include <rtems/score/threadqimpl.h>
-#include <rtems/seterr.h>
-#include <rtems/posix/time.h>
+#include <rtems/score/todimpl.h>
+#include <rtems/score/watchdogimpl.h>
 #include <rtems/score/isr.h>
 
 static int _POSIX_signals_Get_lowest(
@@ -72,13 +71,14 @@ int sigtimedwait(
   const struct timespec  *__restrict timeout
 )
 {
-  Thread_Control    *executing;
-  POSIX_API_Control *api;
-  Watchdog_Interval  interval;
-  siginfo_t          signal_information;
-  siginfo_t         *the_info;
-  int                signo;
-  ISR_lock_Context   lock_context;
+  Thread_Control       *executing;
+  POSIX_API_Control    *api;
+  siginfo_t             signal_information;
+  siginfo_t            *the_info;
+  int                   signo;
+  struct timespec       uptime;
+  Thread_queue_Context  queue_context;
+  int                   error;
 
   /*
    *  Error check parameters before disabling interrupts.
@@ -86,20 +86,23 @@ int sigtimedwait(
   if ( !set )
     rtems_set_errno_and_return_minus_one( EINVAL );
 
+  _Thread_queue_Context_initialize( &queue_context );
+
   /*  NOTE: This is very specifically a RELATIVE not ABSOLUTE time
    *        in the Open Group specification.
    */
 
-  interval = 0;
-  if ( timeout ) {
+  if ( timeout != NULL ) {
+    const struct timespec *end;
 
-    if ( !_Timespec_Is_valid( timeout ) )
-      rtems_set_errno_and_return_minus_one( EINVAL );
-
-    interval = _Timespec_To_ticks( timeout );
-
-    if ( !interval )
-      rtems_set_errno_and_return_minus_one( EINVAL );
+    _Timecounter_Nanouptime( &uptime );
+    end = _Watchdog_Future_timespec( &uptime, timeout );
+    _Thread_queue_Context_set_enqueue_timeout_monotonic_timespec(
+      &queue_context,
+      end
+    );
+  } else {
+    _Thread_queue_Context_set_enqueue_do_nothing_extra( &queue_context );
   }
 
   /*
@@ -117,7 +120,7 @@ int sigtimedwait(
 
   /* API signals pending? */
 
-  _POSIX_signals_Acquire( &lock_context );
+  _POSIX_signals_Acquire( &queue_context );
   if ( *set & api->signals_pending ) {
     /* XXX real info later */
     the_info->si_signo = _POSIX_signals_Get_lowest( api->signals_pending );
@@ -129,7 +132,7 @@ int sigtimedwait(
       false,
       false
     );
-    _POSIX_signals_Release( &lock_context );
+    _POSIX_signals_Release( &queue_context );
 
     the_info->si_code = SI_USER;
     the_info->si_value.sival_int = 0;
@@ -141,7 +144,7 @@ int sigtimedwait(
   if ( *set & _POSIX_signals_Pending ) {
     signo = _POSIX_signals_Get_lowest( _POSIX_signals_Pending );
     _POSIX_signals_Clear_signals( api, signo, the_info, true, false, false );
-    _POSIX_signals_Release( &lock_context );
+    _POSIX_signals_Release( &queue_context );
 
     the_info->si_signo = signo;
     the_info->si_code = SI_USER;
@@ -151,19 +154,18 @@ int sigtimedwait(
 
   the_info->si_signo = -1;
 
-  _Thread_Disable_dispatch();
-    executing->Wait.return_code     = EINTR;
-    executing->Wait.option          = *set;
-    executing->Wait.return_argument = the_info;
-    _Thread_queue_Enqueue_critical(
-      &_POSIX_signals_Wait_queue,
-      executing,
-      STATES_WAITING_FOR_SIGNAL | STATES_INTERRUPTIBLE_BY_SIGNAL,
-      interval,
-      EAGAIN,
-      &lock_context
-    );
-  _Thread_Enable_dispatch();
+  executing->Wait.option          = *set;
+  executing->Wait.return_argument = the_info;
+  _Thread_queue_Context_set_thread_state(
+    &queue_context,
+    STATES_WAITING_FOR_SIGNAL | STATES_INTERRUPTIBLE_BY_SIGNAL
+  );
+  _Thread_queue_Enqueue(
+    &_POSIX_signals_Wait_queue.Queue,
+    POSIX_SIGNALS_TQ_OPERATIONS,
+    executing,
+    &queue_context
+  );
 
   /*
    * When the thread is set free by a signal, it is need to eliminate
@@ -184,10 +186,17 @@ int sigtimedwait(
    * was not in our set.
    */
 
-  if ( (executing->Wait.return_code != EINTR)
-       || !(*set & signo_to_mask( the_info->si_signo )) ) {
-    errno = executing->Wait.return_code;
-    return -1;
+  error = _POSIX_Get_error_after_wait( executing );
+
+  if (
+    error != EINTR
+     || ( *set & signo_to_mask( the_info->si_signo ) ) == 0
+  ) {
+    if ( error == ETIMEDOUT ) {
+      error = EAGAIN;
+    }
+
+    rtems_set_errno_and_return_minus_one( error );
   }
 
   return the_info->si_signo;

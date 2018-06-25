@@ -71,10 +71,10 @@ void *POSIX_Init(void *argument)
 
   /*key creation, using NULL destructor*/
   benchmark_pthread_key_create();
-  
+
   /* key deletion*/
   benchmark_pthread_key_delete();
-  
+
   TEST_END();
 
   rtems_test_exit(0);
@@ -82,7 +82,7 @@ void *POSIX_Init(void *argument)
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
 
 #define CONFIGURE_MAXIMUM_POSIX_THREADS     2

@@ -24,16 +24,15 @@ rtems_initialization_tasks_table Initialization_tasks[] = {
 
 #define FATAL_ERROR_TEST_NAME            "1"
 #define FATAL_ERROR_DESCRIPTION          "Classic API Init task create failure"
-#define FATAL_ERROR_EXPECTED_SOURCE      INTERNAL_ERROR_RTEMS_API
-#define FATAL_ERROR_EXPECTED_IS_INTERNAL TRUE
-#define FATAL_ERROR_EXPECTED_ERROR       RTEMS_UNSATISFIED
+#define FATAL_ERROR_EXPECTED_SOURCE      INTERNAL_ERROR_CORE
+#define FATAL_ERROR_EXPECTED_ERROR       INTERNAL_ERROR_RTEMS_INIT_TASK_CREATE_FAILED
 
 void force_error()
 {
 /*
  *  Case 2: Null entry
  *  Case 3: semaphore_create
- *          _Thread_Disable_dispatch
+ *          _Thread_Dispatch_disable
  *          semaphore_obtain
  */
 

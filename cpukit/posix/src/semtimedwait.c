@@ -18,18 +18,8 @@
 #include "config.h"
 #endif
 
-#include <stdarg.h>
-
-#include <errno.h>
-#include <fcntl.h>
-#include <pthread.h>
-#include <semaphore.h>
-#include <limits.h>
-
-#include <rtems/system.h>
 #include <rtems/posix/semaphoreimpl.h>
-#include <rtems/posix/time.h>
-#include <rtems/seterr.h>
+#include <rtems/score/todimpl.h>
 
 /*
  *  11.2.6 Lock a Semaphore, P1003.1b-1993, p.226
@@ -38,47 +28,47 @@
  */
 
 int sem_timedwait(
-  sem_t                 *__restrict sem,
+  sem_t                 *__restrict _sem,
   const struct timespec *__restrict abstime
 )
 {
-  Watchdog_Interval                            ticks;
-  bool                                         do_wait = true;
-  POSIX_Absolute_timeout_conversion_results_t  status;
-  int                                          lock_status;
+  Sem_Control          *sem;
+  Thread_queue_Context  queue_context;
+  ISR_Level             level;
+  Thread_Control       *executing;
+  unsigned int          count;
 
-  /*
-   *  POSIX requires that blocking calls with timeouts that take
-   *  an absolute timeout must ignore issues with the absolute
-   *  time provided if the operation would otherwise succeed.
-   *  So we check the abstime provided, and hold on to whether it
-   *  is valid or not.  If it isn't correct and in the future,
-   *  then we do a polling operation and convert the UNSATISFIED
-   *  status into the appropriate error.
-   *
-   *  If the status is POSIX_ABSOLUTE_TIMEOUT_INVALID,
-   *  POSIX_ABSOLUTE_TIMEOUT_IS_IN_PAST, or POSIX_ABSOLUTE_TIMEOUT_IS_NOW,
-   *  then we should not wait.
-   */
-  status = _POSIX_Absolute_timeout_to_ticks( abstime, &ticks );
-  if ( status != POSIX_ABSOLUTE_TIMEOUT_IS_IN_FUTURE )
-    do_wait = false;
+  POSIX_SEMAPHORE_VALIDATE_OBJECT( _sem );
 
-  lock_status = _POSIX_Semaphore_Wait_support( sem, do_wait, ticks );
+  sem = _Sem_Get( &_sem->_Semaphore );
+  _Thread_queue_Context_initialize( &queue_context );
+  _Thread_queue_Context_ISR_disable( &queue_context, level );
+  executing = _Sem_Queue_acquire_critical( sem, &queue_context );
 
-  /*
-   *  This service only gives us the option to block.  We used a polling
-   *  attempt to obtain if the abstime was not in the future.  If we did
-   *  not obtain the semaphore, then not look at the status immediately,
-   *  make sure the right reason is returned.
-   */
-  if ( !do_wait && (lock_status == EBUSY) ) {
-    if ( lock_status == POSIX_ABSOLUTE_TIMEOUT_INVALID )
-      rtems_set_errno_and_return_minus_one( EINVAL );
-    if ( lock_status == POSIX_ABSOLUTE_TIMEOUT_IS_IN_PAST ||
-         lock_status == POSIX_ABSOLUTE_TIMEOUT_IS_NOW )
-      rtems_set_errno_and_return_minus_one( ETIMEDOUT );
+  count = sem->count;
+  if ( __predict_true( count > 0 ) ) {
+    sem->count = count - 1;
+    _Sem_Queue_release( sem, level, &queue_context );
+    return 0;
+  } else {
+    Status_Control status;
+
+    _Thread_queue_Context_set_thread_state(
+      &queue_context,
+      STATES_WAITING_FOR_SEMAPHORE
+    );
+    _Thread_queue_Context_set_enqueue_timeout_realtime_timespec(
+      &queue_context,
+      abstime
+    );
+    _Thread_queue_Context_set_ISR_level( &queue_context, level );
+    _Thread_queue_Enqueue(
+      &sem->Queue.Queue,
+      SEMAPHORE_TQ_OPERATIONS,
+      executing,
+      &queue_context
+    );
+    status = _Thread_Wait_get_status( executing );
+    return _POSIX_Zero_or_minus_one_plus_errno( status );
   }
-
-  return lock_status;
 }

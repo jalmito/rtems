@@ -4,7 +4,6 @@
  *  Attempt to mount the IMFS file system on a mount point in the base IMFS
  */
 
-#define CONFIGURE_INIT
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -29,7 +28,7 @@ rtems_task Init(
 
 /* NOTICE: the clock driver is explicitly disabled */
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 10
 

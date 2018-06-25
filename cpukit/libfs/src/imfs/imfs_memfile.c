@@ -18,7 +18,7 @@
   #include "config.h"
 #endif
 
-#include "imfs.h"
+#include <rtems/imfs.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -87,7 +87,7 @@ static ssize_t memfile_write(
   IMFS_memfile_t *memfile = IMFS_iop_to_memfile( iop );
   ssize_t         status;
 
-  if ((iop->flags & LIBIO_FLAGS_APPEND) != 0)
+  if (rtems_libio_iop_is_append(iop))
     iop->offset = memfile->File.size;
 
   status = IMFS_memfile_write( memfile, iop->offset, buffer, count );
@@ -844,6 +844,7 @@ static const rtems_filesystem_file_handlers_r IMFS_memfile_handlers = {
   .fdatasync_h = rtems_filesystem_default_fsync_or_fdatasync_success,
   .fcntl_h = rtems_filesystem_default_fcntl,
   .kqfilter_h = rtems_filesystem_default_kqfilter,
+  .mmap_h = rtems_filesystem_default_mmap,
   .poll_h = rtems_filesystem_default_poll,
   .readv_h = rtems_filesystem_default_readv,
   .writev_h = rtems_filesystem_default_writev

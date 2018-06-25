@@ -44,7 +44,7 @@
 #include <sys/socketvar.h>
 #include <sys/protosw.h>
 #include <sys/kernel.h>
-#include <sys/ioctl.h>
+#include <sys/sockio.h>
 #include <errno.h>
 #include <sys/syslog.h>
 #include <sys/sysctl.h>
@@ -54,6 +54,9 @@
 #include <net/if_types.h>
 #include <net/if_var.h>
 #include <net/radix.h>
+#ifdef __rtems__
+#include <rtems/rtems_bsdnet.h>
+#endif /* __rtems__ */
 
 /*
  * System initialization
@@ -435,7 +438,7 @@ if_slowtimo(void *arg)
  * Map interface name to
  * interface structure pointer.
  */
-struct ifnet *
+static struct ifnet *
 ifunit(char *name)
 {
 	char *cp;
@@ -478,6 +481,7 @@ ifunit(char *name)
 int
 ifioctl(struct socket *so, u_long cmd, caddr_t data, struct proc *p)
 {
+	struct rtems_tap_ifreq *tr;
 	struct ifnet *ifp;
 	struct ifreq *ifr;
 	int error;
@@ -488,6 +492,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct proc *p)
 	case OSIOCGIFCONF:
 		return (ifconf(cmd, data));
 	}
+	tr = (struct rtems_tap_ifreq *)data;
 	ifr = (struct ifreq *)data;
 	ifp = ifunit(ifr->ifr_name);
 	if (ifp == 0)
@@ -660,11 +665,11 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct proc *p)
 	 * RTEMS additions for setting/getting `tap' function
 	 */
 	case SIOCSIFTAP:
-		ifp->if_tap = ifr->ifr_tap;
+		ifp->if_tap = tr->ifr_tap;
 		return 0;
 
 	case SIOCGIFTAP:
-		ifr->ifr_tap = ifp->if_tap;
+		tr->ifr_tap = ifp->if_tap;
 		return 0;
 	}
 	return (0);
@@ -715,7 +720,7 @@ ifconf(u_long cmd, caddr_t data)
 	struct ifconf *ifc = (struct ifconf *)data;
 	struct ifnet *ifp = ifnet;
 	struct ifaddr *ifa;
-	struct ifreq ifr, *ifrp;
+	struct ifreq ifr;
 	char              *ifrpc;
 	int space = ifc->ifc_len, error = 0;
 

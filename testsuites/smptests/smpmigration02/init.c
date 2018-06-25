@@ -46,20 +46,32 @@ typedef struct {
 
 static test_context test_instance;
 
+static rtems_task_priority migration_task_prio(uint32_t task_index)
+{
+  return task_index > 0 ? PRIO_LOW : PRIO_HIGH;
+}
+
 static void migration_task(rtems_task_argument arg)
 {
   test_context *ctx = &test_instance;
-  rtems_status_code sc;
+  uint32_t task_index = arg;
+  rtems_task_priority prio = migration_task_prio(task_index);
   uint32_t cpu_count = rtems_get_processor_count();
   uint32_t cpu_index = rtems_get_current_processor();
 
   while (true) {
+    rtems_status_code sc;
+
     cpu_index = (cpu_index + 1) % cpu_count;
 
-    sc = rtems_task_set_scheduler(RTEMS_SELF, ctx->scheduler_ids[cpu_index]);
+    sc = rtems_task_set_scheduler(
+      RTEMS_SELF,
+      ctx->scheduler_ids[cpu_index],
+      prio
+    );
     rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-    ++ctx->counters[arg].value;
+    ++ctx->counters[task_index].value;
 
     rtems_test_assert(cpu_index == rtems_get_current_processor());
   }
@@ -77,7 +89,7 @@ static void test_migrations(test_context *ctx)
 
     sc = rtems_task_create(
       rtems_build_name('T', 'A', 'S', 'K'),
-      task_index > 0 ? PRIO_LOW : PRIO_HIGH,
+      255,
       RTEMS_MINIMUM_STACK_SIZE,
       RTEMS_DEFAULT_MODES,
       RTEMS_DEFAULT_ATTRIBUTES,
@@ -85,7 +97,11 @@ static void test_migrations(test_context *ctx)
     );
     rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-    sc = rtems_task_set_scheduler(task_id, ctx->scheduler_ids[task_index % cpu_count]);
+    sc = rtems_task_set_scheduler(
+      task_id,
+      ctx->scheduler_ids[task_index % cpu_count],
+      migration_task_prio(task_index)
+    );
     rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
     sc = rtems_task_start(task_id, migration_task, task_index);
@@ -118,12 +134,12 @@ static void busy_loop_task(rtems_task_argument arg)
 
 static Thread_Control *get_thread_by_id(rtems_id task_id)
 {
-  Objects_Locations location;
+  ISR_lock_Context lock_context;
   Thread_Control *thread;
 
-  thread = _Thread_Get(task_id, &location);
-  rtems_test_assert(location == OBJECTS_LOCAL);
-  _Thread_Enable_dispatch();
+  thread = _Thread_Get(task_id, &lock_context);
+  rtems_test_assert(thread != NULL);
+  _ISR_lock_ISR_enable(&lock_context);
 
   return thread;
 }
@@ -140,6 +156,7 @@ static void test_double_migration(test_context *ctx)
     uint32_t cpu_other_index = 1;
     Per_CPU_Control *cpu_self = _Per_CPU_Get_by_index(cpu_self_index);
     Per_CPU_Control *cpu_other = _Per_CPU_Get_by_index(cpu_other_index);
+    Per_CPU_Control *cpu_self_dispatch_disabled;
     Thread_Control *self;
     Thread_Control *other;
 
@@ -162,7 +179,8 @@ static void test_double_migration(test_context *ctx)
 
     sc = rtems_task_set_scheduler(
       task_id,
-      ctx->scheduler_ids[cpu_other_index]
+      ctx->scheduler_ids[cpu_other_index],
+      2
     );
     rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
@@ -173,7 +191,8 @@ static void test_double_migration(test_context *ctx)
       /* Wait */
     }
 
-    _Thread_Disable_dispatch();
+    cpu_self_dispatch_disabled = _Thread_Dispatch_disable();
+    rtems_test_assert(cpu_self == cpu_self_dispatch_disabled);
 
     self = _Thread_Executing;
 
@@ -187,7 +206,8 @@ static void test_double_migration(test_context *ctx)
 
     sc = rtems_task_set_scheduler(
       RTEMS_SELF,
-      ctx->scheduler_ids[cpu_other_index]
+      ctx->scheduler_ids[cpu_other_index],
+      1
     );
     rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
@@ -205,7 +225,8 @@ static void test_double_migration(test_context *ctx)
 
     sc = rtems_task_set_scheduler(
       RTEMS_SELF,
-      ctx->scheduler_ids[cpu_self_index]
+      ctx->scheduler_ids[cpu_self_index],
+      1
     );
     rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
@@ -215,7 +236,7 @@ static void test_double_migration(test_context *ctx)
 
     rtems_test_assert(cpu_other->heir == other);
 
-    _Thread_Enable_dispatch();
+    _Thread_Dispatch_enable(cpu_self_dispatch_disabled);
 
     while (!_Thread_Is_executing_on_a_processor(other)) {
       /* Wait */
@@ -258,84 +279,82 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
-#define CONFIGURE_SMP_APPLICATION
-
-#define CONFIGURE_SMP_MAXIMUM_PROCESSORS CPU_COUNT
+#define CONFIGURE_MAXIMUM_PROCESSORS CPU_COUNT
 
 #define CONFIGURE_SCHEDULER_SIMPLE_SMP
 
 #include <rtems/scheduler.h>
 
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(0);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(1);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(2);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(3);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(4);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(5);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(6);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(7);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(8);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(9);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(10);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(11);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(12);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(13);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(14);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(15);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(16);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(17);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(18);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(19);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(20);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(21);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(22);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(23);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(24);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(25);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(26);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(27);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(28);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(29);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(30);
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(31);
+RTEMS_SCHEDULER_SIMPLE_SMP(0);
+RTEMS_SCHEDULER_SIMPLE_SMP(1);
+RTEMS_SCHEDULER_SIMPLE_SMP(2);
+RTEMS_SCHEDULER_SIMPLE_SMP(3);
+RTEMS_SCHEDULER_SIMPLE_SMP(4);
+RTEMS_SCHEDULER_SIMPLE_SMP(5);
+RTEMS_SCHEDULER_SIMPLE_SMP(6);
+RTEMS_SCHEDULER_SIMPLE_SMP(7);
+RTEMS_SCHEDULER_SIMPLE_SMP(8);
+RTEMS_SCHEDULER_SIMPLE_SMP(9);
+RTEMS_SCHEDULER_SIMPLE_SMP(10);
+RTEMS_SCHEDULER_SIMPLE_SMP(11);
+RTEMS_SCHEDULER_SIMPLE_SMP(12);
+RTEMS_SCHEDULER_SIMPLE_SMP(13);
+RTEMS_SCHEDULER_SIMPLE_SMP(14);
+RTEMS_SCHEDULER_SIMPLE_SMP(15);
+RTEMS_SCHEDULER_SIMPLE_SMP(16);
+RTEMS_SCHEDULER_SIMPLE_SMP(17);
+RTEMS_SCHEDULER_SIMPLE_SMP(18);
+RTEMS_SCHEDULER_SIMPLE_SMP(19);
+RTEMS_SCHEDULER_SIMPLE_SMP(20);
+RTEMS_SCHEDULER_SIMPLE_SMP(21);
+RTEMS_SCHEDULER_SIMPLE_SMP(22);
+RTEMS_SCHEDULER_SIMPLE_SMP(23);
+RTEMS_SCHEDULER_SIMPLE_SMP(24);
+RTEMS_SCHEDULER_SIMPLE_SMP(25);
+RTEMS_SCHEDULER_SIMPLE_SMP(26);
+RTEMS_SCHEDULER_SIMPLE_SMP(27);
+RTEMS_SCHEDULER_SIMPLE_SMP(28);
+RTEMS_SCHEDULER_SIMPLE_SMP(29);
+RTEMS_SCHEDULER_SIMPLE_SMP(30);
+RTEMS_SCHEDULER_SIMPLE_SMP(31);
 
-#define CONFIGURE_SCHEDULER_CONTROLS \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(0, 0), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(1, 1), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(2, 2), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(3, 3), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(4, 4), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(5, 5), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(6, 6), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(7, 7), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(8, 8), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(9, 9), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(10, 10), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(11, 11), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(12, 12), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(13, 13), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(14, 14), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(15, 15), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(16, 16), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(17, 17), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(18, 18), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(19, 19), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(20, 20), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(21, 21), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(22, 22), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(23, 23), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(24, 24), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(25, 25), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(26, 26), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(27, 27), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(28, 28), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(29, 29), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(30, 30), \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(31, 31)
+#define CONFIGURE_SCHEDULER_TABLE_ENTRIES \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(0, 0), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(1, 1), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(2, 2), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(3, 3), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(4, 4), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(5, 5), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(6, 6), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(7, 7), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(8, 8), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(9, 9), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(10, 10), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(11, 11), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(12, 12), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(13, 13), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(14, 14), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(15, 15), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(16, 16), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(17, 17), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(18, 18), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(19, 19), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(20, 20), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(21, 21), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(22, 22), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(23, 23), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(24, 24), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(25, 25), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(26, 26), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(27, 27), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(28, 28), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(29, 29), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(30, 30), \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(31, 31)
 
-#define CONFIGURE_SMP_SCHEDULER_ASSIGNMENTS \
+#define CONFIGURE_SCHEDULER_ASSIGNMENTS \
   RTEMS_SCHEDULER_ASSIGN(0, RTEMS_SCHEDULER_ASSIGN_PROCESSOR_OPTIONAL), \
   RTEMS_SCHEDULER_ASSIGN(1, RTEMS_SCHEDULER_ASSIGN_PROCESSOR_OPTIONAL), \
   RTEMS_SCHEDULER_ASSIGN(2, RTEMS_SCHEDULER_ASSIGN_PROCESSOR_OPTIONAL), \

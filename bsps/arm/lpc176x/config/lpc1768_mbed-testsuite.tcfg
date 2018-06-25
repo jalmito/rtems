@@ -1,0 +1,20 @@
+#
+# lpc1768 mbed RTEMS Test Database.
+#
+# Format is one line per test that is _NOT_ built.
+#
+
+include: testdata/disable-iconv-tests.tcfg
+include: testdata/disable-jffs2-tests.tcfg
+
+exclude: flashdisk01
+exclude: ftp01
+exclude: utf8proc01
+exclude: spstkalloc02
+exclude: fsdosfsname01
+exclude: linpack
+exclude: pppd
+exclude: mghttpd01
+exclude: tmfine01
+exclude: iostream
+exclude: rtems++

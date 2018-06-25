@@ -79,7 +79,7 @@ static void Init(rtems_task_argument arg)
   rtems_test_assert(rv == 0);
 
   fd = creat(file, S_IRWXU);
-  rtems_test_assert(fd == 3);
+  rtems_test_assert(fd == 0);
 
   rv = close(fd);
   rtems_test_assert(rv == 0);
@@ -126,9 +126,8 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 
-#define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 4
+#define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 1
 
 #define CONFIGURE_FILESYSTEM_IMFS
 

@@ -232,12 +232,12 @@ static void Init(rtems_task_argument arg)
     );
   }
 
-  sc = rtems_capture_control (true);
+  sc = rtems_capture_set_control (true);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
   test();
 
-  sc = rtems_capture_control (false);
+  sc = rtems_capture_set_control (false);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
   rtems_capture_print_trace_records ( 22, false );
@@ -249,17 +249,18 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
-
-#define CONFIGURE_SMP_APPLICATION
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_SCHEDULER_PRIORITY_AFFINITY_SMP
 
-#define CONFIGURE_SMP_MAXIMUM_PROCESSORS NUM_CPUS
+#define CONFIGURE_MAXIMUM_SEMAPHORES 1
+
+#define CONFIGURE_MAXIMUM_PROCESSORS NUM_CPUS
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
 
 #define CONFIGURE_INIT_TASK_PRIORITY       7
+#define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
 
 #define TASK_ALLOCATION_SIZE     (5)
 #define CONFIGURE_MAXIMUM_TASKS  rtems_resource_unlimited(TASK_ALLOCATION_SIZE)

@@ -62,10 +62,15 @@ rtems_status_code rtems_rate_monotonic_create(
     return RTEMS_TOO_MANY;
   }
 
+  _ISR_lock_Initialize( &the_period->Lock, "Rate Monotonic Period" );
+  _Priority_Node_initialize( &the_period->Priority, 0 );
+  _Priority_Node_set_inactive( &the_period->Priority );
+
   the_period->owner = _Thread_Get_executing();
   the_period->state = RATE_MONOTONIC_INACTIVE;
 
-  _Watchdog_Preinitialize( &the_period->Timer );
+  _Watchdog_Preinitialize( &the_period->Timer, _Per_CPU_Get_by_index( 0 ) );
+  _Watchdog_Initialize( &the_period->Timer, _Rate_monotonic_Timeout );
 
   _Rate_monotonic_Reset_statistics( the_period );
 

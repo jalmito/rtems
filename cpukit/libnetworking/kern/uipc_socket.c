@@ -44,7 +44,17 @@
 #include <sys/resourcevar.h>
 #include <sys/signalvar.h>
 #include <sys/sysctl.h>
+#include <sys/uio.h>
 #include <limits.h>
+#ifdef __rtems__
+/*
+ * This socket option was removed 1997 from the upstream FreeBSD network stack.
+ * Turn this feature into essentially dead code.
+ */
+#define	SO_PRIVSTATE	0x1009		/* get/deny privileged state */
+
+#include <rtems/rtems_bsdnet.h>
+#endif /* __rtems__ */
 
 static int somaxconn = SOMAXCONN;
 SYSCTL_INT(_kern, KIPC_SOMAXCONN, somaxconn, CTLFLAG_RW, &somaxconn, 0, "");

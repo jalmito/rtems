@@ -43,7 +43,7 @@ int termios_printk_fd = -1;
 struct rtems_termios_tty *termios_printk_tty;
 
 static void _termios_printk_null_char(
-	char c __attribute__((unused)))
+	char c RTEMS_UNUSED)
 {
   return;
 }
@@ -69,7 +69,6 @@ void termios_printk_outputchar
 |    <none>                                                                 |
 \*=========================================================================*/
 {
-  static const char cr = '\r';
   /*
    * check, whether printk serial port is available
    */
@@ -85,9 +84,6 @@ void termios_printk_outputchar
     /*
      * send character to debug serial port
      */
-    if (c == '\n') {
-      termios_printk_tty->device.write(termios_printk_tty->minor,&cr,1);
-    }
     termios_printk_tty->device.write(termios_printk_tty->minor,&c,1);
   }
 }
@@ -204,7 +200,7 @@ int termios_printk_open
    * capture tty structure
    */
   if (!err_occurred) {
-    iop = &rtems_libio_iops[termios_printk_fd];
+    iop = rtems_libio_iop(termios_printk_fd);
     termios_printk_tty = iop->data1;
   }
   /*

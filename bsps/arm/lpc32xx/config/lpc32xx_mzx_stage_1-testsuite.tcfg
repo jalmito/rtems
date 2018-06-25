@@ -1,0 +1,20 @@
+#
+# lpc32xx_mzx_stage_1 RTEMS Test Database.
+#
+# Format is one line per test that is _NOT_ built.
+#
+
+include: testdata/disable-iconv-tests.tcfg
+include: testdata/disable-jffs2-tests.tcfg
+
+exclude: dl05
+exclude: fileio
+exclude: ftp01
+exclude: fsdosfsname01
+exclude: iostream
+exclude: linpack
+exclude: mghttpd01
+exclude: monitor02
+exclude: pppd
+exclude: rtems++
+exclude: utf8proc01

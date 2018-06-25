@@ -26,13 +26,10 @@
 #include <sys/sysctl.h>
 
 #include <net/if.h>
+#include <net/if_var.h>
 #include <net/route.h>
 
-/*
- *  Since we are "in the kernel", these do not get prototyped in sys/socket.h
- */
-ssize_t	send(int, const void *, size_t, int);
-ssize_t	recv(int, void *, size_t, int);
+#include "rtems_syscall.h"
 
 /*
  * Hooks to RTEMS I/O system
@@ -47,15 +44,14 @@ rtems_bsdnet_fdToSocket (int fd)
 {
   rtems_libio_t *iop;
 
-  /* same as rtems_libio_check_fd(_fd) but different return */
   if ((uint32_t)fd >= rtems_libio_number_iops) {
     errno = EBADF;
     return NULL;
   }
-  iop = &rtems_libio_iops[fd];
 
-  /* same as rtems_libio_check_is_open(iop) but different return */
-  if ((iop->flags & LIBIO_FLAGS_OPEN) == 0) {
+  iop = rtems_libio_iop(fd);
+
+  if ((rtems_libio_iop_flags(iop) & LIBIO_FLAGS_OPEN) == 0) {
     errno = EBADF;
     return NULL;
   }
@@ -84,12 +80,12 @@ rtems_bsdnet_makeFdForSocket (void *so)
       rtems_set_errno_and_return_minus_one( ENFILE );
 
   fd = rtems_libio_iop_to_descriptor(iop);
-  iop->flags |= LIBIO_FLAGS_WRITE | LIBIO_FLAGS_READ;
   iop->data0 = fd;
   iop->data1 = so;
   iop->pathinfo.handlers = &socket_handlers;
   iop->pathinfo.mt_entry = &rtems_filesystem_null_mt_entry;
   rtems_filesystem_location_add_to_mt_entry(&iop->pathinfo);
+  rtems_libio_iop_flags_initialize(iop, LIBIO_FLAGS_READ_WRITE);
   return fd;
 }
 
@@ -145,7 +141,7 @@ socket (int domain, int type, int protocol)
 }
 
 int
-bind (int s, struct sockaddr *name, int namelen)
+bind (int s, const struct sockaddr *name, socklen_t namelen)
 {
 	int error;
 	int ret = -1;
@@ -172,7 +168,7 @@ bind (int s, struct sockaddr *name, int namelen)
 }
 
 int
-connect (int s, struct sockaddr *name, int namelen)
+connect (int s, const struct sockaddr *name, socklen_t namelen)
 {
 	int error;
 	int ret = -1;
@@ -244,7 +240,7 @@ listen (int s, int backlog)
 }
 
 int
-accept (int s, struct sockaddr *name, int *namelen)
+accept (int s, struct sockaddr *name, socklen_t *namelen)
 {
 	int fd;
 	struct socket *head, *so;
@@ -412,7 +408,7 @@ sendmsg (int s, const struct msghdr *mp, int flags)
  * Send a message to a host
  */
 ssize_t
-sendto (int s, const void *buf, size_t buflen, int flags, const struct sockaddr *to, int tolen)
+sendto (int s, const void *buf, size_t buflen, int flags, const struct sockaddr *to, socklen_t tolen)
 {
 	struct msghdr msg;
 	struct iovec iov;
@@ -526,7 +522,7 @@ recvmsg (int s, struct msghdr *mp, int flags)
  * Receive a message from a host
  */
 ssize_t
-recvfrom (int s, void *buf, size_t buflen, int flags, const struct sockaddr *from, int *fromlen)
+recvfrom (int s, void *buf, size_t buflen, int flags, struct sockaddr *from, socklen_t *fromlen)
 {
 	struct msghdr msg;
 	struct iovec iov;
@@ -550,7 +546,7 @@ recvfrom (int s, void *buf, size_t buflen, int flags, const struct sockaddr *fro
 }
 
 int
-setsockopt (int s, int level, int name, const void *val, int len)
+setsockopt (int s, int level, int name, const void *val, socklen_t len)
 {
 	struct socket *so;
 	struct mbuf *m = NULL;
@@ -585,7 +581,7 @@ setsockopt (int s, int level, int name, const void *val, int len)
 }
 
 int
-getsockopt (int s, int level, int name, void *aval, int *avalsize)
+getsockopt (int s, int level, int name, void *aval, socklen_t *avalsize)
 {
 	struct socket *so;
 	struct mbuf *m = NULL, *m0;
@@ -628,7 +624,7 @@ getsockopt (int s, int level, int name, void *aval, int *avalsize)
 }
 
 static int
-getpeersockname (int s, struct sockaddr *name, int *namelen, int pflag)
+getpeersockname (int s, struct sockaddr *name, socklen_t *namelen, int pflag)
 {
 	struct socket *so;
 	struct mbuf *m;
@@ -667,19 +663,19 @@ getpeersockname (int s, struct sockaddr *name, int *namelen, int pflag)
 }
 
 int
-getpeername (int s, struct sockaddr *name, int *namelen)
+getpeername (int s, struct sockaddr *name, socklen_t *namelen)
 {
 	return getpeersockname (s, name, namelen, 1);
 }
 int
-getsockname (int s, struct sockaddr *name, int *namelen)
+getsockname (int s, struct sockaddr *name, socklen_t *namelen)
 {
 	return getpeersockname (s, name, namelen, 0);
 }
 
 int
-sysctl(int *name, u_int namelen, void *oldp,
-       size_t *oldlenp, void *newp, size_t newlen)
+sysctl(const int *name, u_int namelen, void *oldp,
+       size_t *oldlenp, const void *newp, size_t newlen)
 {
   int    error;
 	size_t j;
@@ -766,7 +762,7 @@ so_ioctl (rtems_libio_t *iop, struct socket *so, uint32_t   command, void *buffe
 }
 
 static int
-rtems_bsdnet_ioctl (rtems_libio_t *iop, uint32_t   command, void *buffer)
+rtems_bsdnet_ioctl (rtems_libio_t *iop, ioctl_command_t command, void *buffer)
 {
 	struct socket *so;
 	int error;
@@ -797,7 +793,7 @@ rtems_bsdnet_fcntl (rtems_libio_t *iop, int cmd)
 			rtems_bsdnet_semaphore_release ();
 			return EBADF;
 		}
-		if (iop->flags & LIBIO_FLAGS_NO_DELAY)
+		if (rtems_libio_iop_is_no_delay(iop))
 			so->so_state |= SS_NBIO;
 		else
 			so->so_state &= ~SS_NBIO;
@@ -826,6 +822,7 @@ static const rtems_filesystem_file_handlers_r socket_handlers = {
 	.fdatasync_h = rtems_filesystem_default_fsync_or_fdatasync,
 	.fcntl_h = rtems_bsdnet_fcntl,
 	.kqfilter_h = rtems_filesystem_default_kqfilter,
+	.mmap_h = rtems_filesystem_default_mmap,
 	.poll_h = rtems_filesystem_default_poll,
 	.readv_h = rtems_filesystem_default_readv,
 	.writev_h = rtems_filesystem_default_writev

@@ -52,12 +52,12 @@ static void print_info(void)
   _Heap_Get_information(&task_stack_heap, &info);
 
   printf(
-    "used blocks = %" PRIu32 ", "
-    "largest used block = %" PRIu32 ", "
-    "used space = %" PRIu32 "\n"
-    "free blocks = %" PRIu32 ", "
-    "largest free block = %" PRIu32 ", "
-    "free space = %" PRIu32 "\n",
+    "used blocks = %" PRIuPTR ", "
+    "largest used block = %" PRIuPTR ", "
+    "used space = %" PRIuPTR "\n"
+    "free blocks = %" PRIuPTR ", "
+    "largest free block = %" PRIuPTR ", "
+    "free space = %" PRIuPTR "\n",
     info.Used.number,
     info.Used.largest,
     info.Used.total,
@@ -117,7 +117,7 @@ static rtems_task Init(rtems_task_argument argument)
   rtems_test_exit(0);
 }
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS TASK_COUNT
@@ -138,7 +138,7 @@ static rtems_task Init(rtems_task_argument argument)
 #include <rtems/confdefs.h>
 
 static char task_stack_space
-  [CONFIGURE_TASK_STACK_FROM_ALLOCATOR(CONFIGURE_STACK_SPACE_SIZE)];
+  [CONFIGURE_TASK_STACK_FROM_ALLOCATOR(_CONFIGURE_STACK_SPACE_SIZE)];
 
 static void task_stack_init(size_t stack_space_size)
 {
@@ -149,7 +149,7 @@ static void task_stack_init(size_t stack_space_size)
     STACK_HEAP_PAGE_SIZE
   );
 
-  rtems_test_assert(stack_space_size == CONFIGURE_STACK_SPACE_SIZE);
+  rtems_test_assert(stack_space_size == _CONFIGURE_STACK_SPACE_SIZE);
   rtems_test_assert(ok);
 }
 

@@ -14,6 +14,7 @@
 #endif
 
 #include <stdlib.h>
+#include <string.h>
 
 #include <rtems.h>
 
@@ -102,9 +103,7 @@ static void Init( rtems_task_argument arg )
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 
-#define CONFIGURE_SMP_APPLICATION
-
-#define CONFIGURE_SMP_MAXIMUM_PROCESSORS 32
+#define CONFIGURE_MAXIMUM_PROCESSORS 32
 
 #define CONFIGURE_DISABLE_BSP_SETTINGS
 

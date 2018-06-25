@@ -18,73 +18,36 @@
 #include "config.h"
 #endif
 
-#include <rtems/system.h>
-#include <rtems/rtems/status.h>
-#include <rtems/rtems/support.h>
-#include <rtems/score/thread.h>
 #include <rtems/rtems/timerimpl.h>
-#include <rtems/score/watchdogimpl.h>
-
-/*
- *  rtems_timer_reset
- *
- *  This directive allows a thread to reset a timer.
- *
- *  Input parameters:
- *    id - timer id
- *
- *  Output parameters:
- *    RTEMS_SUCCESSFUL - if successful
- *    error code       - if unsuccessful
- */
 
 rtems_status_code rtems_timer_reset(
   rtems_id id
 )
 {
-  Timer_Control     *the_timer;
-  Objects_Locations  location;
-  rtems_status_code  status = RTEMS_SUCCESSFUL;
+  Timer_Control    *the_timer;
+  ISR_lock_Context  lock_context;
 
-  the_timer = _Timer_Get( id, &location );
-  switch ( location ) {
+  the_timer = _Timer_Get( id, &lock_context );
+  if ( the_timer != NULL ) {
+    Per_CPU_Control   *cpu;
+    rtems_status_code  status;
 
-    case OBJECTS_LOCAL:
-      if ( the_timer->the_class == TIMER_INTERVAL ) {
-        _Watchdog_Reset_ticks( &the_timer->Ticker );
-      } else if ( the_timer->the_class == TIMER_INTERVAL_ON_TASK ) {
-        Timer_server_Control *timer_server = _Timer_server;
+    cpu = _Timer_Acquire_critical( the_timer, &lock_context );
 
-        /*
-         *  There is no way for a timer to have this class unless
-         *  it was scheduled as a server fire.  That requires that
-         *  the Timer Server be initiated.  So this error cannot
-         *  occur unless something is internally wrong.
-         */
-        #if defined(RTEMS_DEBUG)
-          if ( !timer_server ) {
-            _Objects_Put( &the_timer->Object );
-            return RTEMS_INCORRECT_STATE;
-          }
-        #endif
-        (*timer_server->cancel)( timer_server, the_timer );
-        (*timer_server->schedule_operation)( timer_server, the_timer );
-      } else {
-        /*
-         *  Must be dormant or time of day timer (e.g. TIMER_DORMANT,
-         *  TIMER_TIME_OF_DAY, or TIMER_TIME_OF_DAY_ON_TASK).  We
-         *  can only reset active interval timers.
-         */
-        status = RTEMS_NOT_DEFINED;
-      }
-      _Objects_Put( &the_timer->Object );
-      return status;
+    if ( _Timer_Is_interval_class( the_timer->the_class ) ) {
+      _Timer_Cancel( cpu, the_timer );
+      _Watchdog_Insert(
+        &cpu->Watchdog.Header[ PER_CPU_WATCHDOG_TICKS ],
+        &the_timer->Ticker,
+        cpu->Watchdog.ticks + the_timer->initial
+      );
+      status = RTEMS_SUCCESSFUL;
+    } else {
+      status = RTEMS_NOT_DEFINED;
+    }
 
-#if defined(RTEMS_MULTIPROCESSING)
-    case OBJECTS_REMOTE:            /* should never return this */
-#endif
-    case OBJECTS_ERROR:
-      break;
+    _Timer_Release( cpu, &lock_context );
+    return status;
   }
 
   return RTEMS_INVALID_ID;

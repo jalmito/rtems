@@ -1,56 +1,50 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
+include $(top_srcdir)/../../bsp.am
 
-include_bspdir = $(includedir)/bsp
+dist_project_lib_DATA = ../../../../../../bsps/powerpc/ss555/start/bsp_specs
 
-dist_project_lib_DATA = bsp_specs
 
-include_HEADERS = include/bsp.h
-include_HEADERS += include/tm27.h
 
-nodist_include_HEADERS = include/bspopts.h
-nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
-DISTCLEANFILES = include/bspopts.h
-
-include_HEADERS += ../../shared/include/coverhd.h
-include_bsp_HEADERS = irq/irq.h
-
-EXTRA_DIST = times
-
-dist_project_lib_DATA += startup/linkcmds
-
-EXTRA_DIST += ../../powerpc/shared/start/rtems_crti.S
-rtems_crti.$(OBJEXT): ../../powerpc/shared/start/rtems_crti.S
+rtems_crti.$(OBJEXT): ../../../../../../bsps/powerpc/shared/start/rtems_crti.S
 	$(CPPASCOMPILE) -o $@ -c $<
 project_lib_DATA = rtems_crti.$(OBJEXT)
 
-noinst_LIBRARIES = libbsp.a
-libbsp_a_SOURCES =
+project_lib_DATA += linkcmds
+
+project_lib_LIBRARIES = librtemsbsp.a
+librtemsbsp_a_SOURCES =
 
 # pclock
-libbsp_a_SOURCES += clock/p_clock.c
+librtemsbsp_a_SOURCES +=../../../../../../bsps/powerpc/ss555/clock/p_clock.c
 # console
-libbsp_a_SOURCES += console/console.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/ss555/console/console.c
 # startup
-libbsp_a_SOURCES += ../../shared/bspclean.c ../../shared/bsplibc.c \
-    ../../shared/bsppost.c ../../shared/bsppredriverhook.c \
-    startup/bspstart.c ../../shared/bootcard.c startup/iss555.c \
-    ../../shared/sbrk.c ../../shared/gnatinstallhandler.c start/start.S \
-    ../../shared/bsppretaskinghook.c ../../shared/bspgetworkarea.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/ss555/start/bspstart.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/ss555/start/iss555.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/ss555/start/start.S
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-empty.c
 # tm27supp
-libbsp_a_SOURCES += startup/tm27supp.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/ss555/start/tm27supp.c
 
-libbsp_a_LIBADD = \
-    ../../../libcpu/@RTEMS_CPU@/shared/cpuIdent.rel \
-    ../../../libcpu/@RTEMS_CPU@/shared/cache.rel \
-    ../../../libcpu/@RTEMS_CPU@/@exceptions@/rtems-cpu.rel \
-    ../../../libcpu/@RTEMS_CPU@/mpc5xx/clock.rel \
-    ../../../libcpu/@RTEMS_CPU@/mpc5xx/console-generic.rel \
-    ../../../libcpu/@RTEMS_CPU@/mpc5xx/exceptions.rel \
-    ../../../libcpu/@RTEMS_CPU@/mpc5xx/irq.rel \
-    ../../../libcpu/@RTEMS_CPU@/mpc5xx/timer.rel \
-    ../../../libcpu/@RTEMS_CPU@/mpc5xx/vectors.rel
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/cache/cache.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/btimer/btimer-ppc-dec.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/exceptions/ppc_exc_print.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/ss555/clock/clock.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/ss555/dev/console-generic.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/ss555/start/irq_asm.S
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/ss555/start/irq.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/ss555/start/irq_init.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/ss555/start/raw_exception.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/ss555/start/vectors_init.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/ss555/start/vectors.S
 
-include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
+include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
+include $(srcdir)/../../../../../../bsps/powerpc/shared/shared-sources.am
+include $(srcdir)/../../../../../../bsps/powerpc/ss555/headers.am

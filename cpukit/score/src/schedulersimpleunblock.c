@@ -21,15 +21,22 @@
 #include <rtems/score/schedulersimpleimpl.h>
 #include <rtems/score/thread.h>
 
-Scheduler_Void_or_thread _Scheduler_simple_Unblock(
+void _Scheduler_simple_Unblock(
   const Scheduler_Control *scheduler,
-  Thread_Control          *the_thread
+  Thread_Control          *the_thread,
+  Scheduler_Node          *node
 )
 {
-  Scheduler_simple_Context *context =
-    _Scheduler_simple_Get_context( scheduler );
+  Scheduler_simple_Context *context;
+  unsigned int              priority;
+  unsigned int              insert_priority;
 
-  _Scheduler_simple_Insert_priority_fifo( &context->Ready, the_thread );
+  (void) node;
+
+  context = _Scheduler_simple_Get_context( scheduler );
+  priority = _Thread_Get_priority( the_thread );
+  insert_priority = SCHEDULER_PRIORITY_APPEND( priority );
+  _Scheduler_simple_Insert( &context->Ready, the_thread, insert_priority );
 
   /*
    *  If the thread that was unblocked is more important than the heir,
@@ -43,12 +50,10 @@ Scheduler_Void_or_thread _Scheduler_simple_Unblock(
    *    Even if the thread isn't preemptible, if the new heir is
    *    a pseudo-ISR system task, we need to do a context switch.
    */
-  if ( the_thread->current_priority < _Thread_Heir->current_priority ) {
+  if ( priority < _Thread_Get_priority( _Thread_Heir ) ) {
     _Scheduler_Update_heir(
       the_thread,
-      the_thread->current_priority == PRIORITY_PSEUDO_ISR
+      priority == PRIORITY_PSEUDO_ISR
     );
   }
-
-  SCHEDULER_RETURN_VOID_OR_NULL;
 }

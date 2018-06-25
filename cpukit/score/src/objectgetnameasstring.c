@@ -21,7 +21,65 @@
 
 #include <rtems/score/threadimpl.h>
 
-#include <ctype.h>
+/*
+ * Do not use isprint() from <ctypes.h> since this depends on the heavy weight
+ * C locale support of Newlib.
+ */
+static bool _Objects_Name_char_is_printable( char c )
+{
+  unsigned char uc;
+
+  uc = (unsigned char) c;
+  return uc >= ' ' && uc <= '~';
+}
+
+size_t _Objects_Name_to_string(
+  Objects_Name  name,
+  bool          is_string,
+  char         *buffer,
+  size_t        buffer_size
+)
+{
+  char        lname[ 5 ];
+  const char *s;
+  char       *d;
+  size_t      i;
+
+#if defined(RTEMS_SCORE_OBJECT_ENABLE_STRING_NAMES)
+  if ( is_string ) {
+    s = name.name_p;
+  } else
+#endif
+  {
+    lname[ 0 ] = (name.name_u32 >> 24) & 0xff;
+    lname[ 1 ] = (name.name_u32 >> 16) & 0xff;
+    lname[ 2 ] = (name.name_u32 >>  8) & 0xff;
+    lname[ 3 ] = (name.name_u32 >>  0) & 0xff;
+    lname[ 4 ] = '\0';
+    s = lname;
+  }
+
+  d = buffer;
+  i = 1;
+
+  if ( s != NULL ) {
+    while ( *s != '\0' ) {
+      if ( i < buffer_size ) {
+        *d = _Objects_Name_char_is_printable(*s) ? *s : '*';
+        ++d;
+      }
+
+      ++s;
+      ++i;
+    }
+  }
+
+  if ( buffer_size > 0 ) {
+    *d = '\0';
+  }
+
+  return i - 1;
+}
 
 /*
  *  This method objects the name of an object and returns its name
@@ -36,12 +94,8 @@ char *_Objects_Get_name_as_string(
 )
 {
   Objects_Information   *information;
-  const char            *s;
-  char                  *d;
-  uint32_t               i;
-  char                   lname[5];
   Objects_Control       *the_object;
-  Objects_Locations      location;
+  ISR_lock_Context       lock_context;
   Objects_Id             tmpId;
 
   if ( length == 0 )
@@ -56,45 +110,22 @@ char *_Objects_Get_name_as_string(
   if ( !information )
     return NULL;
 
-  the_object = _Objects_Get( information, tmpId, &location );
-  switch ( location ) {
-
-    case OBJECTS_LOCAL:
-
-      #if defined(RTEMS_SCORE_OBJECT_ENABLE_STRING_NAMES)
-        if ( information->is_string ) {
-          s = the_object->name.name_p;
-        } else
-      #endif
-      {
-        uint32_t  u32_name = (uint32_t) the_object->name.name_u32;
-
-        lname[ 0 ] = (u32_name >> 24) & 0xff;
-        lname[ 1 ] = (u32_name >> 16) & 0xff;
-        lname[ 2 ] = (u32_name >>  8) & 0xff;
-        lname[ 3 ] = (u32_name >>  0) & 0xff;
-        lname[ 4 ] = '\0';
-        s = lname;
-      }
-
-      d = name;
-      if ( s ) {
-        for ( i=0 ; i<(length-1) && *s ; i++, s++, d++ ) {
-          *d = (isprint((unsigned char)*s)) ? *s : '*';
-        }
-      }
-      *d = '\0';
-
-      _Objects_Put( the_object );
-      return name;
-
-#if defined(RTEMS_MULTIPROCESSING)
-    case OBJECTS_REMOTE:
-      /* not supported */
-#endif
-    case OBJECTS_ERROR:
-      return NULL;
-
+  the_object = _Objects_Get( tmpId, &lock_context, information );
+  if ( the_object == NULL ) {
+    return NULL;
   }
-  return NULL;                  /* unreachable path */
+
+  _Objects_Name_to_string(
+    the_object->name,
+#if defined(RTEMS_SCORE_OBJECT_ENABLE_STRING_NAMES)
+    information->is_string,
+#else
+    false,
+#endif
+    name,
+    length
+  );
+
+  _ISR_lock_ISR_enable( &lock_context );
+  return name;
 }

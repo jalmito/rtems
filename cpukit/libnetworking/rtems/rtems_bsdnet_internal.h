@@ -10,18 +10,19 @@
 #ifndef _RTEMS_RTEMS_BSDNET_INTERNAL_H
 #define _RTEMS_RTEMS_BSDNET_INTERNAL_H
 
+#include <sys/_types.h>
 #include <rtems.h>
 #include <rtems/fs.h>
-#include <rtems/bsd.h>
+#include <rtems/score/timecounter.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef	unsigned int		vm_offset_t;
-typedef	long long		vm_ooffset_t;
-typedef	unsigned int		vm_pindex_t;
-typedef	unsigned int		vm_size_t;
+typedef	__uintptr_t		vm_offset_t;
+typedef	__intptr_t		vm_ooffset_t;
+typedef	__uintptr_t		vm_pindex_t;
+typedef	__uintptr_t		vm_size_t;
 
 #define _BSD_OFF_T_	int32_t
 #define _BSD_PID_T_	rtems_id
@@ -30,10 +31,11 @@ typedef	unsigned int		vm_size_t;
 /* make sure we get the network versions of these */
 #include <machine/types.h>
 #include <machine/param.h>
+#include <machine/endian.h>
 #include <sys/cdefs.h>
 
 #include <sys/time.h>
-#include <sys/ioctl.h>
+#include <sys/ioccom.h>
 
 struct mdproc {
 	int	md_flags;
@@ -62,7 +64,7 @@ void *memset(void *s, int c, size_t n);
 #define panic	rtems_panic
 #define suser(a,b)	0
 
-#define microtime(tv) rtems_bsd_microtime(tv)
+#define	microtime(_tvp) _Timecounter_Microtime(_tvp)
 
 #define hz rtems_bsdnet_ticks_per_second
 #define tick rtems_bsdnet_microseconds_per_tick
@@ -81,13 +83,6 @@ typedef	quad_t *	qaddr_t;
 typedef void __sighandler_t(int);
 typedef	__sighandler_t	*sig_t;	/* type of pointer to a signal function */
 #define NSIG    32
-#if (__RTEMS_HAVE_DECL_SIGALTSTACK__ == 0)
-struct sigaltstack {
-       char    *ss_sp;                 /* signal stack base */
-       int     ss_size;                /* signal stack length */
-       int     ss_flags;               /* SS_DISABLE and/or SS_ONSTACK */
-};
-#endif
 
 #ifdef _KERNEL
 typedef	int		boolean_t;
@@ -104,7 +99,30 @@ typedef	int		boolean_t;
 #define	makedev(x,y)	((dev_t)(((x) << 8) | (y)))	/* create dev_t */
 #endif
 
-#include <rtems/endian.h>
+#ifndef _BYTEORDER_PROTOTYPED
+#define	_BYTEORDER_PROTOTYPED
+__BEGIN_DECLS
+__uint32_t	 htonl(__uint32_t);
+__uint16_t	 htons(__uint16_t);
+__uint32_t	 ntohl(__uint32_t);
+__uint16_t	 ntohs(__uint16_t);
+__END_DECLS
+#endif
+
+#ifndef _BYTEORDER_FUNC_DEFINED
+#define	_BYTEORDER_FUNC_DEFINED
+#define	htonl(x)	__htonl(x)
+#define	htons(x)	__htons(x)
+#define	ntohl(x)	__ntohl(x)
+#define	ntohs(x)	__ntohs(x)
+#endif /* !_BYTEORDER_FUNC_DEFINED */
+
+#define NTOHS(x) (x) = ntohs(x)
+#define HTONS(x) (x) = htons(x)
+#define NTOHL(x) (x) = ntohl(x)
+#define HTONL(x) (x) = htonl(x)
+
+in_addr_t	 inet_addr(const char *);
 
 typedef quad_t          rlim_t;         /* resource limit */
 typedef	u_int32_t	fixpt_t;	/* fixed point number */
@@ -222,6 +240,43 @@ int ioctl (int, ioctl_command_t, ...);
 #endif
 
 struct socket *rtems_bsdnet_fdToSocket(int fd);
+
+void sysctl_register_all(void *);
+
+void rtems_set_udp_buffer_sizes(u_long, u_long);
+
+void rtems_set_tcp_buffer_sizes(u_long, u_long);
+
+void rtems_set_sb_efficiency(u_long);
+
+#define IFF_OACTIVE IFF_DRV_OACTIVE
+#define IFF_RUNNING IFF_DRV_RUNNING
+
+struct ifaddr;
+void	ifafree(struct ifaddr *);
+
+struct ifnet;
+struct mbuf;
+struct sockaddr;
+struct rtentry;
+int	looutput(struct ifnet *,
+	   struct mbuf *, struct sockaddr *, struct rtentry *);
+
+typedef u_long	tcp_cc;			/* connection count per rfc1644 */
+
+#define    TCPOPT_TSTAMP_HDR		\
+    (uint32_t)(((uint32_t)TCPOPT_NOP<<24)| \
+               ((uint32_t)TCPOPT_NOP<<16)| \
+               ((uint32_t)TCPOPT_TIMESTAMP<<8)| \
+               ((uint32_t)TCPOLEN_TIMESTAMP))
+
+#define	TCPOPT_CC		11		/* CC options: RFC-1644 */
+#define TCPOPT_CCNEW		12
+#define TCPOPT_CCECHO		13
+#define	   TCPOLEN_CC			6
+#define	   TCPOLEN_CC_APPA		(TCPOLEN_CC+2)
+#define	   TCPOPT_CC_HDR(ccopt)		\
+    (TCPOPT_NOP<<24|TCPOPT_NOP<<16|(ccopt)<<8|TCPOLEN_CC)
 
 #ifdef __cplusplus
 }

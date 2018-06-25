@@ -20,17 +20,18 @@
 
 #include <rtems/rtems/ratemonimpl.h>
 #include <rtems/rtems/object.h>
+#include <rtems/printer.h>
 
 #include <inttypes.h>
+#include <rtems/inttypes.h>
 
 /* We print to 1/10's of milliseconds */
-#define NANOSECONDS_DIVIDER 1000
+#define NANOSECONDS_DIVIDER 1000L
 #define PERCENT_FMT     "%04" PRId32
-#define NANOSECONDS_FMT "%06" PRId32
+#define NANOSECONDS_FMT "%06ld"
 
 void rtems_rate_monotonic_report_statistics_with_plugin(
-  void                  *context,
-  rtems_printk_plugin_t  print
+  const rtems_printer *printer
 )
 {
   rtems_status_code                      status;
@@ -39,12 +40,9 @@ void rtems_rate_monotonic_report_statistics_with_plugin(
   rtems_rate_monotonic_period_status     the_status;
   char                                   name[5];
 
-  if ( !print )
-    return;
-
-  (*print)( context, "Period information by period\n" );
-  (*print)( context, "--- CPU times are in seconds ---\n" );
-  (*print)( context, "--- Wall times are in seconds ---\n" );
+  rtems_printf( printer, "Period information by period\n" );
+  rtems_printf( printer, "--- CPU times are in seconds ---\n" );
+  rtems_printf( printer, "--- Wall times are in seconds ---\n" );
 /*
 Layout by columns -- in memory of Hollerith :)
 
@@ -58,7 +56,7 @@ ididididid NNNN ccccc mmmmmm X
 1234567890123456789012345678901234567890123456789012345678901234567890123456789\
 \n");
 */
-  (*print)( context,
+  rtems_printf( printer,
       "   ID     OWNER COUNT MISSED     "
       "     CPU TIME                  WALL TIME\n"
       "                               "
@@ -90,7 +88,7 @@ ididididid NNNN ccccc mmmmmm X
     /*
      *  Print part of report line that is not dependent on granularity
      */
-    (*print)( context,
+    rtems_printf( printer,
       "0x%08" PRIx32 " %4s %5" PRId32 " %6" PRId32 " ",
       id, name,
       the_stats.count, the_stats.missed_count
@@ -100,7 +98,7 @@ ididididid NNNN ccccc mmmmmm X
      *  If the count is zero, don't print statistics
      */
     if (the_stats.count == 0) {
-      (*print)( context, "\n" );
+      rtems_printf( printer, "\n" );
       continue;
     }
 
@@ -114,10 +112,10 @@ ididididid NNNN ccccc mmmmmm X
       struct timespec *total_cpu = &the_stats.total_cpu_time;
 
       _Timespec_Divide_by_integer( total_cpu, the_stats.count, &cpu_average );
-      (*print)( context,
-        "%" PRId32 "."  NANOSECONDS_FMT "/"        /* min cpu time */
-        "%" PRId32 "."  NANOSECONDS_FMT "/"        /* max cpu time */
-        "%" PRId32 "."  NANOSECONDS_FMT " ",       /* avg cpu time */
+      rtems_printf( printer,
+        "%" PRIdtime_t "."  NANOSECONDS_FMT "/"        /* min cpu time */
+        "%" PRIdtime_t "."  NANOSECONDS_FMT "/"        /* max cpu time */
+        "%" PRIdtime_t "."  NANOSECONDS_FMT " ",       /* avg cpu time */
         _Timespec_Get_seconds( min_cpu ),
 	  _Timespec_Get_nanoseconds( min_cpu ) / NANOSECONDS_DIVIDER,
         _Timespec_Get_seconds( max_cpu ),
@@ -137,10 +135,10 @@ ididididid NNNN ccccc mmmmmm X
       struct timespec *total_wall = &the_stats.total_wall_time;
 
       _Timespec_Divide_by_integer(total_wall, the_stats.count, &wall_average);
-      (*print)( context,
-        "%" PRId32 "." NANOSECONDS_FMT "/"        /* min wall time */
-        "%" PRId32 "." NANOSECONDS_FMT "/"        /* max wall time */
-        "%" PRId32 "." NANOSECONDS_FMT "\n",      /* avg wall time */
+      rtems_printf( printer,
+        "%" PRIdtime_t "." NANOSECONDS_FMT "/"        /* min wall time */
+        "%" PRIdtime_t "." NANOSECONDS_FMT "/"        /* max wall time */
+        "%" PRIdtime_t "." NANOSECONDS_FMT "\n",      /* avg wall time */
         _Timespec_Get_seconds( min_wall ),
           _Timespec_Get_nanoseconds( min_wall ) / NANOSECONDS_DIVIDER,
         _Timespec_Get_seconds( max_wall ),
@@ -154,5 +152,7 @@ ididididid NNNN ccccc mmmmmm X
 
 void rtems_rate_monotonic_report_statistics( void )
 {
-  rtems_rate_monotonic_report_statistics_with_plugin( NULL, printk_plugin );
+  rtems_printer printer;
+  rtems_print_printer_printk( &printer );
+  rtems_rate_monotonic_report_statistics_with_plugin( &printer );
 }

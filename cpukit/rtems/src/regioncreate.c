@@ -71,11 +71,13 @@ rtems_status_code rtems_region_create(
       return_status = RTEMS_TOO_MANY;
 
     else {
-      _Thread_queue_Initialize(
-        &the_region->Wait_queue,
-        _Attributes_Is_priority( attribute_set ) ?
-           THREAD_QUEUE_DISCIPLINE_PRIORITY : THREAD_QUEUE_DISCIPLINE_FIFO
-      );
+      _Thread_queue_Object_initialize( &the_region->Wait_queue );
+
+      if ( _Attributes_Is_priority( attribute_set ) ) {
+        the_region->wait_operations = &_Thread_queue_Operations_priority;
+      } else {
+        the_region->wait_operations = &_Thread_queue_Operations_FIFO;
+      }
 
       the_region->maximum_segment_size = _Heap_Initialize(
         &the_region->Memory, starting_address, length, page_size
@@ -85,11 +87,7 @@ rtems_status_code rtems_region_create(
         _Region_Free( the_region );
         return_status = RTEMS_INVALID_SIZE;
       } else {
-        the_region->starting_address      = starting_address;
-        the_region->length                = length;
-        the_region->page_size             = page_size;
-        the_region->attribute_set         = attribute_set;
-        the_region->number_of_used_blocks = 0;
+        the_region->attribute_set = attribute_set;
 
         _Objects_Open(
           &_Region_Information,

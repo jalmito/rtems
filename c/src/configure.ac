@@ -3,8 +3,10 @@
 
 AC_PREREQ([2.69])
 AC_INIT([rtems-c-src],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
-AC_CONFIG_SRCDIR([libchip])
+AC_CONFIG_SRCDIR([lib])
 RTEMS_TOP(../..)
+RTEMS_SOURCE_TOP
+RTEMS_BUILD_TOP
 
 RTEMS_ENABLE_CXX
 RTEMS_ENABLE_NETWORKING
@@ -14,13 +16,12 @@ RTEMS_CANONICAL_TARGET_CPU
 AM_INIT_AUTOMAKE([no-define subdir-objects no-exeext foreign 1.12.2])
 AM_MAINTAINER_MODE
 
-RTEMS_ENABLE_MULTILIB
 RTEMS_ENABLE_MULTIPROCESSING
+RTEMS_ENABLE_CXX
 RTEMS_ENV_RTEMSBSP
 
 RTEMS_CHECK_CUSTOM_BSP(RTEMS_BSP)
 
-RTEMS_CHECK_NETWORKING(RTEMS_BSP)
 RTEMS_CHECK_POSIX_API(RTEMS_BSP)
 
 AC_MSG_NOTICE([setting up make/custom])
@@ -93,12 +94,13 @@ rtems_cv_CFLAGS_set="${CFLAGS+set}"
 CFLAGS="${CFLAGS-${CPU_CFLAGS} ${CFLAGS_OPTIMIZE_V}}"
 
 RTEMS_PROG_CC_FOR_TARGET
+RTEMS_PROG_CXX_FOR_TARGET
 AM_PROG_CC_C_O
 RTEMS_PROG_CCAS
 RTEMS_CANONICALIZE_TOOLS
 
 # Append warning flags if CFLAGS wasn't set.
-AS_IF([test "$GCC" = yes && test "$rtems_cv_CFLAGS_set" != set],
+AS_IF([test "$GCC" = yes],
 [CFLAGS="$CFLAGS -Wall -Wmissing-prototypes -Wimplicit-function-declaration -Wstrict-prototypes -Wnested-externs"])
 
 AS_IF([test -n "${CFLAGS}"],[
@@ -108,7 +110,7 @@ RTEMS_CHECK_GCC_WEAK
 
 AC_SUBST(CUSTOM_CFG_FILES)
 
-RTEMS_CHECK_MULTIPROCESSING
+RTEMS_ENABLE_MULTILIB
 
 BSP_SUBDIRS=
 ## Configure ${srcdir}/../../cpukit as cpukit/ if multilibs are disabled
@@ -124,51 +126,13 @@ RTEMS_BSP_CONFIG_SUBDIR(
 AC_CONFIG_SUBDIRS([make])
 BSP_SUBDIRS="$BSP_SUBDIRS make"
 
-RTEMS_CPU_SUBDIRS(lib/libcpu)
-if test -d "${srcdir}/lib/libcpu/${RTEMS_CPU}"; then
-  libcpu_cpu_subdir="${RTEMS_CPU}"
-else
-  libcpu_cpu_subdir=
-fi
-AC_SUBST(libcpu_cpu_subdir)
-
 # Is there code where there should be for this BSP?
 RTEMS_CPU_SUBDIRS([lib/libbsp])
 AC_SUBST(libbsp_cpu_subdir,$RTEMS_CPU)
 
-BSP_SUBDIRS="$BSP_SUBDIRS lib"
-BSP_SUBDIRS="$BSP_SUBDIRS libchip"
+BSP_SUBDIRS="$BSP_SUBDIRS lib/libbsp"
 
-AS_IF([test "$RTEMS_HAS_CPLUSPLUS" = "yes"],[
-  AC_CONFIG_SUBDIRS([librtems++])
-  BSP_SUBDIRS="$BSP_SUBDIRS librtems++"
-])
-
-BSP_SUBDIRS="$BSP_SUBDIRS support"
-BSP_SUBDIRS="$BSP_SUBDIRS ada"
-BSP_SUBDIRS="$BSP_SUBDIRS wrapup"
-
-AC_ARG_ENABLE([ada],
-[AS_HELP_STRING(--enable-ada,enable ada support)],
-[case "${enable_ada}" in
-  yes) ;;
-  no) ;;
-  *)  AC_MSG_ERROR(bad value ${enable_ada} for --enable-ada) ;;
-esac],[enable_ada=no])
-
-RTEMS_BSP_CONFIG_SUBDIR(
-  [ada-tests],[ada-tests],
-  ['--enable-rtems-root=../' \
-   '--enable-project-root=${with_project_root}../$RTEMS_BSP' \
-   '--with-project-top=${with_project_top}../' \
-   '--enable-rtemsbsp=$RTEMS_BSP' \
-  ],
-  [test x"$enable_tests" = xyes && test x"$enable_ada" = xyes])
-
-# HACK ALERT!
-
-# FIXME: Assume multilib implies in-source-tree multilibs
-# Build testsuites multilibbed
+# Build testsuites
 RTEMS_BSP_CONFIG_SUBDIR(
   [testsuites],[../../testsuites],
   ['--enable-rtems-root=../' \
@@ -178,20 +142,7 @@ RTEMS_BSP_CONFIG_SUBDIR(
    '--includedir=${exec_prefix}/${RTEMS_BSP}/lib/include' \
    '--libdir=${exec_prefix}/${RTEMS_BSP}/lib' \
   ],
-  [test x"$enable_tests" != x"no" && test x"$multilib" = xno])
-
-# Build testsuites non-multilibbed
-RTEMS_BSP_CONFIG_SUBDIR(
-  [testsuites],[../../testsuites],
-  ['--enable-rtems-root=../' \
-   '--enable-cpukit-root=${with_project_root}..' \
-   '--enable-project-root=${with_project_root}../$RTEMS_BSP' \
-   '--with-project-top=${with_project_top}../' \
-   '--enable-rtemsbsp=$RTEMS_BSP' \
-   '--includedir=${exec_prefix}/${RTEMS_BSP}/lib/include' \
-   '--libdir=${exec_prefix}/${RTEMS_BSP}/lib' \
-  ],
-  [test x"$enable_tests" != x"no" && test x"$multilib" = xyes])
+  [test x"$enable_tests" != x"no"])
 
 AC_SUBST([BSP_SUBDIRS],[$BSP_SUBDIRS])
 
@@ -199,11 +150,6 @@ AS_IF([test "$host_cpu" = sparc],[
   AC_DEFINE_UNQUOTED([CPU_U32_FIX],[1],
     [whether to enable ipalignment work-around])
 ])
-
-AM_CONDITIONAL([HAS_NETWORKING],[test "$HAS_NETWORKING" = "yes"])
-
-AM_CONDITIONAL(RTEMS_ADA,[test x"$enable_ada" = x"yes" \
-  && test x"$rtems_cv_HAS_POSIX_API" = x"yes"])
 
 RTEMS_PROJECT_ROOT
 
@@ -214,13 +160,7 @@ AC_CONFIG_FILES([Makefile],
  MAKE=${MAKE}])
 
 AC_CONFIG_FILES([
-support/Makefile
-libchip/Makefile
-lib/Makefile
-lib/libcpu/Makefile
 lib/libbsp/Makefile
-ada/Makefile
-wrapup/Makefile
 ])
 
 AC_OUTPUT

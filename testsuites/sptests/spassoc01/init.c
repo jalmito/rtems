@@ -61,6 +61,65 @@ static void reset_name( void )
   memset( name, 0, 40 );
 }
 
+static void test_assoc_32_to_string( void )
+{
+  static const rtems_assoc_32_pair pairs[] = {
+    { 1, "A" },
+    { 2, "LOOOOONG" },
+    { 4, "C" }
+  };
+  char buf[4];
+  size_t len;
+
+  len = rtems_assoc_32_to_string(
+    0,
+    buf,
+    sizeof( buf ),
+    pairs,
+    RTEMS_ARRAY_SIZE( pairs ),
+    ":",
+    "D"
+  );
+  rtems_test_assert( len == 1 );
+  rtems_test_assert( strcmp( buf, "D" ) == 0 );
+
+  len = rtems_assoc_32_to_string(
+    1,
+    buf,
+    sizeof( buf ),
+    pairs,
+    RTEMS_ARRAY_SIZE( pairs ),
+    ":",
+    "D"
+  );
+  rtems_test_assert( len == 1 );
+  rtems_test_assert( strcmp( buf, "A" ) == 0 );
+
+  len = rtems_assoc_32_to_string(
+    5,
+    buf,
+    sizeof( buf ),
+    pairs,
+    RTEMS_ARRAY_SIZE( pairs ),
+    ":",
+    "D"
+  );
+  rtems_test_assert( len == 3 );
+  rtems_test_assert( strcmp( buf, "A:C" ) == 0 );
+
+  len = rtems_assoc_32_to_string(
+    7,
+    buf,
+    sizeof( buf ),
+    pairs,
+    RTEMS_ARRAY_SIZE( pairs ),
+    ":",
+    "D"
+  );
+  rtems_test_assert( len == 12 );
+  rtems_test_assert( strcmp( buf, "A:L" ) == 0 );
+}
+
 rtems_task Init(
   rtems_task_argument argument
 )
@@ -217,6 +276,8 @@ rtems_task Init(
 
   free( name );
 
+  test_assoc_32_to_string();
+
   TEST_END();
 
   rtems_test_exit(0);
@@ -224,12 +285,13 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS             1
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
+#define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
 
 #define CONFIGURE_INIT

@@ -25,41 +25,76 @@
 #include <inttypes.h>
 
 #include <rtems/cpuuse.h>
-#include <rtems/score/objectimpl.h>
+#include <rtems/printer.h>
 #include <rtems/score/threadimpl.h>
 #include <rtems/score/todimpl.h>
-#include <rtems/score/watchdogimpl.h>
+
+#include "cpuuseimpl.h"
+
+typedef struct {
+  const rtems_printer *printer;
+  Timestamp_Control    total;
+  Timestamp_Control    uptime_at_last_reset;
+} cpu_usage_context;
+
+static bool cpu_usage_visitor( Thread_Control *the_thread, void *arg )
+{
+  cpu_usage_context *ctx;
+  char               name[ 38 ];
+  uint32_t           ival;
+  uint32_t           fval;
+  Timestamp_Control  uptime;
+  Timestamp_Control  used;
+  uint32_t           seconds;
+  uint32_t           nanoseconds;
+
+  ctx = arg;
+  _Thread_Get_name( the_thread, name, sizeof( name ) );
+
+  _Thread_Get_CPU_time_used( the_thread, &used );
+  _TOD_Get_uptime( &uptime );
+  _Timestamp_Subtract( &ctx->uptime_at_last_reset, &uptime, &ctx->total );
+  _Timestamp_Divide( &used, &ctx->total, &ival, &fval );
+  seconds = _Timestamp_Get_seconds( &used );
+  nanoseconds = _Timestamp_Get_nanoseconds( &used ) /
+    TOD_NANOSECONDS_PER_MICROSECOND;
+
+  rtems_printf(
+    ctx->printer,
+    " 0x%08" PRIx32 " | %-38s |"
+      "%7" PRIu32 ".%06" PRIu32 " |%4" PRIu32 ".%03" PRIu32 "\n",
+    the_thread->Object.id,
+    name,
+    seconds, nanoseconds,
+    ival, fval
+  );
+
+  return false;
+}
 
 /*
  *  rtems_cpu_usage_report
  */
 void rtems_cpu_usage_report_with_plugin(
-  void                  *context,
-  rtems_printk_plugin_t  print
+  const rtems_printer *printer
 )
 {
-  uint32_t             i;
-  uint32_t             api_index;
-  Thread_Control      *the_thread;
-  Objects_Information *information;
-  char                 name[13];
-  uint32_t             ival, fval;
-  Timestamp_Control  uptime, total, ran, uptime_at_last_reset;
-  uint32_t seconds, nanoseconds;
+  cpu_usage_context  ctx;
+  uint32_t           seconds;
+  uint32_t           nanoseconds;
 
-  if ( !print )
-    return;
+  ctx.printer = printer;
 
   /*
    *  When not using nanosecond CPU usage resolution, we have to count
    *  the number of "ticks" we gave credit for to give the user a rough
    *  guideline as to what each number means proportionally.
    */
-  _Timestamp_Set_to_zero( &total );
-  uptime_at_last_reset = CPU_usage_Uptime_at_last_reset;
+  _Timestamp_Set_to_zero( &ctx.total );
+  ctx.uptime_at_last_reset = CPU_usage_Uptime_at_last_reset;
 
-  (*print)(
-     context,
+  rtems_printf(
+     printer,
      "-------------------------------------------------------------------------------\n"
      "                              CPU USAGE BY THREAD\n"
      "------------+----------------------------------------+---------------+---------\n"
@@ -67,70 +102,13 @@ void rtems_cpu_usage_report_with_plugin(
      "------------+----------------------------------------+---------------+---------\n"
   );
 
-  for ( api_index = 1 ; api_index <= OBJECTS_APIS_LAST ; api_index++ ) {
-    #if !defined(RTEMS_POSIX_API) || defined(RTEMS_DEBUG)
-      if ( !_Objects_Information_table[ api_index ] )
-        continue;
-    #endif
+  rtems_task_iterate( cpu_usage_visitor, &ctx );
 
-    information = _Objects_Information_table[ api_index ][ 1 ];
-    if ( information ) {
-      for ( i=1 ; i <= information->maximum ; i++ ) {
-        the_thread = (Thread_Control *)information->local_table[ i ];
-
-        if ( !the_thread )
-          continue;
-
-        rtems_object_get_name( the_thread->Object.id, sizeof(name), name );
-
-        (*print)(
-          context,
-          " 0x%08" PRIx32 " | %-38s |",
-          the_thread->Object.id,
-          name
-        );
-
-        {
-          Timestamp_Control last;
-
-          /*
-           * If this is the currently executing thread, account for time
-           * since the last context switch.
-           */
-          ran = the_thread->cpu_time_used;
-          if ( _Thread_Get_time_of_last_context_switch( the_thread, &last ) ) {
-            Timestamp_Control used;
-            _TOD_Get_uptime( &uptime );
-            _Timestamp_Subtract( &last, &uptime, &used );
-            _Timestamp_Add_to( &ran, &used );
-          } else {
-            _TOD_Get_uptime( &uptime );
-          }
-          _Timestamp_Subtract( &uptime_at_last_reset, &uptime, &total );
-          _Timestamp_Divide( &ran, &total, &ival, &fval );
-
-          /*
-           * Print the information
-           */
-
-          seconds = _Timestamp_Get_seconds( &ran );
-          nanoseconds = _Timestamp_Get_nanoseconds( &ran ) /
-            TOD_NANOSECONDS_PER_MICROSECOND;
-          (*print)( context,
-            "%7" PRIu32 ".%06" PRIu32 " |%4" PRIu32 ".%03" PRIu32 "\n",
-            seconds, nanoseconds,
-            ival, fval
-          );
-        }
-      }
-    }
-  }
-
-  seconds = _Timestamp_Get_seconds( &total );
-  nanoseconds = _Timestamp_Get_nanoseconds( &total ) /
+  seconds = _Timestamp_Get_seconds( &ctx.total );
+  nanoseconds = _Timestamp_Get_nanoseconds( &ctx.total ) /
     TOD_NANOSECONDS_PER_MICROSECOND;
-  (*print)(
-     context,
+  rtems_printf(
+     printer,
      "------------+----------------------------------------+---------------+---------\n"
      " TIME SINCE LAST CPU USAGE RESET IN SECONDS:                    %7" PRIu32 ".%06" PRIu32 "\n"
      "-------------------------------------------------------------------------------\n",
@@ -140,5 +118,7 @@ void rtems_cpu_usage_report_with_plugin(
 
 void rtems_cpu_usage_report( void )
 {
-  rtems_cpu_usage_report_with_plugin( NULL, printk_plugin );
+  rtems_printer printer;
+  rtems_print_printer_printk( &printer );
+  rtems_cpu_usage_report_with_plugin( &printer );
 }

@@ -1,5 +1,5 @@
 /*
- *  COPYRIGHT (c) 1989-2009.
+ *  COPYRIGHT (c) 1989-2009, 2017.
  *  On-Line Applications Research Corporation (OAR).
  *
  *  The license and distribution terms for this file may be
@@ -86,38 +86,9 @@
     (void) ctime_r( &_tv.tv_sec, _time_buffer ); \
     _time_buffer[ strlen( _time_buffer ) - 1 ] = 0; \
     printf( "%s%s%s\n", s1, _time_buffer, s2 ); \
-    fflush(stdout); \
   } while ( 0 )
 
 #define empty_line() puts( "" )
-
-#if SIZEOF_OFF_T == 8
-#define PRIdoff_t PRIo64
-#elif SIZEOF_OFF_T == 4
-#define PRIdoff_t PRIo32
-#else
-#error "unsupported size of off_t"
-#endif
-
-#if SIZEOF_BLKSIZE_T == 8
-#define PRIxblksize_t PRIx64
-#elif SIZEOF_BLKSIZE_T == 4
-#define PRIxblksize_t PRIx32
-#else
-/* Warn and fall back to "long" */
-#warning "unsupported size of blksize_t"
-#define PRIxblksize_t "lx"
-#endif
-
-#if SIZEOF_BLKSIZE_T == 8
-#define PRIxblkcnt_t PRIx64
-#elif SIZEOF_BLKSIZE_T == 4
-#define PRIxblkcnt_t PRIx32
-#else
-/* Warn and fall back to "long" */
-#warning "unsupported size of blkcnt_t"
-#define PRIxblkcnt_t "lx"
-#endif
 
 #endif
 

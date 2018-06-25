@@ -14,9 +14,10 @@
 /*
  *  Some of the fatal error cases require the ability to peek inside RTEMS
  */
+
+#include "tmacros.h"
+
 #include <rtems.h>
-#include <rtems/test.h>
-#include <tmacros.h>
 
 /* functions */
 
@@ -26,7 +27,7 @@ rtems_task Init(
 
 void Fatal_extension(
   rtems_fatal_source source,
-  bool               is_internal,
+  bool               always_set_to_false,
   rtems_fatal_code   error
 );
 
@@ -42,9 +43,9 @@ void force_error(void);
 /* need some prototypes for test cases */
 
 rtems_device_driver consume_semaphores_initialize(
-  rtems_device_major_number major __attribute__((unused)),
-  rtems_device_minor_number minor __attribute__((unused)),
-  void *pargp __attribute__((unused))
+  rtems_device_major_number major RTEMS_UNUSED,
+  rtems_device_minor_number minor RTEMS_UNUSED,
+  void *pargp RTEMS_UNUSED
 );
 
 #define CONSUME_SEMAPHORE_DRIVERS \
@@ -70,7 +71,7 @@ extern rtems_extensions_table initial_extensions;
   RTEMS_TEST_INITIAL_EXTENSION
 
 /* extra parameters may be in testcase.h */
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 /* always need an Init task, some cases need more tasks */

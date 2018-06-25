@@ -11,6 +11,8 @@
  *  COPYRIGHT (c) 1989-2007.
  *  On-Line Applications Research Corporation (OAR).
  *
+ *  Copyright (c) 2016 embedded brains GmbH
+ *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
  *  http://www.rtems.org/license/LICENSE.
@@ -20,50 +22,21 @@
 #include "config.h"
 #endif
 
-#include <pthread.h>
-#include <errno.h>
-
-#include <rtems/system.h>
 #include <rtems/posix/spinlockimpl.h>
 
-/*
- *  pthread_spin_unlock
- *
- *  This directive allows a thread to wait at a spinlock.
- *
- *  Input parameters:
- *    spinlock    - spinlock id
- *
- *  Output parameters:
- *    0          - if successful
- *    error code - if unsuccessful
- */
-
-int pthread_spin_unlock(
-  pthread_spinlock_t *spinlock
-)
+int pthread_spin_unlock( pthread_spinlock_t *lock )
 {
-  POSIX_Spinlock_Control  *the_spinlock = NULL;
-  Objects_Locations        location;
-  CORE_spinlock_Status     status;
+  POSIX_Spinlock_Control *the_spinlock;
+  ISR_Level               level;
 
-  if ( !spinlock )
-    return EINVAL;
-
-  the_spinlock = _POSIX_Spinlock_Get( spinlock, &location );
-  switch ( location ) {
-
-    case OBJECTS_LOCAL:
-      status = _CORE_spinlock_Release( &the_spinlock->Spinlock );
-      _Objects_Put( &the_spinlock->Object );
-      return _POSIX_Spinlock_Translate_core_spinlock_return_code( status );
-
-#if defined(RTEMS_MULTIPROCESSING)
-    case OBJECTS_REMOTE:
+  the_spinlock = _POSIX_Spinlock_Get( lock );
+  level = the_spinlock->interrupt_state;
+#if defined(RTEMS_SMP)
+  _SMP_ticket_lock_Release(
+    &the_spinlock->Lock,
+    &_Per_CPU_Get()->Lock_stats_context
+  );
 #endif
-    case OBJECTS_ERROR:
-      break;
-  }
-
-  return EINVAL;
+  _ISR_Local_enable( level );
+  return 0;
 }

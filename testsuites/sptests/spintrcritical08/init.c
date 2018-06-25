@@ -25,20 +25,18 @@ static rtems_id Period;
 
 static volatile bool case_hit = false;
 
+static Thread_Control *thread;
+
 static rtems_rate_monotonic_period_states getState(void)
 {
-  Objects_Locations       location;
-  Rate_monotonic_Control *period;
+  Rate_monotonic_Control *the_period;
+  ISR_lock_Context        lock_context;
 
-  period = (Rate_monotonic_Control *)_Objects_Get(
-    &_Rate_monotonic_Information, Period, &location );
-  if ( location != OBJECTS_LOCAL ) {
-    puts( "Bad object lookup" );
-    rtems_test_exit(0);
-  }
-  _Thread_Unnest_dispatch();
+  the_period = _Rate_monotonic_Get( Period, &lock_context );
+  rtems_test_assert( the_period != NULL );
+  _ISR_lock_ISR_enable( &lock_context );
 
-  return period->state;
+  return the_period->state;
 }
 
 static rtems_timer_service_routine test_release_from_isr(
@@ -46,23 +44,29 @@ static rtems_timer_service_routine test_release_from_isr(
   void     *arg
 )
 {
-  Watchdog_Header *header = &_Watchdog_Ticks_header;
+  Per_CPU_Control *cpu = _Per_CPU_Get();
+  Watchdog_Header *header = &cpu->Watchdog.Header[ PER_CPU_WATCHDOG_TICKS ];
+  Watchdog_Control *watchdog = (Watchdog_Control *) header->first;
 
-  if ( !_Watchdog_Is_empty( header ) ) {
-    Watchdog_Control *watchdog = _Watchdog_First( header );
+  if (
+    watchdog != NULL
+      && watchdog->expire == cpu->Watchdog.ticks
+      && watchdog->routine == _Rate_monotonic_Timeout
+  ) {
+    Thread_Wait_flags flags = _Thread_Wait_flags_get( thread );
 
-    if (
-      watchdog->delta_interval == 0
-        && watchdog->routine == _Rate_monotonic_Timeout
-    ) {
-      Watchdog_States state = _Watchdog_Remove_ticks( watchdog );
+    _Watchdog_Per_CPU_remove_ticks( watchdog );
 
-      rtems_test_assert( state == WATCHDOG_ACTIVE );
-      (*watchdog->routine)( watchdog->id, watchdog->user_data );
+    rtems_test_assert( getState() == RATE_MONOTONIC_ACTIVE );
 
-      if ( getState() == RATE_MONOTONIC_EXPIRED_WHILE_BLOCKING ) {
-        case_hit = true;
-      }
+    (*watchdog->routine)( watchdog );
+
+    if ( flags == RATE_MONOTONIC_INTEND_TO_BLOCK ) {
+      rtems_test_assert(
+        _Thread_Wait_flags_get( thread ) == RATE_MONOTONIC_READY_AGAIN
+      );
+      rtems_test_assert( getState() == RATE_MONOTONIC_ACTIVE );
+      case_hit = true;
     }
   }
 }
@@ -95,6 +99,8 @@ rtems_task Init(
 
   puts( "Init - Trying to generate period ending while blocking" );
 
+  thread = _Thread_Get_executing();
+
   puts( "Init - rtems_rate_monotonic_create - OK" );
   sc = rtems_rate_monotonic_create(
     rtems_build_name( 'P', 'E', 'R', '1' ),
@@ -114,7 +120,7 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS       2

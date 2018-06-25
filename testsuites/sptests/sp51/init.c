@@ -61,6 +61,16 @@ rtems_task Init(
 
   TEST_BEGIN();
 
+  puts( "Create semaphore - priority ceiling unlocked - invalid ceiling" );
+  sc = rtems_semaphore_create(
+    rtems_build_name( 'S', 'E', 'M', '1' ),
+    0,
+    RTEMS_BINARY_SEMAPHORE | RTEMS_PRIORITY_CEILING | RTEMS_PRIORITY,
+    UINT32_MAX,
+    &mutex
+  );
+  fatal_directive_status(sc, RTEMS_INVALID_PRIORITY, "rtems_semaphore_create");
+
   puts( "Create semaphore - priority ceiling locked - violate ceiling" );
   sc = rtems_semaphore_create(
     rtems_build_name( 'S', 'E', 'M', '1' ),
@@ -91,6 +101,9 @@ rtems_task Init(
   fatal_directive_status(
     sc, RTEMS_NOT_OWNER_OF_RESOURCE, "rtems_semaphore_release" );
 
+  sc = rtems_semaphore_delete( mutex );
+  directive_failed( sc, "rtems_semaphore_delete" );
+
   test_create_initially_locked_prio_inherit_sema();
 
   TEST_END();
@@ -101,7 +114,7 @@ rtems_task Init(
 /**************** START OF CONFIGURATION INFORMATION ****************/
 
 #define CONFIGURE_INIT
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS         1

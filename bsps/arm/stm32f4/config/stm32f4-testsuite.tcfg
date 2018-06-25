@@ -1,0 +1,11 @@
+#
+# stm32f4 RTEMS Test Database.
+#
+# Format is one line per test that is _NOT_ built.
+#
+
+include: testdata/disable-iconv-tests.tcfg
+include: testdata/disable-jffs2-tests.tcfg
+
+exclude: fsdosfsname01
+exclude: linpack

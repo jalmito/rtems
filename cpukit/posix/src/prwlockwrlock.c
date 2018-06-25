@@ -20,59 +20,26 @@
 #include "config.h"
 #endif
 
-#include <pthread.h>
-#include <errno.h>
-
 #include <rtems/posix/rwlockimpl.h>
-#include <rtems/score/thread.h>
-
-/*
- *  pthread_rwlock_wrlock
- *
- *  This directive attempts to obtain a write only lock on an rwlock instance.
- *
- *  Input parameters:
- *    rwlock          - pointer to rwlock id
- *
- *  Output parameters:
- *    0          - if successful
- *    error code - if unsuccessful
- */
+#include <rtems/posix/posixapi.h>
 
 int pthread_rwlock_wrlock(
   pthread_rwlock_t  *rwlock
 )
 {
-  POSIX_RWLock_Control  *the_rwlock;
-  Objects_Locations      location;
-  Thread_Control        *executing;
+  POSIX_RWLock_Control *the_rwlock;
+  Thread_queue_Context  queue_context;
+  Status_Control        status;
 
-  the_rwlock = _POSIX_RWLock_Get( rwlock, &location );
-  switch ( location ) {
+  the_rwlock = _POSIX_RWLock_Get( rwlock );
+  POSIX_RWLOCK_VALIDATE_OBJECT( the_rwlock );
 
-    case OBJECTS_LOCAL:
-
-      executing = _Thread_Executing;
-      _CORE_RWLock_Obtain_for_writing(
-        &the_rwlock->RWLock,
-        executing,
-        *rwlock,
-        true,          /* do not timeout -- wait forever */
-        0,
-        NULL
-      );
-
-      _Objects_Put( &the_rwlock->Object );
-      return _POSIX_RWLock_Translate_core_RWLock_return_code(
-        (CORE_RWLock_Status) executing->Wait.return_code
-      );
-
-#if defined(RTEMS_MULTIPROCESSING)
-    case OBJECTS_REMOTE:
-#endif
-    case OBJECTS_ERROR:
-      break;
-  }
-
-  return EINVAL;
+  _Thread_queue_Context_initialize( &queue_context );
+  _Thread_queue_Context_set_enqueue_do_nothing_extra( &queue_context );
+  status = _CORE_RWLock_Seize_for_writing(
+    &the_rwlock->RWLock,
+    true,          /* do not timeout -- wait forever */
+    &queue_context
+  );
+  return _POSIX_Get_error( status );
 }

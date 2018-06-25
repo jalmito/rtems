@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2014, 2016 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
  *  Dornierstr. 4
@@ -22,7 +22,6 @@
 #include <rtems.h>
 #include <rtems/libcsupport.h>
 
-#define TESTS_USE_PRINTF
 #include "tmacros.h"
 
 const char rtems_test_name[] = "SPTLS 2";
@@ -162,8 +161,24 @@ static void checkTLSValues()
 
 static rtems_id masterTask;
 
-static void task(rtems_task_argument arg)
+static void wakeUpMaster()
 {
+	rtems_status_code sc = rtems_event_transient_send(masterTask);
+	rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+}
+
+static void waitForWorker()
+{
+	rtems_status_code sc = rtems_event_transient_receive(
+		RTEMS_WAIT,
+		RTEMS_NO_TIMEOUT
+	);
+	rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+}
+
+static void worker(rtems_task_argument arg)
+{
+	wakeUpMaster();
 	checkTLSValues();
 
 	const long gc = static_cast<long>(arg);
@@ -182,21 +197,20 @@ static void task(rtems_task_argument arg)
 	a2.clobber();
 	a3.clobber();
 
-	rtems_status_code sc = rtems_event_transient_send(masterTask);
-	rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+	wakeUpMaster();
 
-	sc = rtems_task_suspend(RTEMS_SELF);
-	rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+	(void) rtems_task_suspend(RTEMS_SELF);
+	rtems_test_assert(false);
 }
 
-static void testTask()
+static void testWorkerTask()
 {
 	checkTLSValues();
 
 	rtems_id id;
 	rtems_status_code sc = rtems_task_create(
 		rtems_build_name('T', 'A', 'S', 'K'),
-		RTEMS_MINIMUM_PRIORITY,
+		2,
 		RTEMS_MINIMUM_STACK_SIZE,
 		RTEMS_DEFAULT_MODES,
 		RTEMS_DEFAULT_ATTRIBUTES,
@@ -206,11 +220,23 @@ static void testTask()
 
 	const long gc = A::globalCounter();
 
-	sc = rtems_task_start(id, task, gc);
+	sc = rtems_task_start(id, worker, gc);
 	rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-	sc = rtems_event_transient_receive(RTEMS_WAIT, RTEMS_NO_TIMEOUT);
+	waitForWorker();
+	rtems_test_assert(A::globalCounter() == gc);
+
+	waitForWorker();
+	rtems_test_assert(A::globalCounter() == gc + 3);
+
+	sc = rtems_task_restart(id, gc);
 	rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+
+	waitForWorker();
+	rtems_test_assert(A::globalCounter() == gc);
+
+	waitForWorker();
+	rtems_test_assert(A::globalCounter() == gc + 3);
 
 	sc = rtems_task_delete(id);
 	rtems_test_assert(sc == RTEMS_SUCCESSFUL);
@@ -232,12 +258,12 @@ extern "C" void Init(rtems_task_argument arg)
 
 	masterTask = rtems_task_self();
 
-	testTask();
+	testWorkerTask();
 
 	rtems_resource_snapshot snapshot;
 	rtems_resource_snapshot_take(&snapshot);
 
-	testTask();
+	testWorkerTask();
 
 	rtems_test_assert(rtems_resource_snapshot_check(&snapshot));
 
@@ -247,7 +273,7 @@ extern "C" void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS 2
 #define CONFIGURE_MAXIMUM_SEMAPHORES 3

@@ -9,6 +9,8 @@
  *  COPYRIGHT (c) 1989-2007.
  *  On-Line Applications Research Corporation (OAR).
  *
+ *  Copyright (c) 2016 embedded brains GmbH
+ *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
  *  http://www.rtems.org/license/LICENSE.
@@ -18,46 +20,63 @@
 #include "config.h"
 #endif
 
-#include <pthread.h>
-#include <errno.h>
-
-#include <rtems/system.h>
 #include <rtems/posix/spinlockimpl.h>
 
-/**
- *  This directive allows a thread to wait at a spinlock.
- *
- *  @param[in] spinlock is spinlock id
- * 
- *  @return This method returns 0 if there was not an
- *  error. Otherwise, a status code is returned indicating the
- *  source of the error.
- */
-int pthread_spin_lock(
-  pthread_spinlock_t *spinlock
-)
-{
-  POSIX_Spinlock_Control  *the_spinlock = NULL;
-  Objects_Locations        location;
-  CORE_spinlock_Status     status;
-
-  if ( !spinlock )
-    return EINVAL;
-
-  the_spinlock = _POSIX_Spinlock_Get( spinlock, &location );
-  switch ( location ) {
-
-    case OBJECTS_LOCAL:
-      status = _CORE_spinlock_Wait( &the_spinlock->Spinlock, true, 0 );
-      _Objects_Put( &the_spinlock->Object );
-      return _POSIX_Spinlock_Translate_core_spinlock_return_code( status );
-
-#if defined(RTEMS_MULTIPROCESSING)
-    case OBJECTS_REMOTE:
+RTEMS_STATIC_ASSERT(
+#if defined(RTEMS_SMP)
+  offsetof( POSIX_Spinlock_Control, Lock.next_ticket )
+#else
+  offsetof( POSIX_Spinlock_Control, reserved[ 0 ] )
 #endif
-    case OBJECTS_ERROR:
-      break;
-  }
+    == offsetof( pthread_spinlock_t, _Lock._next_ticket ),
+  POSIX_SPINLOCK_T_LOCK_NEXT_TICKET
+);
 
-  return EINVAL;
+RTEMS_STATIC_ASSERT(
+#if defined(RTEMS_SMP)
+  offsetof( POSIX_Spinlock_Control, Lock.now_serving )
+#else
+  offsetof( POSIX_Spinlock_Control, reserved[ 1 ] )
+#endif
+    == offsetof( pthread_spinlock_t, _Lock._now_serving ),
+  POSIX_SPINLOCK_T_LOCK_NOW_SERVING
+);
+
+RTEMS_STATIC_ASSERT(
+  offsetof( POSIX_Spinlock_Control, interrupt_state )
+    == offsetof( pthread_spinlock_t, _interrupt_state ),
+  POSIX_SPINLOCK_T_INTERRUPT_STATE
+);
+
+RTEMS_STATIC_ASSERT(
+  sizeof( POSIX_Spinlock_Control ) == sizeof( pthread_spinlock_t ),
+  POSIX_SPINLOCK_T_SIZE
+);
+
+int pthread_spin_lock( pthread_spinlock_t *spinlock )
+{
+  POSIX_Spinlock_Control *the_spinlock;
+  ISR_Level               level;
+#if defined(RTEMS_SMP) && defined(RTEMS_PROFILING)
+  Per_CPU_Control        *cpu_self;
+#endif
+
+  the_spinlock = _POSIX_Spinlock_Get( spinlock );
+  _ISR_Local_disable( level );
+#if defined(RTEMS_SMP)
+#if defined(RTEMS_PROFILING)
+  /* The lock statistics are incorrect in case of nested pthread spinlocks */
+  cpu_self = _Per_CPU_Get();
+#endif
+  _SMP_ticket_lock_Acquire(
+    &the_spinlock->Lock,
+    &cpu_self->Lock_stats,
+    &cpu_self->Lock_stats_context
+  );
+#endif
+  the_spinlock->interrupt_state = level;
+  return 0;
 }
+
+int pthread_spin_trylock( pthread_spinlock_t *spinlock )
+  RTEMS_ALIAS( pthread_spin_lock );

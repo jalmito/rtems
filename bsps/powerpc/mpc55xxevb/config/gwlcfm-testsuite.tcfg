@@ -1,0 +1,11 @@
+#
+# gwlcfm RTEMS Test Database.
+#
+# Format is one line per test that is _NOT_ built.
+#
+
+include: testdata/dltests-broken-on-this-bsp.tcfg
+include: testdata/disable-jffs2-tests.tcfg
+
+exclude: fsdosfsname01
+exclude: linpack

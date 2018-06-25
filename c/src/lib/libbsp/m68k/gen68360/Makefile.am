@@ -1,62 +1,54 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
+include $(top_srcdir)/../../bsp.am
 
-include_bspdir = $(includedir)/bsp
+dist_project_lib_DATA = ../../../../../../bsps/m68k/gen68360/start/bsp_specs
 
-dist_project_lib_DATA = bsp_specs
-
-include_HEADERS = include/bsp.h
-include_HEADERS += include/tm27.h
-nodist_include_HEADERS = include/bspopts.h
-nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
-DISTCLEANFILES = include/bspopts.h
 noinst_PROGRAMS =
 
-include_HEADERS += include/coverhd.h
 
-noinst_LIBRARIES = libbspstart.a
-libbspstart_a_SOURCES = start/start.S
+start.$(OBJEXT): ../../../../../../bsps/m68k/gen68360/start/start.S
+	$(CPPASCOMPILE) -o $@ -c $<
 project_lib_DATA = start.$(OBJEXT)
 
-dist_project_lib_DATA += startup/linkcmds startup/linkcmds.prom \
-    startup/linkcmds.bootp
+project_lib_DATA += linkcmds
+dist_project_lib_DATA += ../../../../../../bsps/m68k/gen68360/start/linkcmds.bootp
+dist_project_lib_DATA += ../../../../../../bsps/m68k/gen68360/start/linkcmds.prom
 
-noinst_LIBRARIES += libbsp.a
-libbsp_a_SOURCES =
+project_lib_LIBRARIES = librtemsbsp.a
+librtemsbsp_a_SOURCES =
 
 # startup
-libbsp_a_SOURCES += startup/alloc360.c ../../shared/bspclean.c \
-    ../../shared/bsppredriverhook.c ../../shared/bsppretaskinghook.c \
-    ../../shared/bsplibc.c ../../shared/bsppost.c \
-    ../../shared/bspgetworkarea.c ../../shared/bspstart.c \
-    startup/init68360.c ../../shared/bootcard.c \
-    ../../shared/sbrk.c ../../shared/setvec.c \
-    ../../shared/gnatinstallhandler.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/gen68360/start/alloc360.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspstart-empty.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/gen68360/start/init68360.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/setvec.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-empty.c
 # clock
-libbsp_a_SOURCES += clock/clock.c ../../../shared/clockdrv_shell.h
+librtemsbsp_a_SOURCES +=../../../../../../bsps/m68k/gen68360/clock/clock.c
 # console
-libbsp_a_SOURCES += console/console.c ../../shared/dummy_printk_support.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/gen68360/console/console.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/printk-dummy.c
 # timer
-libbsp_a_SOURCES += timer/timer.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/gen68360/btimer/btimer.c
 
 if HAS_NETWORKING
-network_CPPFLAGS = -D__INSIDE_RTEMS_BSD_TCPIP_STACK__
-noinst_PROGRAMS += network.rel
-network_rel_SOURCES = network/network.c
-network_rel_CPPFLAGS = $(AM_CPPFLAGS) $(network_CPPFLAGS)
-network_rel_LDFLAGS = $(RTEMS_RELLDFLAGS)
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/gen68360/net/network.c
 endif
 
-libbsp_a_LIBADD = \
-    ../../../libcpu/@RTEMS_CPU@/shared/cache.rel \
-    ../../../libcpu/@RTEMS_CPU@/shared/misc.rel
-if HAS_NETWORKING
-libbsp_a_LIBADD += network.rel
-endif
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/shared/cache/cache.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/shared/m68kidle.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/shared/memProbe.c
+
 if HAS_FPSP
-libbsp_a_LIBADD += ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/fpsp.rel
+include $(srcdir)/../../../../../../bsps/m68k/shared/fpsp-sources.am
 endif
 
-include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
+include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
+include $(srcdir)/../../../../../../bsps/m68k/gen68360/headers.am

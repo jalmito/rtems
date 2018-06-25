@@ -8,6 +8,8 @@
 /*
  *  COPYRIGHT (c) 1989-2015.
  *  On-Line Applications Research Corporation (OAR).
+ * 
+ *  Copyright (c) 2016. Gedare Bloom.
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
@@ -19,16 +21,17 @@
 #endif
 
 #include <time.h>
-#include <errno.h>
 
-#include <rtems/seterr.h>
 #include <rtems/score/threadimpl.h>
 #include <rtems/score/threadqimpl.h>
 #include <rtems/score/timespec.h>
+#include <rtems/score/timecounter.h>
 #include <rtems/score/watchdogimpl.h>
+#include <rtems/posix/posixapi.h>
+#include <rtems/seterr.h>
 
 static Thread_queue_Control _Nanosleep_Pseudo_queue =
-  THREAD_QUEUE_FIFO_INITIALIZER( _Nanosleep_Pseudo_queue, "Nanosleep" );
+  THREAD_QUEUE_INITIALIZER( "Nanosleep" );
 
 /*
  *  14.2.5 High Resolution Sleep, P1003.1b-1993, p. 269
@@ -38,87 +41,95 @@ int nanosleep(
   struct timespec        *rmtp
 )
 {
-  /*
-   * It is critical to obtain the executing thread after thread dispatching is
-   * disabled on SMP configurations.
-   */
-  Thread_Control  *executing;
-  Per_CPU_Control *cpu_self;
+  int eno;
 
-  Watchdog_Interval  ticks;
-  Watchdog_Interval  elapsed;
+  eno = clock_nanosleep( CLOCK_REALTIME, 0, rqtp, rmtp );
 
-
-  /*
-   *  Return EINVAL if the delay interval is negative.
-   *
-   *  NOTE:  This behavior is beyond the POSIX specification.
-   *         FSU and GNU/Linux pthreads shares this behavior.
-   */
-  if ( !_Timespec_Is_valid( rqtp ) )
-    rtems_set_errno_and_return_minus_one( EINVAL );
-
-  /*
-   * Convert the timespec delay into the appropriate number of clock ticks.
-   */
-  ticks = _Timespec_To_ticks( rqtp );
-
-  executing = _Thread_Get_executing();
-
-  /*
-   *  A nanosleep for zero time is implemented as a yield.
-   *  This behavior is also beyond the POSIX specification but is
-   *  consistent with the RTEMS API and yields desirable behavior.
-   */
-  if ( !ticks ) {
-    cpu_self = _Thread_Dispatch_disable();
-      _Thread_Yield( executing );
-    _Thread_Dispatch_enable( cpu_self );
-    if ( rmtp ) {
-       rmtp->tv_sec = 0;
-       rmtp->tv_nsec = 0;
-    }
-    return 0;
+  if ( eno != 0 ) {
+    rtems_set_errno_and_return_minus_one( eno );
   }
 
-  /*
-   *  Block for the desired amount of time
-   */
-  _Thread_queue_Enqueue(
-    &_Nanosleep_Pseudo_queue,
-    executing,
-    STATES_DELAYING | STATES_INTERRUPTIBLE_BY_SIGNAL,
-    ticks,
-    0
+  return eno;
+}
+
+/*
+ * High Resolution Sleep with Specifiable Clock, IEEE Std 1003.1, 2001
+ */
+int clock_nanosleep(
+  clockid_t               clock_id,
+  int                     flags,
+  const struct timespec  *rqtp,
+  struct timespec        *rmtp
+)
+{
+  Thread_queue_Context   queue_context;
+  struct timespec        uptime;
+  const struct timespec *end;
+  Thread_Control        *executing;
+  int                    eno;
+
+  if ( clock_id != CLOCK_REALTIME && clock_id != CLOCK_MONOTONIC ) {
+    return ENOTSUP;
+  }
+
+  _Thread_queue_Context_initialize( &queue_context );
+  _Thread_queue_Context_set_thread_state(
+    &queue_context,
+    STATES_WAITING_FOR_TIME | STATES_INTERRUPTIBLE_BY_SIGNAL
   );
 
-  /*
-   * Calculate the time that passed while we were sleeping and how
-   * much remains from what we requested.
-   */
-  elapsed = executing->Timer.stop_time - executing->Timer.start_time;
-  if ( elapsed >= ticks )
-    ticks = 0;
-  else
-    ticks -= elapsed;
+  if ( ( flags & TIMER_ABSTIME ) != 0 ) {
+    end = rqtp;
 
-  /*
-   * If the user wants the time remaining, do the conversion.
-   */
-  if ( rmtp ) {
-    _Timespec_From_ticks( ticks, rmtp );
+    if ( clock_id == CLOCK_REALTIME ) {
+      _Thread_queue_Context_set_enqueue_timeout_realtime_timespec(
+        &queue_context,
+        end
+      );
+    } else {
+      _Thread_queue_Context_set_enqueue_timeout_monotonic_timespec(
+        &queue_context,
+        end
+      );
+    }
+  } else {
+    _Timecounter_Nanouptime( &uptime );
+    end = _Watchdog_Future_timespec( &uptime, rqtp );
+    _Thread_queue_Context_set_enqueue_timeout_monotonic_timespec(
+      &queue_context,
+      end
+    );
   }
 
-  /*
-   *  Only when POSIX is enabled, can a sleep be interrupted.
-   */
-  #if defined(RTEMS_POSIX_API)
-    /*
-     *  If there is time remaining, then we were interrupted by a signal.
-     */
-    if ( ticks )
-      rtems_set_errno_and_return_minus_one( EINTR );
-  #endif
+  _Thread_queue_Acquire( &_Nanosleep_Pseudo_queue, &queue_context );
+  executing = _Thread_Executing;
+  _Thread_queue_Enqueue(
+    &_Nanosleep_Pseudo_queue.Queue,
+    &_Thread_queue_Operations_FIFO,
+    executing,
+    &queue_context
+  );
+  eno = _POSIX_Get_error_after_wait( executing );
 
-  return 0;
+  if ( eno == ETIMEDOUT ) {
+    eno = 0;
+  }
+
+  if ( rmtp != NULL && ( flags & TIMER_ABSTIME ) == 0 ) {
+    if ( eno == EINTR ) {
+      struct timespec actual_end;
+
+      _Timecounter_Nanouptime( &actual_end );
+
+      if ( _Timespec_Less_than( &actual_end, end ) ) {
+        _Timespec_Subtract( &actual_end, end, rmtp );
+      } else {
+        _Timespec_Set_to_zero( rmtp );
+      }
+    } else {
+      _Timespec_Set_to_zero( rmtp );
+    }
+  }
+
+  return eno;
 }

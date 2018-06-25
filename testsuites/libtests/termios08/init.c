@@ -150,12 +150,9 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 #define CONFIGURE_APPLICATION_EXTRA_DRIVERS TERMIOS_TEST_DRIVER_TABLE_ENTRY
-
-/* one for the console and one for the test port */
-#define CONFIGURE_NUMBER_OF_TERMIOS_PORTS 3
 
 /* we need to be able to open the test device */
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 4

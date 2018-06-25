@@ -10,7 +10,6 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-#include <coverhd.h>
 #include <errno.h>
 #include <timesys.h>
 #include <tmacros.h>
@@ -122,11 +121,10 @@ void *POSIX_Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
 
 #define CONFIGURE_MAXIMUM_POSIX_THREADS     OPERATION_COUNT + 2
-#define CONFIGURE_MAXIMUM_POSIX_RWLOCKS     1
 #define CONFIGURE_POSIX_INIT_THREAD_TABLE
 
 #define CONFIGURE_INIT

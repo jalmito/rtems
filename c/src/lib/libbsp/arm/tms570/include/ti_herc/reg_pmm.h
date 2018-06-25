@@ -38,6 +38,9 @@
 */
 #ifndef LIBBSP_ARM_TMS570_PMM
 #define LIBBSP_ARM_TMS570_PMM
+	#ifndef TMS570_LC43X
+	#define TMS570_LC43X
+	#endif
 
 #include <bsp/utility.h>
 #ifdef TMS570_LC43X

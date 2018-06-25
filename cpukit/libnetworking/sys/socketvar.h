@@ -34,7 +34,7 @@
 #define _SYS_SOCKETVAR_H_
 
 #include <sys/queue.h>			/* for TAILQ macros */
-#include <sys/select.h>			/* for struct selinfo */
+#include <sys/selinfo.h>		/* for struct selinfo */
 
 
 /*
@@ -160,7 +160,7 @@ struct socket {
 /* adjust counters in sb reflecting allocation of m */
 #define	sballoc(sb, m) { \
 	(sb)->sb_cc += (m)->m_len; \
-	(sb)->sb_mbcnt += MSIZE; \
+	(sb)->sb_mbcnt += _SYS_MBUF_LEGACY_MSIZE; \
 	if ((m)->m_flags & M_EXT) \
 		(sb)->sb_mbcnt += (m)->m_ext.ext_size; \
 }
@@ -168,7 +168,7 @@ struct socket {
 /* adjust counters in sb reflecting freeing of m */
 #define	sbfree(sb, m) { \
 	(sb)->sb_cc -= (m)->m_len; \
-	(sb)->sb_mbcnt -= MSIZE; \
+	(sb)->sb_mbcnt -= _SYS_MBUF_LEGACY_MSIZE; \
 	if ((m)->m_flags & M_EXT) \
 		(sb)->sb_mbcnt -= (m)->m_ext.ext_size; \
 }
@@ -208,6 +208,7 @@ struct filedesc;
 struct mbuf;
 struct sockaddr;
 struct stat;
+struct uio;
 
 /*
  * From uipc_socket and friends

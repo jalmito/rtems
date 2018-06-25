@@ -20,12 +20,13 @@
 off_t lseek( int fd, off_t offset, int whence )
 {
   rtems_libio_t *iop;
+  off_t          rv;
 
-  rtems_libio_check_fd( fd );
-  iop = rtems_libio_iop( fd );
-  rtems_libio_check_is_open(iop);
+  LIBIO_GET_IOP( fd, iop );
 
-  return (*iop->pathinfo.handlers->lseek_h)( iop, offset, whence );
+  rv = (*iop->pathinfo.handlers->lseek_h)( iop, offset, whence );
+  rtems_libio_iop_drop( iop );
+  return rv;
 }
 
 /*
@@ -39,7 +40,7 @@ off_t lseek( int fd, off_t offset, int whence )
 #include <reent.h>
 
 off_t _lseek_r(
-  struct _reent *ptr __attribute__((unused)),
+  struct _reent *ptr RTEMS_UNUSED,
   int            fd,
   off_t          offset,
   int            whence

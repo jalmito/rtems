@@ -73,6 +73,7 @@
 #include <strings.h>
 #endif
 #include <netdb.h>
+#include <rtems/rtems_netdb.h>
 #include <resolv.h>
 #include <ctype.h>
 #include <errno.h>
@@ -117,7 +118,6 @@ typedef union {
     char ac;
 } align;
 
-extern int h_errno;
 int _dns_ttl_;
 
 #ifdef DEBUG

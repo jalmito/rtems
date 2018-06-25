@@ -21,16 +21,17 @@
 #endif
 
 #include <sched.h>
-#include <errno.h>
 
-#include <rtems/system.h>
 #include <rtems/seterr.h>
 #include <rtems/posix/priorityimpl.h>
+#include <rtems/score/schedulerimpl.h>
 
 int sched_get_priority_max(
   int  policy
 )
 {
+  const Scheduler_Control *scheduler;
+
   switch ( policy ) {
     case SCHED_OTHER:
     case SCHED_FIFO:
@@ -42,5 +43,6 @@ int sched_get_priority_max(
       rtems_set_errno_and_return_minus_one( EINVAL );
   }
 
-  return POSIX_SCHEDULER_MAXIMUM_PRIORITY;
+  scheduler = _Thread_Scheduler_get_home( _Thread_Get_executing() );
+  return _POSIX_Priority_Get_maximum( scheduler );
 }

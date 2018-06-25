@@ -23,13 +23,12 @@ rtems_task Test_task(
 /* configuration information */
 
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
-#define CONFIGURE_SMP_APPLICATION
-#define CONFIGURE_SMP_MAXIMUM_PROCESSORS   4 
+#define CONFIGURE_MAXIMUM_PROCESSORS   4 
 
 #define CONFIGURE_MAXIMUM_TASKS            \
-    (1 + CONFIGURE_SMP_MAXIMUM_PROCESSORS)
+    (1 + CONFIGURE_MAXIMUM_PROCESSORS)
 
 #define CONFIGURE_MAXIMUM_SEMAPHORES 1
 
@@ -38,8 +37,6 @@ rtems_task Test_task(
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
 #define CONFIGURE_INIT_TASK_STACK_SIZE \
     (3 * CONFIGURE_MINIMUM_TASK_STACK_SIZE)
-
-#define CONFIGURE_RTEMS_INIT_TASKS_TABLE
 
 #define CONFIGURE_INIT_TASK_PRIORITY        5 
 #define CONFIGURE_INIT_TASK_INITIAL_MODES   RTEMS_PREEMPT
@@ -53,7 +50,7 @@ rtems_task Test_task(
  *  Keep the names and IDs in global variables so another task can use them.
  */
 
-TEST_EXTERN volatile bool TaskRan[ CONFIGURE_SMP_MAXIMUM_PROCESSORS + 1 ];
+TEST_EXTERN volatile bool TaskRan[ CONFIGURE_MAXIMUM_PROCESSORS + 1 ];
 
 /*
  *  Keep the names and IDs in global variables so another task can use them.

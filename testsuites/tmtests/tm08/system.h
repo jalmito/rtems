@@ -11,7 +11,6 @@
  */
 
 
-#include <coverhd.h>
 #include <tmacros.h>
 
 /* functions */
@@ -24,15 +23,15 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
-
-#define CONFIGURE_ENABLE_CLASSIC_API_NOTEPADS
 
 #define CONFIGURE_MAXIMUM_TASKS              3
 #define CONFIGURE_TICKS_PER_TIMESLICE        0
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
+
+#define CONFIGURE_DISABLE_SMP_CONFIGURATION
 
 #include <rtems/confdefs.h>
 

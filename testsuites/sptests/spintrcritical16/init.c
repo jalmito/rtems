@@ -43,7 +43,7 @@ static rtems_timer_service_routine test_release_from_isr(
   }
 
   if ( Main_TCB->Wait.queue != NULL ) {
-    _Thread_Timeout( 0, Main_TCB );
+    _Thread_Timeout( &Main_TCB->Timer.Watchdog );
   }
 }
 
@@ -97,7 +97,7 @@ static rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS          1

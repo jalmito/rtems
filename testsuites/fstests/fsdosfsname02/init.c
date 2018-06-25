@@ -93,7 +93,11 @@ rtems_ramdisk_config rtems_ramdisk_configuration[] = {
 size_t rtems_ramdisk_configuration_size = RTEMS_ARRAY_SIZE(rtems_ramdisk_configuration);
 
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
+<<<<<<< HEAD
 #define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+=======
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+>>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 #define CONFIGURE_APPLICATION_NEEDS_LIBBLOCK
 
 #define CONFIGURE_APPLICATION_EXTRA_DRIVERS RAMDISK_DRIVER_TABLE_ENTRY

@@ -12,7 +12,6 @@
 #define FATAL_ERROR_DESCRIPTION  \
         "Configuration of unlimited and maximum of 0"
 #define FATAL_ERROR_EXPECTED_SOURCE      INTERNAL_ERROR_CORE
-#define FATAL_ERROR_EXPECTED_IS_INTERNAL TRUE
 #define FATAL_ERROR_EXPECTED_ERROR     INTERNAL_ERROR_UNLIMITED_AND_MAXIMUM_IS_0
 
 /*
@@ -23,4 +22,5 @@
 void force_error()
 {
   /* we should not run this far */
+  rtems_partition_create(0, NULL, 0, 0, 0, NULL);
 }

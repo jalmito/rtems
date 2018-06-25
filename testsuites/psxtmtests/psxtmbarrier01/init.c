@@ -79,7 +79,7 @@ void *POSIX_Init(
   benchmark_pthread_barrier_init();
   /* destroying barrier */
   benchmark_pthread_barrier_destroy();
-  
+
   TEST_END();
 
   rtems_test_exit(0);
@@ -87,11 +87,10 @@ void *POSIX_Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
 
 #define CONFIGURE_MAXIMUM_POSIX_THREADS     1
-#define CONFIGURE_MAXIMUM_POSIX_BARRIERS    1
 #define CONFIGURE_POSIX_INIT_THREAD_TABLE
 
 #define CONFIGURE_INIT

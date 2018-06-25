@@ -22,6 +22,7 @@
 #endif
 
 #include <rtems.h>
+#include <rtems/ioimpl.h>
 #include <rtems/monitor.h>
 
 #include <stdio.h>
@@ -58,7 +59,7 @@ rtems_monitor_driver_canonical(
 
 const void *
 rtems_monitor_driver_next(
-    void                  *object_info __attribute__((unused)),
+    void                  *object_info RTEMS_UNUSED,
     rtems_monitor_driver_t *canonical_driver,
     rtems_id              *next_id
 )
@@ -68,7 +69,7 @@ rtems_monitor_driver_next(
     if (n >= _IO_Number_of_drivers)
         goto failed;
 
-    _Thread_Disable_dispatch();
+    _Objects_Allocator_lock();
 
     /*
      * dummy up a fake id and name for this item
@@ -88,7 +89,7 @@ failed:
 
 void
 rtems_monitor_driver_dump_header(
-    bool verbose __attribute__((unused))
+    bool verbose RTEMS_UNUSED
 )
 {
     fprintf(stdout,"\

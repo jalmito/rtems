@@ -15,10 +15,6 @@
 #include <sys/resource.h>
 #include <errno.h>
 
-#if !HAVE_DECL_GETRUSAGE
-extern int getrusage(int who, struct rusage *usage);
-#endif
-
 #include <tmacros.h>
 #include "test_support.h"
 
@@ -26,7 +22,7 @@ const char rtems_test_name[] = "PSXGETRUSAGE 1";
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS             1

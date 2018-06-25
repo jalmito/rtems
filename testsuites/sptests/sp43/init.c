@@ -347,9 +347,9 @@ rtems_task Init(
     rtems_object_get_api_class_name( 0, OBJECTS_RTEMS_TASKS ) );
   printf( "rtems_object_get_api_class_name(CLASSIC_API, 0) = %s\n",
     rtems_object_get_api_class_name( OBJECTS_CLASSIC_API, 0 ) );
-  printf("rtems_object_get_api_class_name(INTERNAL_API, MUTEXES) = %s\n",
+  printf("rtems_object_get_api_class_name(INTERNAL_API, THREADS) = %s\n",
     rtems_object_get_api_class_name(
-       OBJECTS_INTERNAL_API, OBJECTS_INTERNAL_MUTEXES));
+       OBJECTS_INTERNAL_API, OBJECTS_INTERNAL_THREADS));
   printf("rtems_object_get_api_class_name(CLASSIC_API, RTEMS_BARRIERS) = %s\n",
     rtems_object_get_api_class_name(
        OBJECTS_CLASSIC_API, OBJECTS_RTEMS_BARRIERS));
@@ -412,6 +412,12 @@ rtems_task Init(
   print_class_info( OBJECTS_CLASSIC_API, OBJECTS_RTEMS_TASKS, &info );
 
   puts( "rtems_object_get_class_information - Classic Timers - OK" );
+  sc = rtems_timer_create(0, NULL);
+  fatal_directive_status(
+    sc,
+    RTEMS_INVALID_NAME,
+    "rtems_timer_create"
+  );
   sc = rtems_object_get_class_information(
              OBJECTS_CLASSIC_API, OBJECTS_RTEMS_TIMERS, &info );
   directive_failed( sc, "rtems_object_get_class_information" );
@@ -441,23 +447,6 @@ rtems_task Init(
       &old_priority
     );
     directive_failed( sc, "rtems_task_set_priority" );
-
-    /* destroy internal API pointer */
-    puts( "rtems_task_set_priority - clobber internal API info" );
-    tmp = _Objects_Information_table[ api ];
-    _Objects_Information_table[ api ] = NULL;
-
-    puts( "rtems_task_set_priority - use valid Idle thread id again" );
-    sc = rtems_task_set_priority(
-      rtems_build_id( class, api, 1, 1 ),
-      RTEMS_CURRENT_PRIORITY,
-      &old_priority
-    );
-    fatal_directive_status( sc, RTEMS_INVALID_ID, "rtems_task_set_priority" );
-
-    /* restore pointer */
-    puts( "rtems_task_set_priority - restore internal api info" );
-    _Objects_Information_table[ api ] = tmp;
 
     /* destroy internal API thread class pointer */
     puts( "rtems_task_set_priority - clobber internal thread class info" );
@@ -503,24 +492,6 @@ rtems_task Init(
     0
   );
   fatal_directive_status( sc, RTEMS_INVALID_ID, "rtems_semaphore_obtain" );
-
-  /*
-   * Invalid POSIX API pointer on get name
-   */
-  {
-    void *tmp;
-    tmp = _Objects_Information_table[OBJECTS_POSIX_API];
-    _Objects_Information_table[OBJECTS_POSIX_API] = NULL;
-
-    puts( "rtems_object_get_classic_name - bad API pointer - INVALID_ID" );
-    sc = rtems_object_get_classic_name(
-      rtems_build_id( OBJECTS_POSIX_API, OBJECTS_POSIX_THREADS, 1, 1 ),
-      &tmpName
-    );
-    fatal_directive_status( sc, RTEMS_INVALID_ID, "object_get_classic_name" );
-
-    _Objects_Information_table[OBJECTS_POSIX_API] = tmp;
-  }
 
   TEST_END();
   rtems_test_exit( 0 );

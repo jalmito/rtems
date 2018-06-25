@@ -70,6 +70,7 @@
 
 #include <stdio.h>
 #include <netdb.h>
+#include <rtems/rtems_netdb.h>
 #include <resolv.h>
 #include <ctype.h>
 #include <errno.h>
@@ -78,8 +79,6 @@
 #include <syslog.h>
 
 #include "res_config.h"
-
-extern int h_errno;
 
 #define BYADDR 0
 #define BYNAME 1
