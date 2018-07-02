@@ -31,19 +31,18 @@ ssize_t read(
 )
 {
   rtems_libio_t *iop;
-  ssize_t        n;
 
+  rtems_libio_check_fd( fd );
+  iop = rtems_libio_iop( fd );
+  rtems_libio_check_is_open( iop );
   rtems_libio_check_buffer( buffer );
   rtems_libio_check_count( count );
-
-  LIBIO_GET_IOP_WITH_ACCESS( fd, iop, LIBIO_FLAGS_READ, EBADF );
+  rtems_libio_check_permissions_with_error( iop, LIBIO_FLAGS_READ, EBADF );
 
   /*
    *  Now process the read().
    */
-  n = (*iop->pathinfo.handlers->read_h)( iop, buffer, count );
-  rtems_libio_iop_drop( iop );
-  return n;
+  return (*iop->pathinfo.handlers->read_h)( iop, buffer, count );
 }
 
 #if defined(RTEMS_NEWLIB) && !defined(HAVE__READ_R)
@@ -54,7 +53,7 @@ ssize_t read(
  *  This is the Newlib dependent reentrant version of read().
  */
 ssize_t _read_r(
-  struct _reent *ptr RTEMS_UNUSED,
+  struct _reent *ptr __attribute__((unused)),
   int            fd,
   void          *buf,
   size_t         nbytes

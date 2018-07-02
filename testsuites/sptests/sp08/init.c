@@ -176,7 +176,7 @@ rtems_task Init(
 /* END OF RTEMS_PREEMPT */
 
 /* BEGINNING OF RTEMS_INTERRUPT_LEVEL */
-#if !defined(RTEMS_SMP)
+
   status = rtems_task_mode(
     RTEMS_INTERRUPT_LEVEL(3),
     RTEMS_INTERRUPT_MASK,
@@ -198,7 +198,7 @@ rtems_task Init(
     "TA1 - rtems_task_mode - RTEMS_INTERRUPT_LEVEL( 5 ) - previous mode: ",
     previous_mode
   );
-#endif
+
 /* END OF RTEMS_INTERRUPT_LEVEL */
 
 /* BEGINNING OF COMBINATIONS */
@@ -292,15 +292,13 @@ rtems_task Init(
 }
 
 /* configuration information */
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS             1
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
-
-#define CONFIGURE_DISABLE_SMP_CONFIGURATION
 
 #define CONFIGURE_INIT
 #include <rtems/confdefs.h>

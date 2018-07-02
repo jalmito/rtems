@@ -25,7 +25,7 @@
 
 #define DOT_COUNT 100
 
-static rtems_timer_service_routine Stop_Test_TSR(
+rtems_timer_service_routine Stop_Test_TSR(
   rtems_id  ignored_id,
   void     *ignored_address
 )

@@ -20,13 +20,12 @@
 
 #include <rtems/system.h>
 #include <rtems/config.h>
-#include <rtems/sysinit.h>
 #include <rtems/rtems/status.h>
 #include <rtems/rtems/support.h>
 #include <rtems/rtems/options.h>
 #include <rtems/rtems/regionimpl.h>
-
-Objects_Information _Region_Information;
+#include <rtems/score/thread.h>
+#include <rtems/score/apimutex.h>
 
 /*
  *  _Region_Manager_initialization
@@ -38,7 +37,7 @@ Objects_Information _Region_Information;
  *  Output parameters:  NONE
  */
 
-static void _Region_Manager_initialization(void)
+void _Region_Manager_initialization(void)
 {
   _Objects_Initialize_information(
     &_Region_Information,      /* object information table */
@@ -48,13 +47,23 @@ static void _Region_Manager_initialization(void)
                                /* maximum objects of this class */
     sizeof( Region_Control ),  /* size of this object's control block */
     false,                     /* true if the name is a string */
-    RTEMS_MAXIMUM_NAME_LENGTH, /* maximum length of an object name */
+    RTEMS_MAXIMUM_NAME_LENGTH  /* maximum length of an object name */
+#if defined(RTEMS_MULTIPROCESSING)
+    ,
+    false,                     /* true if this is a global object class */
     NULL                       /* Proxy extraction support callout */
+#endif
   );
-}
 
-RTEMS_SYSINIT_ITEM(
-  _Region_Manager_initialization,
-  RTEMS_SYSINIT_CLASSIC_REGION,
-  RTEMS_SYSINIT_ORDER_MIDDLE
-);
+  /*
+   *  Register the MP Process Packet routine.
+   */
+
+#if defined(RTEMS_MULTIPROCESSING)
+  _MPCI_Register_packet_processor(
+    MP_PACKET_REGION,
+    0  /* Multiprocessing is not currently supported for Regions */
+  );
+#endif
+
+}

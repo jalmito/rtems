@@ -35,12 +35,12 @@ void _CPU_ISR_install_vector(
 {
   uint32_t level;
 
-  _ISR_Local_disable( level );
+  _ISR_Disable( level );
   if ( old_handler != NULL ) {
     *old_handler = _ARMV7M_Get_exception_handler( (int) vector );
   }
   _ARMV7M_Set_exception_handler( (int) vector, new_handler );
-  _ISR_Local_enable( level );
+  _ISR_Enable( level );
 }
 
 #endif /* ARM_MULTILIB_ARCH_V7M */

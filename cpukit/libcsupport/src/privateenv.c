@@ -57,8 +57,7 @@ rtems_status_code rtems_libio_set_private_env(void)
   bool uses_global_env = old_env == &rtems_global_user_env;
 
   if (uses_global_env) {
-    Thread_Life_state life_state =
-      _Thread_Set_life_protection(THREAD_LIFE_PROTECTED);
+    bool life_protection = _Thread_Set_life_protection(true);
     rtems_user_env_t *new_env = calloc(1, sizeof(*new_env));
 
     if (new_env != NULL) {
@@ -93,7 +92,7 @@ rtems_status_code rtems_libio_set_private_env(void)
       sc = RTEMS_NO_MEMORY;
     }
 
-    _Thread_Set_life_protection(life_state);
+    _Thread_Set_life_protection(life_protection);
   }
 
   return sc;
@@ -105,12 +104,11 @@ void rtems_libio_use_global_env(void)
   bool uses_private_env = env != &rtems_global_user_env;
 
   if (uses_private_env) {
-    Thread_Life_state life_state =
-      _Thread_Set_life_protection(THREAD_LIFE_PROTECTED);
+    bool life_protection = _Thread_Set_life_protection(true);
 
     rtems_libio_free_user_env(env);
     pthread_setspecific(rtems_current_user_env_key, NULL);
 
-    _Thread_Set_life_protection(life_state);
+    _Thread_Set_life_protection(life_protection);
   }
 }

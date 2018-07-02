@@ -8,96 +8,130 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
-include $(top_srcdir)/../../bsp.am
 
-dist_project_lib_DATA = ../../../../../../bsps/arm/beagle/start/bsp_specs
+include_bspdir = $(includedir)/bsp
+include_libcpudir = $(includedir)/libcpu
+
+dist_project_lib_DATA = bsp_specs
 
 ###############################################################################
 #                  Header                                                     #
 ###############################################################################
 
+include_HEADERS = include/bsp.h
+include_HEADERS += ../../shared/include/tm27.h
+
+nodist_include_HEADERS = ../../shared/include/coverhd.h \
+  include/bspopts.h
+
+nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
+
+include_bsp_HEADERS =
+include_bsp_HEADERS += ../../shared/include/utility.h
+include_bsp_HEADERS += ../../shared/include/irq-generic.h
+include_bsp_HEADERS += ../../shared/include/irq-info.h
+include_bsp_HEADERS += ../../shared/include/stackalloc.h
+include_bsp_HEADERS += ../../shared/include/uart-output-char.h
+include_bsp_HEADERS += ../shared/include/arm-a8core-start.h
+include_bsp_HEADERS += ../shared/include/arm-cp15-start.h
+include_bsp_HEADERS += ../shared/include/arm-errata.h
+include_bsp_HEADERS += ../shared/include/arm-release-id.h
+include_bsp_HEADERS += ../shared/include/start.h
+include_bsp_HEADERS += include/irq.h
+include_bsp_HEADERS += include/i2c.h
+
+include_libcpu_HEADERS =
+include_libcpu_HEADERS += ../../../libcpu/arm/shared/include/arm-cp15.h
+include_libcpu_HEADERS += ../../../libcpu/arm/shared/include/omap3.h
+include_libcpu_HEADERS += ../../../libcpu/arm/shared/include/am335x.h
+include_libcpu_HEADERS += ../../../libcpu/arm/shared/include/omap_timer.h
+
 ###############################################################################
 #                  Data                                                       #
 ###############################################################################
 
-start.$(OBJEXT): ../../../../../../bsps/arm/shared/start/start.S
-	$(CPPASCOMPILE) -o $@ -c $<
+noinst_LIBRARIES = libbspstart.a
+
+libbspstart_a_SOURCES = ../shared/start/start.S
+
 project_lib_DATA = start.$(OBJEXT)
 
-project_lib_DATA += linkcmds
-dist_project_lib_DATA += ../../../../../../bsps/arm/beagle/start/linkcmds.beagle
+project_lib_DATA += startup/linkcmds
+project_lib_DATA += startup/linkcmds.beagle
+
+EXTRA_DIST = startup/linkcmds.beagle
 
 ###############################################################################
 #                  LibBSP                                                     #
 ###############################################################################
 
-project_lib_LIBRARIES = librtemsbsp.a
+noinst_LIBRARIES += libbsp.a
 
-librtemsbsp_a_SOURCES =
-librtemsbsp_a_LIBADD =
+libbsp_a_SOURCES =
+libbsp_a_CPPFLAGS =
+libbsp_a_LIBADD =
 
 # Shared
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bsp-fdt.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/stackalloc.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/gpio/gpio-support.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/cpucounter/cpucounterdiff.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/btimer/btimer-stub.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/cpucounter/cpucounterread.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/start/bsp-start-memcpy.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/cp15/arm-cp15-set-exception-handler.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/cp15/arm-cp15-set-ttb-entries.c
+libbsp_a_SOURCES += ../../shared/bootcard.c
+libbsp_a_SOURCES += ../../shared/bspclean.c
+libbsp_a_SOURCES += ../../shared/bspgetworkarea.c
+libbsp_a_SOURCES += ../../shared/bsplibc.c
+libbsp_a_SOURCES += ../../shared/bsppost.c
+libbsp_a_SOURCES += ../../shared/bsppredriverhook.c
+libbsp_a_SOURCES += ../../shared/bsppretaskinghook.c
+libbsp_a_SOURCES += ../../shared/gnatinstallhandler.c
+libbsp_a_SOURCES += ../../shared/sbrk.c
+libbsp_a_SOURCES += ../../shared/src/stackalloc.c
+libbsp_a_SOURCES += ../../shared/cpucounterdiff.c
+libbsp_a_SOURCES += ../../shared/timerstub.c
+libbsp_a_SOURCES += ../../shared/cpucounterread.c
+libbsp_a_SOURCES += ../shared/startup/bsp-start-memcpy.S
+libbsp_a_SOURCES += ../shared/arm-cp15-set-exception-handler.c
 
 # Startup
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/beagle/start/bspreset.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/beagle/start/bspstart.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/beagle/start/bspstarthooks.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/beagle/start/bspstartmmu.c
+libbsp_a_SOURCES += startup/bspreset.c
+libbsp_a_SOURCES += startup/bspstart.c
+libbsp_a_SOURCES += startup/bspstarthooks.c
+libbsp_a_SOURCES += startup/bspstartmmu.c
 
 # IRQ
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/irq/irq-default-handler.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/beagle/irq/irq.c
+libbsp_a_SOURCES += ../../shared/src/irq-default-handler.c
+libbsp_a_SOURCES += ../../shared/src/irq-generic.c
+libbsp_a_SOURCES += ../../shared/src/irq-info.c
+libbsp_a_SOURCES += ../../shared/src/irq-legacy.c
+libbsp_a_SOURCES += ../../shared/src/irq-server.c
+libbsp_a_SOURCES += ../../shared/src/irq-shell.c
+libbsp_a_SOURCES += irq.c
 
 # Console
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console-control.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console-select.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/beagle/console/console-config.c
+libbsp_a_SOURCES += ../../shared/console.c \
+        ../../shared/console_select.c \
+  console/console-config.c \
+        ../../shared/console_read.c \
+        ../../shared/console_write.c \
+        ../../shared/console_control.c
 
 # I2C
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/beagle/i2c/bbb-i2c.c
-
-# GPIO
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/beagle/gpio/bbb-gpio.c
-
-#pwm
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/beagle/pwm/pwm.c
+libbsp_a_SOURCES += misc/i2c.c
 
 #RTC
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/beagle/rtc/rtc.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/rtc/rtc-support.c
+libbsp_a_SOURCES += rtc.c
+libbsp_a_SOURCES += ../../shared/tod.c
 # Clock
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/beagle/clock/clock.c
+libbsp_a_SOURCES += clock.c
+libbsp_a_SOURCES += ../../shared/clockdrv_shell.h
 
 # Cache
-<<<<<<< HEAD
 libbsp_a_SOURCES += ../../../libcpu/shared/src/cache_manager.c
 libbsp_a_SOURCES += ../shared/include/arm-cache-l1.h
 libbsp_a_SOURCES += ../shared/armv467ar-basic-cache/cache_.h
 libbsp_a_CPPFLAGS += -I$(srcdir)/../shared/armv467ar-basic-cache
-=======
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/cache/cache-cp15.c
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 
 ###############################################################################
 #                  Special Rules                                              #
 ###############################################################################
 
+DISTCLEANFILES = include/bspopts.h
 
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
-include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
-include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/arm/beagle/headers.am

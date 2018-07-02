@@ -18,8 +18,11 @@
 #include "config.h"
 #endif
 
+#if defined(__RTEMS_HAVE_SYS_CPUSET_H__)
+
 #include <rtems/rtems/tasks.h>
 #include <rtems/score/threadimpl.h>
+#include <rtems/score/cpusetimpl.h>
 #include <rtems/score/schedulerimpl.h>
 
 rtems_status_code rtems_task_set_affinity(
@@ -28,37 +31,33 @@ rtems_status_code rtems_task_set_affinity(
   const cpu_set_t *cpuset
 )
 {
-  Thread_Control   *the_thread;
-  ISR_lock_Context  lock_context;
-  Per_CPU_Control  *cpu_self;
-  bool              ok;
+  Thread_Control        *the_thread;
+  Objects_Locations      location;
+  int                    ok;
 
-  if ( cpuset == NULL ) {
+  if ( !cpuset )
     return RTEMS_INVALID_ADDRESS;
-  }
 
-  the_thread = _Thread_Get( id, &lock_context );
+  the_thread = _Thread_Get( id, &location );
+  switch ( location ) {
 
-  if ( the_thread == NULL ) {
+    case OBJECTS_LOCAL:
+      ok = _Scheduler_Set_affinity(
+        the_thread,
+        cpusetsize,
+        cpuset
+      );
+      _Objects_Put( &the_thread->Object );
+      return ok ? RTEMS_SUCCESSFUL : RTEMS_INVALID_NUMBER;
+
 #if defined(RTEMS_MULTIPROCESSING)
-    if ( _Thread_MP_Is_remote( id ) ) {
-      return RTEMS_ILLEGAL_ON_REMOTE_OBJECT;
-    }
+    case OBJECTS_REMOTE:
 #endif
 
-    return RTEMS_INVALID_ID;
+    case OBJECTS_ERROR:
+      break;
   }
 
-  cpu_self = _Thread_Dispatch_disable_critical( &lock_context );
-  _Thread_State_acquire_critical( the_thread, &lock_context );
-
-  ok = _Scheduler_Set_affinity(
-    the_thread,
-    cpusetsize,
-    cpuset
-  );
-
-  _Thread_State_release( the_thread, &lock_context );
-  _Thread_Dispatch_enable( cpu_self );
-  return ok ? RTEMS_SUCCESSFUL : RTEMS_INVALID_NUMBER;
+  return RTEMS_INVALID_ID;
 }
+#endif

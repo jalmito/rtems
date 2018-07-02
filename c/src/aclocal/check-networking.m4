@@ -2,14 +2,13 @@ AC_DEFUN([RTEMS_CHECK_NETWORKING],
 [dnl
 AC_REQUIRE([RTEMS_CANONICAL_TARGET_CPU])dnl
 AC_REQUIRE([RTEMS_ENABLE_NETWORKING])dnl
-AC_REQUIRE([RTEMS_INCLUDES])dnl
 
 AC_CACHE_CHECK([whether BSP supports networking],
   rtems_cv_HAS_NETWORKING,
   [dnl
     case "$RTEMS_CPU" in
     # do not have address space to hold BSD TCP/IP stack
-    m32c*)
+    avr*|h8300*|m32c*)
       rtems_cv_HAS_NETWORKING="no"
       ;;
     *)
@@ -22,7 +21,6 @@ AC_CACHE_CHECK([whether BSP supports networking],
     esac])
 if test "$rtems_cv_HAS_NETWORKING" = "yes"; then
   HAS_NETWORKING="yes";
-  RTEMS_CPPFLAGS="${RTEMS_CPPFLAGS} -I${RTEMS_SOURCE_ROOT}/cpukit/libnetworking";
 else
   HAS_NETWORKING="no";
 fi

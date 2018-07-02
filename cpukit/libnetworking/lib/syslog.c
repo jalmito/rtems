@@ -7,7 +7,6 @@
 #endif
 
 #include <rtems.h>
-#include <rtems/thread.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <errno.h>
@@ -25,8 +24,7 @@ static int LogFacility = LOG_USER;
 static int LogMask = 0xff;
 
 static int LogFd = -1;
-static rtems_recursive_mutex LogSemaphore =
-  RTEMS_RECURSIVE_MUTEX_INITIALIZER("syslog");
+static rtems_id LogSemaphore;
 extern struct in_addr rtems_bsdnet_log_host_address;
 
 #define SYSLOG_PORT	514
@@ -91,7 +89,8 @@ vsyslog (int pri, const char *fmt, va_list ap)
 	 */
 	sent = 0;
 	if ((rtems_bsdnet_log_host_address.s_addr != INADDR_ANY)
-	 && (LogFd >= 0)) {
+	 && (LogFd >= 0)
+	 && (rtems_semaphore_obtain (LogSemaphore, RTEMS_WAIT, RTEMS_NO_TIMEOUT) == RTEMS_SUCCESSFUL)) {
 		/*
 		 * Set the destination address/port
 		 */
@@ -101,13 +100,12 @@ vsyslog (int pri, const char *fmt, va_list ap)
 		farAddress.sin_addr = rtems_bsdnet_log_host_address;
 		memset (farAddress.sin_zero, '\0', sizeof farAddress.sin_zero);
 
-		rtems_recursive_mutex_lock (&LogSemaphore);
 		/*
 		 * Send the message
 		 */
 		if (sendto (LogFd, cbuf, cnt, 0, (struct sockaddr *)&farAddress, sizeof farAddress) >= 0)
 			sent = 1;
-		rtems_recursive_mutex_unlock (&LogSemaphore);
+		rtems_semaphore_release (LogSemaphore);
 	}
 	if (!sent && (LogStatus & LOG_CONS) && !(LogStatus & LOG_PERROR))
 		printf ("%s\n", msgp);
@@ -116,6 +114,7 @@ vsyslog (int pri, const char *fmt, va_list ap)
 void
 openlog (const char *ident, int logstat, int logfac)
 {
+	rtems_status_code sc;
 	struct sockaddr_in myAddress;
 
 	if (ident != NULL)
@@ -145,6 +144,24 @@ openlog (const char *ident, int logstat, int logfac)
 		printf ("Can't bind syslog socket: %d\n", errno);
 		return;
 	}
+
+	/*
+	 * Create the mutex
+	 */
+	sc = rtems_semaphore_create (rtems_build_name('s', 'L', 'o', 'g'),
+					1,
+					RTEMS_PRIORITY |
+						RTEMS_BINARY_SEMAPHORE |
+						RTEMS_INHERIT_PRIORITY |
+						RTEMS_NO_PRIORITY_CEILING |
+						RTEMS_LOCAL,
+					0,
+					&LogSemaphore);
+	if (sc != RTEMS_SUCCESSFUL) {
+		printf ("Can't create syslog semaphore: %d\n", sc);
+		close (LogFd);
+		LogFd = -1;
+	}
 }
 
 void
@@ -153,6 +170,7 @@ closelog(void)
 	if (LogFd >= 0) {
 		close (LogFd);
 		LogFd = -1;
+		rtems_semaphore_delete (LogSemaphore);
 	}
 }
 

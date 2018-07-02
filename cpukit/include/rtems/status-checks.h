@@ -23,8 +23,6 @@
 #ifndef RTEMS_STATUS_CHECKS_H
 #define RTEMS_STATUS_CHECKS_H
 
-#include <rtems/bspIo.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */

@@ -39,7 +39,9 @@ int fchdir( int fd )
   st.st_uid = 0;
   st.st_gid = 0;
 
-  LIBIO_GET_IOP( fd, iop );
+  rtems_libio_check_fd( fd );
+  iop = rtems_libio_iop( fd );
+  rtems_libio_check_is_open( iop );
 
   rtems_filesystem_instance_lock( &iop->pathinfo );
   rv = (*iop->pathinfo.handlers->fstat_h)( &iop->pathinfo, &st );
@@ -59,7 +61,6 @@ int fchdir( int fd )
     }
   }
   rtems_filesystem_instance_unlock( &iop->pathinfo );
-  rtems_libio_iop_drop( iop );
 
   if ( rv == 0 ) {
     rv = rtems_filesystem_chdir( &loc );

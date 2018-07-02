@@ -1,16 +1,12 @@
 /**
  * @file
  *
- * @brief _execve()
+ * @brief execve()
  * @ingroup POSIXAPI
- *
- * The Newlib C Library contains all of the exec*() variants and assumes
- * the underlying OS support provides _execve(). This single method
- * ensures that all exec*() variants return ENOSYS.
  */
 
 /*
- *  COPYRIGHT (c) 1989-2013,2016.
+ *  COPYRIGHT (c) 1989-2013.
  *  On-Line Applications Research Corporation (OAR).
  *
  *  The license and distribution terms for this file may be
@@ -32,13 +28,10 @@
 #include <sys/unistd.h>
 
 int _execve(
-  const char *path,
-  char *const argv[],
-  char *const envp[]
+  const char *path __attribute__((unused)),
+  char *const argv[] __attribute__((unused)),
+  char *const envp[] __attribute__((unused))
 )
 {
-  (void) path;
-  (void) argv;
-  (void) envp;
   rtems_set_errno_and_return_minus_one( ENOSYS );
 }

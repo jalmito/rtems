@@ -25,6 +25,7 @@
 
 static const rtems_assoc_t rtems_object_api_internal_assoc[] = {
   { "Thread",                  OBJECTS_INTERNAL_THREADS, 0},
+  { "Mutex",                   OBJECTS_INTERNAL_MUTEXES, 0},
   { NULL,                      0, 0}
 };
 
@@ -47,10 +48,15 @@ static const rtems_assoc_t rtems_object_api_posix_assoc[] = {
   { "Thread",                  OBJECTS_POSIX_THREADS, 0},
   { "Key",                     OBJECTS_POSIX_KEYS, 0},
   { "Interrupt",               OBJECTS_POSIX_INTERRUPTS, 0},
+  { "Queued fd",               OBJECTS_POSIX_MESSAGE_QUEUE_FDS, 0},
   { "Message Queue",           OBJECTS_POSIX_MESSAGE_QUEUES, 0},
+  { "Mutex",                   OBJECTS_POSIX_MUTEXES, 0},
   { "Semaphore",               OBJECTS_POSIX_SEMAPHORES, 0},
+  { "Condition Variable",      OBJECTS_POSIX_CONDITION_VARIABLES, 0},
   { "Timer",                   OBJECTS_POSIX_TIMERS, 0},
-  { "Shared Memory",           OBJECTS_POSIX_SHMS, 0},
+  { "Barrier",                 OBJECTS_POSIX_BARRIERS, 0},
+  { "Spinlock",                OBJECTS_POSIX_SPINLOCKS, 0},
+  { "RWLock",                  OBJECTS_POSIX_RWLOCKS, 0},
   { NULL,                      0, 0}
 };
 #endif

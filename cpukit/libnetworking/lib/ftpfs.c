@@ -51,6 +51,7 @@
 #include <rtems.h>
 #include <rtems/ftpfs.h>
 #include <rtems/libio_.h>
+#include <rtems/rtems_bsdnet.h>
 #include <rtems/seterr.h>
 
 #ifdef DEBUG
@@ -1032,12 +1033,12 @@ static int rtems_ftpfs_open(
   bool verbose = me->verbose;
   const struct timeval *timeout = &me->timeout;
 
-  e->write = rtems_libio_iop_is_writeable(iop);
+  e->write = (iop->flags & LIBIO_FLAGS_WRITE) != 0;
 
   /* Check for either read-only or write-only flags */
   if (
-    rtems_libio_iop_is_writeable(iop)
-      && rtems_libio_iop_is_readable(iop)
+    (iop->flags & LIBIO_FLAGS_WRITE) != 0
+      && (iop->flags & LIBIO_FLAGS_READ) != 0
   ) {
     eno = ENOTSUP;
   }
@@ -1294,7 +1295,7 @@ static void rtems_ftpfs_unmount_me(
 
 static int rtems_ftpfs_ioctl(
   rtems_libio_t *iop,
-  ioctl_command_t command,
+  uint32_t command,
   void *arg
 )
 {
@@ -1404,7 +1405,6 @@ static const rtems_filesystem_file_handlers_r rtems_ftpfs_handlers = {
   .fdatasync_h = rtems_filesystem_default_fsync_or_fdatasync,
   .fcntl_h = rtems_filesystem_default_fcntl,
   .kqfilter_h = rtems_filesystem_default_kqfilter,
-  .mmap_h = rtems_filesystem_default_mmap,
   .poll_h = rtems_filesystem_default_poll,
   .readv_h = rtems_filesystem_default_readv,
   .writev_h = rtems_filesystem_default_writev
@@ -1423,7 +1423,6 @@ static const rtems_filesystem_file_handlers_r rtems_ftpfs_root_handlers = {
   .fdatasync_h = rtems_filesystem_default_fsync_or_fdatasync,
   .fcntl_h = rtems_filesystem_default_fcntl,
   .kqfilter_h = rtems_filesystem_default_kqfilter,
-  .mmap_h = rtems_filesystem_default_mmap,
   .poll_h = rtems_filesystem_default_poll,
   .readv_h = rtems_filesystem_default_readv,
   .writev_h = rtems_filesystem_default_writev

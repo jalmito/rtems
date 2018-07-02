@@ -18,7 +18,15 @@
 #include "config.h"
 #endif
 
+#include <errno.h>
+#include <pthread.h>
+
+#include <rtems/system.h>
+#include <rtems/score/coremuteximpl.h>
+#include <rtems/score/watchdog.h>
 #include <rtems/posix/muteximpl.h>
+#include <rtems/posix/priorityimpl.h>
+#include <rtems/posix/time.h>
 
 /*
  *  11.3.3 Locking and Unlocking a Mutex, P1003.1c/Draft 10, p. 93
@@ -30,9 +38,5 @@ int pthread_mutex_lock(
   pthread_mutex_t           *mutex
 )
 {
-  return _POSIX_Mutex_Lock_support(
-    mutex,
-    NULL,
-    _Thread_queue_Enqueue_do_nothing_extra
-  );
+  return _POSIX_Mutex_Lock_support( mutex, true, WATCHDOG_NO_TIMEOUT );
 }

@@ -20,29 +20,9 @@
 
 #include <rtems/rtems/regionimpl.h>
 #include <rtems/rtems/optionsimpl.h>
-#include <rtems/rtems/statusimpl.h>
+#include <rtems/score/apimutex.h>
 #include <rtems/score/threadqimpl.h>
 #include <rtems/score/statesimpl.h>
-
-static void _Region_Enqueue_callout(
-  Thread_queue_Queue   *queue,
-  Thread_Control       *the_thread,
-  Per_CPU_Control      *cpu_self,
-  Thread_queue_Context *queue_context
-)
-{
-  Region_Control *the_region;
-
-  _Thread_queue_Add_timeout_ticks(
-    queue,
-    the_thread,
-    cpu_self,
-    queue_context
-  );
-
-  the_region = REGION_OF_THREAD_QUEUE_QUEUE( queue );
-  _Region_Unlock( the_region );
-}
 
 rtems_status_code rtems_region_get_segment(
   rtems_id           id,
@@ -52,68 +32,83 @@ rtems_status_code rtems_region_get_segment(
   void              **segment
 )
 {
-  rtems_status_code  status;
-  Region_Control    *the_region;
+  Thread_Control     *executing;
+  Objects_Locations   location;
+  rtems_status_code   return_status;
+  Region_Control     *the_region;
+  void               *the_segment;
 
-  if ( segment == NULL ) {
+  if ( !segment )
     return RTEMS_INVALID_ADDRESS;
-  }
 
   *segment = NULL;
 
-  if ( size == 0 ) {
+  if ( size == 0 )
     return RTEMS_INVALID_SIZE;
-  }
 
-  the_region = _Region_Get_and_lock( id );
+  _RTEMS_Lock_allocator();
 
-  if ( the_region == NULL ) {
-    return RTEMS_INVALID_ID;
-  }
+    executing  = _Thread_Get_executing();
+    the_region = _Region_Get( id, &location );
+    switch ( location ) {
 
-  if ( size > the_region->maximum_segment_size ) {
-    status = RTEMS_INVALID_SIZE;
-  } else {
-    void *the_segment;
+      case OBJECTS_LOCAL:
+        if ( size > the_region->maximum_segment_size )
+          return_status = RTEMS_INVALID_SIZE;
 
-    the_segment = _Region_Allocate_segment( the_region, size );
+        else {
+          _Region_Debug_Walk( the_region, 1 );
 
-    if ( the_segment != NULL ) {
-      *segment = the_segment;
-      status = RTEMS_SUCCESSFUL;
-    } else if ( _Options_Is_no_wait( option_set ) ) {
-      status = RTEMS_UNSATISFIED;
-    } else {
-      Thread_queue_Context  queue_context;
-      Thread_Control       *executing;
+          the_segment = _Region_Allocate_segment( the_region, size );
 
-      _Thread_queue_Context_initialize( &queue_context );
-      _Thread_queue_Acquire( &the_region->Wait_queue, &queue_context );
+          _Region_Debug_Walk( the_region, 2 );
 
-      executing  = _Thread_Executing;
-      executing->Wait.count           = size;
-      executing->Wait.return_argument = segment;
+          if ( the_segment ) {
+            the_region->number_of_used_blocks += 1;
+            *segment = the_segment;
+            return_status = RTEMS_SUCCESSFUL;
+          } else if ( _Options_Is_no_wait( option_set ) ) {
+            return_status = RTEMS_UNSATISFIED;
+          } else {
+            /*
+             *  Switch from using the memory allocation mutex to using a
+             *  dispatching disabled critical section.  We have to do this
+             *  because this thread is going to block.
+             */
+            /* FIXME: Lock order reversal */
+            _Thread_Disable_dispatch();
+            _RTEMS_Unlock_allocator();
 
-      /* FIXME: This is a home grown condition variable */
-      _Thread_queue_Context_set_thread_state(
-        &queue_context,
-        STATES_WAITING_FOR_SEGMENT
-      );
-      _Thread_queue_Context_set_timeout_ticks( &queue_context, timeout );
-      _Thread_queue_Context_set_enqueue_callout(
-        &queue_context,
-        _Region_Enqueue_callout
-      );
-      _Thread_queue_Enqueue(
-        &the_region->Wait_queue.Queue,
-        the_region->wait_operations,
-        executing,
-        &queue_context
-      );
-      return _Status_Get_after_wait( executing );
+            executing->Wait.id              = id;
+            executing->Wait.count           = size;
+            executing->Wait.return_argument = segment;
+
+            _Thread_queue_Enqueue(
+              &the_region->Wait_queue,
+              executing,
+              STATES_WAITING_FOR_SEGMENT,
+              timeout,
+              RTEMS_TIMEOUT
+            );
+
+            _Objects_Put( &the_region->Object );
+
+            return (rtems_status_code) executing->Wait.return_code;
+          }
+        }
+        break;
+
+#if defined(RTEMS_MULTIPROCESSING)
+      case OBJECTS_REMOTE:        /* this error cannot be returned */
+#endif
+
+      case OBJECTS_ERROR:
+      default:
+        return_status = RTEMS_INVALID_ID;
+        break;
     }
-  }
 
-  _Region_Unlock( the_region );
-  return status;
+  _RTEMS_Unlock_allocator();
+
+  return return_status;
 }

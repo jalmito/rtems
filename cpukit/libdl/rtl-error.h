@@ -27,7 +27,7 @@ extern "C" {
 #endif
 
 /**
- * Sets the error.
+ * Sets the error. 
  *
  * Assumes the RTL has been locked.
  *
@@ -36,11 +36,6 @@ extern "C" {
  * @param ... The variable arguments that depend on the format string.
  */
 void rtems_rtl_set_error (int error, const char* format, ...) RTEMS_RTL_PRINTF_ATTR;
-
-/**
- * Clears the error.
- */
-void rtems_rtl_clear_error (void);
 
 #ifdef __cplusplus
 }

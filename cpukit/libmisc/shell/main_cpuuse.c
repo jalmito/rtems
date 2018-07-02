@@ -18,7 +18,6 @@
 
 #include <rtems.h>
 #include <rtems/cpuuse.h>
-#include <rtems/printer.h>
 #include <rtems/shell.h>
 #include "internal.h"
 
@@ -31,9 +30,7 @@ static int rtems_shell_main_cpuuse(
    *  When invoked with no arguments, print the report.
    */
   if ( argc == 1 ) {
-    rtems_printer printer;
-    rtems_print_printer_fprintf(&printer, stdout);
-    rtems_cpu_usage_report_with_plugin(&printer);
+    rtems_cpu_usage_report_with_plugin(stdout, (rtems_printk_plugin_t)fprintf);
     return 0;
   }
 

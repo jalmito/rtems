@@ -17,34 +17,63 @@
 #include "config.h"
 #endif
 
-#include <rtems/posix/rwlockimpl.h>
+#include <pthread.h>
+#include <errno.h>
 
+#include <rtems/posix/rwlockimpl.h>
+#include <rtems/score/threadqimpl.h>
+
+/**
+ *  This directive allows a thread to delete a rwlock specified by
+ *  the rwlock id.  The rwlock is freed back to the inactive
+ *  rwlock chain.
+ *
+ *  @param[in] rwlock is the rwlock id
+ *
+ *  @return This method returns 0 if there was not an
+ *  error. Otherwise, a status code is returned indicating the
+ *  source of the error.
+ */
 int pthread_rwlock_destroy(
-  pthread_rwlock_t *_rwlock
+  pthread_rwlock_t *rwlock
 )
 {
-  POSIX_RWLock_Control *the_rwlock;
-  Thread_queue_Context  queue_context;
+  POSIX_RWLock_Control *the_rwlock = NULL;
+  Objects_Locations      location;
 
-  the_rwlock = _POSIX_RWLock_Get( _rwlock );
-  POSIX_RWLOCK_VALIDATE_OBJECT( the_rwlock );
+  _Objects_Allocator_lock();
+  the_rwlock = _POSIX_RWLock_Get( rwlock, &location );
+  switch ( location ) {
 
-  _CORE_RWLock_Acquire( &the_rwlock->RWLock, &queue_context );
+    case OBJECTS_LOCAL:
+      /*
+       *  If there is at least one thread waiting, then do not delete it.
+       */
+      if ( _Thread_queue_First( &the_rwlock->RWLock.Wait_queue ) != NULL ) {
+        _Objects_Put( &the_rwlock->Object );
+        _Objects_Allocator_unlock();
+        return EBUSY;
+      }
 
-  /*
-   *  If there is at least one thread waiting, then do not delete it.
-   */
+      /*
+       *  POSIX doesn't require behavior when it is locked.
+       */
 
-  if ( !_Thread_queue_Is_empty( &the_rwlock->RWLock.Queue.Queue ) ) {
-    _CORE_RWLock_Release( &the_rwlock->RWLock, &queue_context );
-    return EBUSY;
+      _Objects_Close( &_POSIX_RWLock_Information, &the_rwlock->Object );
+      _Objects_Put( &the_rwlock->Object );
+      _POSIX_RWLock_Free( the_rwlock );
+      _Objects_Allocator_unlock();
+
+      return 0;
+
+#if defined(RTEMS_MULTIPROCESSING)
+    case OBJECTS_REMOTE:
+#endif
+    case OBJECTS_ERROR:
+      break;
   }
 
-  /*
-   *  POSIX doesn't require behavior when it is locked.
-   */
+  _Objects_Allocator_unlock();
 
-  the_rwlock->flags = ~the_rwlock->flags;
-  _CORE_RWLock_Release( &the_rwlock->RWLock, &queue_context );
-  return 0;
+  return EINVAL;
 }

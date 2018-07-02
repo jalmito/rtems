@@ -30,6 +30,6 @@ speed_t cfgetispeed(
   const struct termios *tp
 )
 {
-  return tp->c_ispeed;
+  return (tp->c_cflag / (CIBAUD / CBAUD)) &  CBAUD;
 }
 #endif

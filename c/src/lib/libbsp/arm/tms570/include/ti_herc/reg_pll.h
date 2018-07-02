@@ -41,7 +41,6 @@
 
 #include <bsp/utility.h>
 
-
 typedef struct{
   uint32_t PLLCTL3;           /*PLL Control 3 Register*/
   uint8_t reserved1 [108];

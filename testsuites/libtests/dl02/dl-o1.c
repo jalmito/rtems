@@ -6,13 +6,12 @@
  * http://www.rtems.org/license/LICENSE.
  */
 
-#include "dl-o2.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 #include <dlfcn.h>
 
-#include <rtems/test.h>
-
-#define printf(...) rtems_printf(&rtems_test_printer, __VA_ARGS__);
+#include "dl-o2.h"
 
 typedef int (*func1_t)(int argc, const char* argv[]);
 

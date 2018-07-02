@@ -16,36 +16,38 @@
   #include "config.h"
 #endif
 
-#include "tmacros.h"
-
 #include <bsp.h>
 #include <bsp/bootcard.h>
+
+#include <rtems/test.h>
 
 const char rtems_test_name[] = "SPINTERNALERROR 1";
 
 #define FATAL_SOURCE 0xdeadbeef
 
+#define FATAL_IS_INTERNAL false
+
 #define FATAL_ERROR 0x600df00d
 
 void boot_card( const char *cmdline )
 {
-  _Terminate( FATAL_SOURCE, FATAL_ERROR );
+  _Terminate( FATAL_SOURCE, FATAL_IS_INTERNAL, FATAL_ERROR );
 }
 
 static void fatal_extension(
   Internal_errors_Source source,
-  bool always_set_to_false,
+  bool is_internal,
   Internal_errors_t error
 )
 {
-  TEST_BEGIN();
+  rtems_test_begink();
 
   if (
     source == FATAL_SOURCE
-      && !always_set_to_false
+      && is_internal == FATAL_IS_INTERNAL
       && error == FATAL_ERROR
   ) {
-    TEST_END();
+    rtems_test_endk();
   }
 }
 
@@ -70,9 +72,9 @@ static void *idle_body(uintptr_t ignored)
 
 #define CONFIGURE_SCHEDULER_USER
 
-#define CONFIGURE_SCHEDULER
+#define CONFIGURE_SCHEDULER_CONTEXT
 
-#define CONFIGURE_SCHEDULER_TABLE_ENTRIES { }
+#define CONFIGURE_SCHEDULER_CONTROLS { }
 
 #define CONFIGURE_MEMORY_PER_TASK_FOR_SCHEDULER 0
 

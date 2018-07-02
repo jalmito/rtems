@@ -31,15 +31,14 @@ int fsync(
 )
 {
   rtems_libio_t *iop;
-  int            rv;
 
-  LIBIO_GET_IOP( fd, iop );
+  rtems_libio_check_fd( fd );
+  iop = rtems_libio_iop( fd );
+  rtems_libio_check_is_open(iop);
 
   /*
    *  Now process the fsync().
    */
 
-  rv = (*iop->pathinfo.handlers->fsync_h)( iop );
-  rtems_libio_iop_drop( iop );
-  return rv;
+  return (*iop->pathinfo.handlers->fsync_h)( iop );
 }

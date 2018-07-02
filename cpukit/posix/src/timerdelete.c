@@ -28,6 +28,7 @@
 #include <rtems/seterr.h>
 #include <rtems/score/thread.h>
 #include <rtems/score/watchdogimpl.h>
+#include <rtems/posix/time.h>
 #include <rtems/posix/timerimpl.h>
 
 
@@ -44,25 +45,27 @@ int timer_delete(
   *       because rtems_timer_delete stops the timer before deleting it.
   */
   POSIX_Timer_Control *ptimer;
-  ISR_lock_Context     lock_context;
+  Objects_Locations    location;
 
   _Objects_Allocator_lock();
+  ptimer = _POSIX_Timer_Get( timerid, &location );
+  switch ( location ) {
 
-  ptimer = _POSIX_Timer_Get( timerid, &lock_context );
-  if ( ptimer != NULL ) {
-    Per_CPU_Control *cpu;
+    case OBJECTS_LOCAL:
+      _Objects_Close( &_POSIX_Timer_Information, &ptimer->Object );
+      ptimer->state = POSIX_TIMER_STATE_FREE;
+      _Watchdog_Remove_ticks( &ptimer->Timer );
+      _Objects_Put( &ptimer->Object );
+      _POSIX_Timer_Free( ptimer );
+      _Objects_Allocator_unlock();
 
-    _Objects_Close( &_POSIX_Timer_Information, &ptimer->Object );
-    cpu = _POSIX_Timer_Acquire_critical( ptimer, &lock_context );
-    ptimer->state = POSIX_TIMER_STATE_FREE;
-    _Watchdog_Remove(
-      &cpu->Watchdog.Header[ PER_CPU_WATCHDOG_TICKS ],
-      &ptimer->Timer
-    );
-    _POSIX_Timer_Release( cpu, &lock_context );
-    _POSIX_Timer_Free( ptimer );
-    _Objects_Allocator_unlock();
-    return 0;
+      return 0;
+
+#if defined(RTEMS_MULTIPROCESSING)
+    case OBJECTS_REMOTE:
+#endif
+    case OBJECTS_ERROR:
+      break;
   }
 
   _Objects_Allocator_unlock();

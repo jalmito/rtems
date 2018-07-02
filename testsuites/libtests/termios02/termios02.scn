@@ -1,4 +1,4 @@
-*** BEGIN OF TEST TERMIOS 2 ***
+*** TERMIOS 02 TEST ***
 tcdrain(12) - EBADF
 tcdrain(stdin) - OK
 tcdrain(stdout) - OK
@@ -24,4 +24,4 @@ ctermid( NULL ) - OK
 ctermid ==> /dev/console
 ctermid( term_name ) - OK
 ctermid ==> /dev/console
-*** END OF TEST TERMIOS 2 ***
+*** END OF TERMIOS 02 TEST ***

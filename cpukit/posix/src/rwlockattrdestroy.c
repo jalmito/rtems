@@ -18,10 +18,14 @@
 #include "config.h"
 #endif
 
-#include <errno.h>
 #include <pthread.h>
-#include <stddef.h>
-#include <stdbool.h>
+#include <errno.h>
+
+#include <rtems/system.h>
+#include <rtems/score/watchdog.h>
+#include <rtems/posix/condimpl.h>
+#include <rtems/posix/time.h>
+#include <rtems/posix/muteximpl.h>
 
 /*
  *  RWLock Initialization Attributes
@@ -31,7 +35,7 @@ int pthread_rwlockattr_destroy(
   pthread_rwlockattr_t *attr
 )
 {
-  if ( attr == NULL || !attr->is_initialized )
+  if ( !attr || attr->is_initialized == false )
     return EINVAL;
 
   attr->is_initialized = false;

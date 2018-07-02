@@ -67,13 +67,7 @@ const char *h_errlist[] = {
 };
 int	h_nerr = { sizeof h_errlist / sizeof h_errlist[0] };
 
-int *
-__h_errno(void)
-{
-	static int the_h_errno;
-
-	return &the_h_errno;
-}
+int	h_errno;
 
 #define HERROR_USE_WRITEV
 

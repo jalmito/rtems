@@ -30,19 +30,24 @@ int timer_getoverrun(
   timer_t   timerid
 )
 {
+  int                  overrun;
   POSIX_Timer_Control *ptimer;
-  ISR_lock_Context     lock_context;
+  Objects_Locations    location;
 
-  ptimer = _POSIX_Timer_Get( timerid, &lock_context );
-  if ( ptimer != NULL ) {
-    Per_CPU_Control *cpu;
-    int              overrun;
+  ptimer = _POSIX_Timer_Get( timerid, &location );
+  switch ( location ) {
 
-    cpu = _POSIX_Timer_Acquire_critical( ptimer, &lock_context );
-    overrun = ptimer->overrun;
-    ptimer->overrun = 0;
-    _POSIX_Timer_Release( cpu, &lock_context );
-    return overrun;
+    case OBJECTS_LOCAL:
+      overrun = ptimer->overrun;
+      ptimer->overrun = 0;
+      _Objects_Put( &ptimer->Object );
+      return overrun;
+
+#if defined(RTEMS_MULTIPROCESSING)
+    case OBJECTS_REMOTE:
+#endif
+    case OBJECTS_ERROR:
+      break;
   }
 
   rtems_set_errno_and_return_minus_one( EINVAL );

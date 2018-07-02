@@ -18,7 +18,7 @@
 #include "config.h"
 #endif
 
-#include <rtems/imfs.h>
+#include "imfs.h"
 
 #include <sys/param.h>
 #include <sys/stat.h>

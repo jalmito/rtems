@@ -102,7 +102,7 @@ bdbuf_test3_2_main()
     WAIT_DRV_MSG_WR(&msg);
     SEND_DRV_MSG(0, 0, RTEMS_SUCCESSFUL, 0);
 
-    TEST_STOP();
+    TEST_END();
 }
 
 static rtems_task
@@ -154,7 +154,7 @@ bdbuf_test3_2_thread2(rtems_task_argument arg)
         TEST_FAILED();
     }
 
-    printf("Thread #2 DEBLOCK\n");
+    printk("Thread #2 DEBLOCK\n");
     CONTINUE_MAIN(2);
 
     rc = rtems_bdbuf_release_modified(bd);
@@ -184,10 +184,10 @@ bdbuf_test3_2_thread3(rtems_task_argument arg)
         TEST_FAILED();
     }
 
-    printf("Thread #3 DEBLOCK\n");
+    printk("Thread #3 DEBLOCK\n");
 
     CONTINUE_MAIN(3);
-
+    
     rc = rtems_bdbuf_release_modified(bd);
     if (rc != RTEMS_SUCCESSFUL)
     {
@@ -196,3 +196,4 @@ bdbuf_test3_2_thread3(rtems_task_argument arg)
 
     THREAD_END();
 }
+

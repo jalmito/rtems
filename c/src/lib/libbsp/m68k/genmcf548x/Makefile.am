@@ -1,60 +1,83 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
-include $(top_srcdir)/../../bsp.am
 
-dist_project_lib_DATA = ../../../../../../bsps/m68k/genmcf548x/start/bsp_specs
+include_bspdir = $(includedir)/bsp
 
+include_HEADERS = include/bsp.h
+include_HEADERS += include/tm27.h
+
+nodist_include_HEADERS = include/bspopts.h
+nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
+
+include_bsp_HEADERS =
+include_bsp_HEADERS += ../../shared/include/irq-generic.h
+include_bsp_HEADERS += ../../shared/include/irq-info.h
+include_bsp_HEADERS += include/irq.h
+
+DISTCLEANFILES = include/bspopts.h
 noinst_PROGRAMS =
 
+include_HEADERS += ../../shared/include/coverhd.h
 
-start.$(OBJEXT): ../../../../../../bsps/m68k/genmcf548x/start/start.S
-	$(CPPASCOMPILE) -o $@ -c $<
+noinst_LIBRARIES = libbspstart.a
+libbspstart_a_SOURCES = start/start.S
+
+dist_project_lib_DATA = bsp_specs
+dist_project_lib_DATA += startup/linkcmds.m5484FireEngine.flash
+dist_project_lib_DATA += startup/linkcmds.COBRA5475
+dist_project_lib_DATA += startup/linkcmds.m5484FireEngine
+
 project_lib_DATA = start.$(OBJEXT)
+project_lib_DATA += startup/linkcmds
 
-project_lib_DATA += linkcmds
-dist_project_lib_DATA += ../../../../../../bsps/m68k/genmcf548x/start/linkcmds.COBRA5475
-dist_project_lib_DATA += ../../../../../../bsps/m68k/genmcf548x/start/linkcmds.m5484FireEngine
-dist_project_lib_DATA += ../../../../../../bsps/m68k/genmcf548x/start/linkcmds.m5484FireEngine.flash
-
-project_lib_LIBRARIES = librtemsbsp.a
-librtemsbsp_a_SOURCES =
-librtemsbsp_a_CPPFLAGS = $(AM_CPPFLAGS)
+noinst_LIBRARIES += libbsp.a
+libbsp_a_SOURCES =
+libbsp_a_CPPFLAGS =
 
 # startup
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-loop.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/genmcf548x/start/init548x.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/genmcf548x/start/bspstart.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/setvec.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
+libbsp_a_SOURCES += ../../shared/bspclean.c ../../shared/bsplibc.c  \
+  ../../shared/bsppost.c ../../shared/bspgetworkarea.c \
+  ../../shared/bspreset_loop.c ../../shared/bsppretaskinghook.c \
+  ../../shared/bsppredriverhook.c startup/init548x.c startup/bspstart.c \
+  ../../shared/bootcard.c ../../shared/sbrk.c ../../shared/setvec.c \
+  ../../shared/gnatinstallhandler.c
 # clock
-librtemsbsp_a_SOURCES +=../../../../../../bsps/m68k/genmcf548x/clock/clock.c
+libbsp_a_SOURCES += clock/clock.c ../../../shared/clockdrv_shell.h
 # console
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/genmcf548x/console/console.c
+libbsp_a_SOURCES += console/console.c
 # timer
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/genmcf548x/btimer/btimer.c
+libbsp_a_SOURCES += timer/timer.c
 
 # IRQ
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/irq/irq-default-handler.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/genmcf548x/irq/irq.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/genmcf548x/irq/intc-icr-init-values.c
+libbsp_a_SOURCES += ../../shared/src/irq-default-handler.c
+libbsp_a_SOURCES += ../../shared/src/irq-info.c
+libbsp_a_SOURCES += ../../shared/src/irq-legacy.c
+libbsp_a_SOURCES += ../../shared/src/irq-server.c
+libbsp_a_SOURCES += ../../shared/src/irq-shell.c
+libbsp_a_SOURCES += irq/irq.c
+libbsp_a_SOURCES += irq/intc-icr-init-values.c
 
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/shared/m68kidle.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/shared/memProbe.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/genmcf548x/mcdma/MCD_dmaApi.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/genmcf548x/mcdma/MCD_tasks.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/genmcf548x/mcdma/MCD_tasksInit.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/genmcf548x/mcdma/mcdma_glue.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/genmcf548x/start/cache.c
+# Cache
+libbsp_a_SOURCES += ../../../libcpu/shared/src/cache_manager.c
+libbsp_a_SOURCES += ../include/cache_.h
+libbsp_a_CPPFLAGS += -I$(srcdir)/include
 
 if HAS_NETWORKING
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/genmcf548x/net/network.c
+network_CPPFLAGS = -D__INSIDE_RTEMS_BSD_TCPIP_STACK__
+noinst_PROGRAMS += network.rel
+network_rel_SOURCES = network/network.c
+network_rel_CPPFLAGS = $(AM_CPPFLAGS) \
+    $(network_CPPFLAGS)
+network_rel_LDFLAGS = $(RTEMS_RELLDFLAGS)
 endif
 
+libbsp_a_LIBADD = ../../../libcpu/@RTEMS_CPU@/shared/misc.rel \
+                  ../../../libcpu/@RTEMS_CPU@/mcf548x/mcdma.rel
+
+if HAS_NETWORKING
+libbsp_a_LIBADD += network.rel
+endif
+
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
-include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
-include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/m68k/genmcf548x/headers.am

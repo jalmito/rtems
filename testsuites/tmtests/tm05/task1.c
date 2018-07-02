@@ -101,7 +101,7 @@ rtems_task High_task(
     end_time,
     operation_count,
     0,
-    0
+    CALLING_OVERHEAD_TASK_RESUME
   );
 
   TEST_END();
@@ -130,7 +130,7 @@ rtems_task Low_task(
     end_time,
     operation_count,
     0,
-    0
+    CALLING_OVERHEAD_TASK_SUSPEND
   );
 
   Task_index = 1;

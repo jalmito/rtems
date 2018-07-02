@@ -131,7 +131,7 @@ rtems_task High_task(
     end_time,
     operation_count - 1,
     overhead,
-    0
+    CALLING_OVERHEAD_MESSAGE_QUEUE_SEND
   );
 
   TEST_END();

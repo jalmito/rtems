@@ -17,6 +17,8 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+#define RCSID	"$Id$";
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -40,6 +42,8 @@
 #include "fsm.h"
 #include "ipcp.h"
 #include "lcp.h"
+
+static const char rcsid[] = RCSID;
 
 static unsigned char *frame;
 static int framelen;

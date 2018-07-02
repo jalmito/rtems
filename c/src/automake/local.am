@@ -1,3 +1,5 @@
-PROJECT_TOOLS = $(PROJECT_RELEASE)/build-tools
+preinstall-am: $(PREINSTALL_FILES)
+preinstall: preinstall-am
+.PHONY: preinstall preinstall-am
 
-all-local: $(TMPINSTALL_FILES)
+PROJECT_TOOLS = $(PROJECT_RELEASE)/build-tools

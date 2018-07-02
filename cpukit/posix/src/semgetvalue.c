@@ -18,24 +18,41 @@
 #include "config.h"
 #endif
 
+#include <stdarg.h>
+
+#include <errno.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <limits.h>
+
+#include <rtems/system.h>
 #include <rtems/posix/semaphoreimpl.h>
+#include <rtems/posix/time.h>
+#include <rtems/seterr.h>
 
 int sem_getvalue(
-  sem_t  *__restrict _sem,
+  sem_t  *__restrict sem,
   int    *__restrict sval
 )
 {
-  Sem_Control          *sem;
-  ISR_Level             level;
-  Thread_queue_Context  queue_context;
+  POSIX_Semaphore_Control          *the_semaphore;
+  Objects_Locations                 location;
 
-  POSIX_SEMAPHORE_VALIDATE_OBJECT( _sem );
+  the_semaphore = _POSIX_Semaphore_Get( sem, &location );
+  switch ( location ) {
 
-  sem = _Sem_Get( &_sem->_Semaphore );
-  _Thread_queue_Context_initialize( &queue_context );
-  _Thread_queue_Context_ISR_disable( &queue_context, level );
-  _Sem_Queue_acquire_critical( sem, &queue_context );
-  *sval = (int) sem->count;
-  _Sem_Queue_release( sem, level, &queue_context );
-  return 0;
+    case OBJECTS_LOCAL:
+      *sval = _CORE_semaphore_Get_count( &the_semaphore->Semaphore );
+      _Objects_Put( &the_semaphore->Object );
+      return 0;
+
+#if defined(RTEMS_MULTIPROCESSING)
+    case OBJECTS_REMOTE:
+#endif
+    case OBJECTS_ERROR:
+      break;
+  }
+
+  rtems_set_errno_and_return_minus_one( EINVAL );
 }

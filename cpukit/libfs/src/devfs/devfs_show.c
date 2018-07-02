@@ -15,9 +15,7 @@
   #include "config.h"
 #endif
 
-#include <rtems/devfs.h>
-
-#include <rtems/bspIo.h>
+#include "devfs.h"
 
 void devFS_Show(void)
 {

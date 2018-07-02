@@ -20,7 +20,13 @@
 
 #include <errno.h>
 #include <pthread.h>
-#include <stddef.h>
+
+#include <rtems/system.h>
+#include <rtems/score/coremuteximpl.h>
+#include <rtems/score/watchdog.h>
+#include <rtems/posix/muteximpl.h>
+#include <rtems/posix/priorityimpl.h>
+#include <rtems/posix/time.h>
 
 /*
  *  13.6.1 Mutex Initialization Scheduling Attributes, P1003.1c/Draft 10, p. 128
@@ -31,7 +37,7 @@ int pthread_mutexattr_getprioceiling(
   int                         *prioceiling
 )
 {
-  if ( attr == NULL || !attr->is_initialized || prioceiling == NULL)
+  if ( !attr || !attr->is_initialized || !prioceiling )
     return EINVAL;
 
   *prioceiling = attr->prio_ceiling;

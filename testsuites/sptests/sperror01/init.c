@@ -12,7 +12,6 @@
 #endif
 
 #include <tmacros.h>
-
 #include "test_support.h"
 #include "rtems/error.h"
 #include <errno.h>
@@ -24,16 +23,16 @@ rtems_task Init(rtems_task_argument argument);
 
 static void fatal_extension(
   rtems_fatal_source source,
-  bool always_set_to_false,
+  bool is_internal,
   rtems_fatal_code error
 )
 {
   if (
     source == RTEMS_FATAL_SOURCE_EXIT
-      && !always_set_to_false
+      && !is_internal
       && error == ENOMEM
   ) {
-    TEST_END();
+    rtems_test_endk();
   }
 }
 
@@ -64,7 +63,7 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS             1
@@ -72,8 +71,6 @@ rtems_task Init(
   { .fatal = fatal_extension }, RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
-
-#define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
 
 #define CONFIGURE_INIT
 

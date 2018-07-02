@@ -18,51 +18,53 @@
 #include "config.h"
 #endif
 
-#include <rtems/posix/semaphoreimpl.h>
+#include <stdarg.h>
 
+#include <errno.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <semaphore.h>
 #include <limits.h>
 
-int sem_post( sem_t *_sem )
+#include <rtems/system.h>
+#include <rtems/posix/semaphoreimpl.h>
+#include <rtems/posix/time.h>
+#include <rtems/seterr.h>
+
+int sem_post(
+  sem_t  *sem
+)
 {
-  Sem_Control          *sem;
-  ISR_Level             level;
-  Thread_queue_Context  queue_context;
-  Thread_queue_Heads   *heads;
-  unsigned int          count;
+  POSIX_Semaphore_Control          *the_semaphore;
+  Objects_Locations                 location;
+  ISR_lock_Context                  lock_context;
 
-  POSIX_SEMAPHORE_VALIDATE_OBJECT( _sem );
+  the_semaphore = _POSIX_Semaphore_Get_interrupt_disable(
+    sem,
+    &location,
+    &lock_context
+  );
+  switch ( location ) {
 
-  sem = _Sem_Get( &_sem->_Semaphore );
-  _Thread_queue_Context_initialize( &queue_context );
-  _Thread_queue_Context_ISR_disable( &queue_context, level );
-  _Sem_Queue_acquire_critical( sem, &queue_context );
+    case OBJECTS_LOCAL:
+      _CORE_semaphore_Surrender(
+        &the_semaphore->Semaphore,
+        the_semaphore->Object.id,
+#if defined(RTEMS_MULTIPROCESSING)
+        NULL,        /* POSIX Semaphores are local only */
+#else
+        NULL,
+#endif
+        &lock_context
+      );
+      return 0;
 
-  heads = sem->Queue.Queue.heads;
-  count = sem->count;
-
-  if ( __predict_true( heads == NULL && count < SEM_VALUE_MAX ) ) {
-    sem->count = count + 1;
-    _Sem_Queue_release( sem, level, &queue_context );
-    return 0;
+#if defined(RTEMS_MULTIPROCESSING)
+    case OBJECTS_REMOTE:
+#endif
+    case OBJECTS_ERROR:
+      break;
   }
 
-  if ( __predict_true( heads != NULL ) ) {
-    const Thread_queue_Operations *operations;
-    Thread_Control *first;
-
-    _Thread_queue_Context_set_ISR_level( &queue_context, level );
-    operations = SEMAPHORE_TQ_OPERATIONS;
-    first = ( *operations->first )( heads );
-
-    _Thread_queue_Extract_critical(
-      &sem->Queue.Queue,
-      operations,
-      first,
-      &queue_context
-    );
-    return 0;
-  }
-
-  _Sem_Queue_release( sem, level, &queue_context );
-  rtems_set_errno_and_return_minus_one( EOVERFLOW );
+  rtems_set_errno_and_return_minus_one( EINVAL );
 }

@@ -1,9 +1,5 @@
 /*
-<<<<<<< HEAD
  * Copyright (c) 2016 Chris Johns <chrisj@rtems.org>.  All rights reserved.
-=======
- * Copyright (c) 2016, 2018 Chris Johns <chrisj@rtems.org>.  All rights reserved.
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
  *
  * The license and distribution terms for this file may be
  * found in the file LICENSE in this distribution or at
@@ -34,11 +30,7 @@
 
 static uint8_t* contents;
 
-<<<<<<< HEAD
 static const char const* filename = "/dl-test";
-=======
-static const char *const filename = "/dl-test";
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 
 static void dl_cache_create_file(void)
 {
@@ -71,11 +63,7 @@ static bool dl_cache_check(void* buffer, off_t offset, size_t length)
   return memcmp(buffer, contents + offset, length) == 0;
 }
 
-<<<<<<< HEAD
 static off_t dl_cache_buffer_offset(rtems_rtl_obj_cache_t* cache, void* buffer)
-=======
-static off_t dl_cache_buffer_offset(rtems_rtl_obj_cache* cache, void* buffer)
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 {
   return (off_t) (((uint8_t*) buffer) - ((uint8_t*) cache->buffer));
 }
@@ -85,23 +73,15 @@ static void dl_init_rtl(void)
   /*
    * Check the RTL object is created and can be locked and unlocked.
    */
-<<<<<<< HEAD
   rtems_test_assert(rtems_rtl_data () == NULL);
   rtems_test_assert(rtems_rtl_lock () != NULL);
   rtems_test_assert(rtems_rtl_unlock () == true);
   rtems_test_assert(rtems_rtl_data () != NULL);
-=======
-  rtems_test_assert(rtems_rtl_data_unprotected () == NULL);
-  rtems_test_assert(rtems_rtl_lock () != NULL);
-  rtems_rtl_unlock ();
-  rtems_test_assert(rtems_rtl_data_unprotected () != NULL);
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
   rtems_rtl_trace_set_mask(RTEMS_RTL_TRACE_ALL | RTEMS_RTL_TRACE_CACHE);
 }
 
 int dl_cache_test(void)
 {
-<<<<<<< HEAD
   rtems_rtl_obj_cache_t cache;
   int                   fd;
   void*                 buffer;
@@ -109,15 +89,6 @@ int dl_cache_test(void)
   off_t                 offset;
   size_t                length_in;
   size_t                length;
-=======
-  rtems_rtl_obj_cache cache;
-  int                 fd;
-  void*               buffer;
-  off_t               offset_in;
-  off_t               offset;
-  size_t              length_in;
-  size_t              length;
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 
   /*
    * Make sure the RTL can initialise.

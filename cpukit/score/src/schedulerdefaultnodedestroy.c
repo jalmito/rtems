@@ -23,9 +23,9 @@
 
 void _Scheduler_default_Node_destroy(
   const Scheduler_Control *scheduler,
-  Scheduler_Node          *node
+  Thread_Control          *the_thread
 )
 {
   (void) scheduler;
-  (void) node;
+  (void) the_thread;
 }

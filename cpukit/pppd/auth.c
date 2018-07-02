@@ -32,6 +32,8 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+#define RCSID	"$Id$"
+
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -72,6 +74,8 @@
 #include "cbcp.h"
 #endif
 #include "pathnames.h"
+
+static const char rcsid[] = RCSID;
 
 /* The name by which the peer authenticated itself to us. */
 char peer_authname[MAXNAMELEN];

@@ -17,9 +17,7 @@
   #include "config.h"
 #endif
 
-#include <string.h>
-
-#include <rtems/imfs.h>
+#include "imfs.h"
 
 static ssize_t IMFS_linfile_read(
   rtems_libio_t *iop,
@@ -56,7 +54,7 @@ static int IMFS_linfile_open(
   /*
    * Perform 'copy on write' for linear files
    */
-  if (rtems_libio_iop_is_writeable(iop)) {
+  if ((iop->flags & LIBIO_FLAGS_WRITE) != 0) {
     uint32_t count = file->File.size;
     const unsigned char *buffer = file->Linearfile.direct;
 
@@ -89,7 +87,6 @@ static const rtems_filesystem_file_handlers_r IMFS_linfile_handlers = {
   .fdatasync_h = rtems_filesystem_default_fsync_or_fdatasync_success,
   .fcntl_h = rtems_filesystem_default_fcntl,
   .kqfilter_h = rtems_filesystem_default_kqfilter,
-  .mmap_h = rtems_filesystem_default_mmap,
   .poll_h = rtems_filesystem_default_poll,
   .readv_h = rtems_filesystem_default_readv,
   .writev_h = rtems_filesystem_default_writev

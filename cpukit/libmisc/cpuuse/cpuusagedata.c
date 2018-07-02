@@ -20,6 +20,6 @@
 #include "config.h"
 #endif
 
-#include "cpuuseimpl.h"
+#include <rtems/cpuuse.h>
 
 Timestamp_Control  CPU_usage_Uptime_at_last_reset;

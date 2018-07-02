@@ -69,7 +69,7 @@ rtems_task Test_task (
     end_time,
     1,
     0,
-    0
+    CALLING_OVERHEAD_MESSAGE_QUEUE_CREATE
   );
 
   queue_test();
@@ -83,7 +83,7 @@ rtems_task Test_task (
     end_time,
     1,
     0,
-    0
+    CALLING_OVERHEAD_MESSAGE_QUEUE_DELETE
   );
 
   TEST_END();
@@ -190,7 +190,7 @@ void queue_test(void)
     send_time,
     OPERATION_COUNT * OPERATION_COUNT,
     send_loop_time,
-    0
+    CALLING_OVERHEAD_MESSAGE_QUEUE_SEND
   );
 
   put_time(
@@ -198,7 +198,7 @@ void queue_test(void)
     urgent_time,
     OPERATION_COUNT * OPERATION_COUNT,
     urgent_loop_time,
-    0
+    CALLING_OVERHEAD_MESSAGE_QUEUE_URGENT
   );
 
   put_time(
@@ -206,7 +206,7 @@ void queue_test(void)
     receive_time,
     OPERATION_COUNT * OPERATION_COUNT * 2,
     receive_loop_time * 2,
-    0
+    CALLING_OVERHEAD_MESSAGE_QUEUE_RECEIVE
   );
 
   put_time(
@@ -214,7 +214,7 @@ void queue_test(void)
     empty_flush_time,
     OPERATION_COUNT,
     0,
-    0
+    CALLING_OVERHEAD_MESSAGE_QUEUE_FLUSH
   );
 
   put_time(
@@ -222,7 +222,7 @@ void queue_test(void)
     flush_time,
     OPERATION_COUNT,
     0,
-    0
+    CALLING_OVERHEAD_MESSAGE_QUEUE_FLUSH
   );
 
 }

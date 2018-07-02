@@ -30,69 +30,115 @@
 #include "config.h"
 #endif
 
-#include <rtems/posix/mqueueimpl.h>
+#include <stdarg.h>
 
+#include <pthread.h>
+#include <limits.h>
+#include <errno.h>
 #include <fcntl.h>
+#include <mqueue.h>
+
+#include <rtems/system.h>
+#include <rtems/score/watchdog.h>
+#include <rtems/seterr.h>
+#include <rtems/posix/mqueueimpl.h>
+#include <rtems/posix/time.h>
+
+
+/*
+ *  _POSIX_Message_queue_Send_support
+ */
 
 int _POSIX_Message_queue_Send_support(
-  mqd_t                         mqdes,
-  const char                   *msg_ptr,
-  size_t                        msg_len,
-  unsigned int                  msg_prio,
-  const struct timespec        *abstime,
-  Thread_queue_Enqueue_callout  enqueue_callout
+  mqd_t               mqdes,
+  const char         *msg_ptr,
+  size_t              msg_len,
+  unsigned int        msg_prio,
+  bool                wait,
+  Watchdog_Interval   timeout
 )
 {
-  POSIX_Message_queue_Control *the_mq;
-  Thread_queue_Context         queue_context;
-  Status_Control               status;
-  Thread_Control              *executing;
+  POSIX_Message_queue_Control    *the_mq;
+  POSIX_Message_queue_Control_fd *the_mq_fd;
+  Objects_Locations               location;
+  CORE_message_queue_Status       msg_status;
+  bool                            do_wait;
+  Thread_Control                 *executing;
+  ISR_lock_Context                lock_context;
 
   /*
    * Validate the priority.
    * XXX - Do not validate msg_prio is not less than 0.
    */
 
-  if ( msg_prio > MQ_PRIO_MAX ) {
+  if ( msg_prio > MQ_PRIO_MAX )
     rtems_set_errno_and_return_minus_one( EINVAL );
-  }
 
-  the_mq = _POSIX_Message_queue_Get( mqdes, &queue_context );
-
-  if ( the_mq == NULL ) {
-    rtems_set_errno_and_return_minus_one( EBADF );
-  }
-
-  if ( ( the_mq->oflag & O_ACCMODE ) == O_RDONLY ) {
-    _ISR_lock_ISR_enable( &queue_context.Lock_context.Lock_context );
-    rtems_set_errno_and_return_minus_one( EBADF );
-  }
-
-  _Thread_queue_Context_set_enqueue_callout( &queue_context, enqueue_callout );
-  _Thread_queue_Context_set_timeout_argument( &queue_context, abstime );
-
-  _CORE_message_queue_Acquire_critical(
-    &the_mq->Message_queue,
-    &queue_context
+  the_mq_fd = _POSIX_Message_queue_Get_fd_interrupt_disable(
+    mqdes,
+    &location,
+    &lock_context
   );
+  switch ( location ) {
 
-  if ( the_mq->open_count == 0 ) {
-    _CORE_message_queue_Release( &the_mq->Message_queue, &queue_context );
-    rtems_set_errno_and_return_minus_one( EBADF );
+    case OBJECTS_LOCAL:
+      if ( (the_mq_fd->oflag & O_ACCMODE) == O_RDONLY ) {
+        _ISR_lock_ISR_enable( &lock_context );
+        rtems_set_errno_and_return_minus_one( EBADF );
+      }
+
+      the_mq = the_mq_fd->Queue;
+
+      /*
+       *  A timed receive with a bad time will do a poll regardless.
+       */
+      if ( wait )
+        do_wait = (the_mq_fd->oflag & O_NONBLOCK) ? false : true;
+      else
+        do_wait = wait;
+
+      /*
+       *  Now perform the actual message receive
+       */
+      executing = _Thread_Executing;
+      msg_status = _CORE_message_queue_Submit(
+        &the_mq->Message_queue,
+        executing,
+        msg_ptr,
+        msg_len,
+        mqdes,      /* mqd_t is an object id */
+        NULL,
+        _POSIX_Message_queue_Priority_to_core( msg_prio ),
+        do_wait,
+        timeout,   /* no timeout */
+        &lock_context
+      );
+
+      /*
+       *  If we had to block, then this is where the task returns
+       *  after it wakes up.  The returned status is correct for
+       *  non-blocking operations but if we blocked, then we need
+       *  to look at the status in our TCB.
+       */
+
+      if ( msg_status == CORE_MESSAGE_QUEUE_STATUS_UNSATISFIED_WAIT )
+        msg_status = executing->Wait.return_code;
+
+      if ( !msg_status )
+        return msg_status;
+
+      rtems_set_errno_and_return_minus_one(
+        _POSIX_Message_queue_Translate_core_message_queue_return_code(
+          msg_status
+        )
+      );
+
+#if defined(RTEMS_MULTIPROCESSING)
+    case OBJECTS_REMOTE:
+#endif
+    case OBJECTS_ERROR:
+      break;
   }
 
-  /*
-   *  Now perform the actual message receive
-   */
-  executing = _Thread_Executing;
-  status = _CORE_message_queue_Submit(
-    &the_mq->Message_queue,
-    executing,
-    msg_ptr,
-    msg_len,
-    _POSIX_Message_queue_Priority_to_core( msg_prio ),
-    ( the_mq->oflag & O_NONBLOCK ) == 0,
-    &queue_context
-  );
-  return _POSIX_Zero_or_minus_one_plus_errno( status );
+  rtems_set_errno_and_return_minus_one( EBADF );
 }

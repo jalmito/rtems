@@ -17,7 +17,6 @@
 #endif
 
 #include <rtems/blkdev.h>
-#include <rtems/printer.h>
 #include <rtems/shellconfig.h>
 
 #include <string.h>
@@ -32,7 +31,6 @@ static int rtems_shell_main_blkstats(int argc, char **argv)
   bool ok = false;
   bool reset = false;
   const char *device;
-  rtems_printer printer;
 
   if (argc == 2) {
     ok = true;
@@ -43,12 +41,10 @@ static int rtems_shell_main_blkstats(int argc, char **argv)
     device = argv [2];
   }
 
-  rtems_print_printer_printf(&printer);
-
   if (ok) {
-    rtems_blkstats(&printer, device, reset);
+    rtems_blkstats(stdout, device, reset);
   } else {
-    rtems_printf(&printer, "usage: %s\n", rtems_shell_BLKSTATS_Command.usage);
+    fprintf(stdout, "usage: %s\n", rtems_shell_BLKSTATS_Command.usage);
   }
 
   return 0;

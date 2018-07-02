@@ -1,94 +1,127 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
-include $(top_srcdir)/../../bsp.am
 
-dist_project_lib_DATA = ../../../../../../bsps/lm32/milkymist/start/bsp_specs
+include_bspdir = $(includedir)/bsp
 
+dist_project_lib_DATA = bsp_specs
+
+include_HEADERS  = include/bsp.h
+include_HEADERS += ../../shared/include/coverhd.h
+include_HEADERS += ../../shared/include/tm27.h
+
+include_bsp_HEADERS  = ../../lm32/shared/include/irq.h
+include_bsp_HEADERS += ../../shared/include/irq-generic.h
+include_bsp_HEADERS += ../../lm32/shared/milkymist_gpio/milkymist_gpio.h
+include_bsp_HEADERS += ../../lm32/shared/milkymist_buttons/milkymist_buttons.h
+include_bsp_HEADERS += ../../lm32/shared/milkymist_ac97/milkymist_ac97.h
+include_bsp_HEADERS += ../../lm32/shared/milkymist_usbinput/milkymist_usbinput.h
+include_bsp_HEADERS += ../../lm32/shared/milkymist_pfpu/milkymist_pfpu.h
+include_bsp_HEADERS += ../../lm32/shared/milkymist_tmu/milkymist_tmu.h
+include_bsp_HEADERS += ../../lm32/shared/milkymist_memcard/milkymist_memcard.h
+include_bsp_HEADERS += ../../lm32/shared/milkymist_flash/milkymist_flash.h
+include_bsp_HEADERS += ../../lm32/shared/milkymist_dmx/milkymist_dmx.h
+include_bsp_HEADERS += ../../lm32/shared/milkymist_midi/milkymist_midi.h
+include_bsp_HEADERS += ../../lm32/shared/milkymist_ir/milkymist_ir.h
+include_bsp_HEADERS += ../../lm32/shared/milkymist_video/milkymist_video.h
+include_bsp_HEADERS += ../../lm32/shared/milkymist_versions/milkymist_versions.h
+
+nodist_include_HEADERS = include/bspopts.h
+nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
+DISTCLEANFILES = include/bspopts.h
 
 noinst_PROGRAMS =
 
+include_HEADERS += include/system_conf.h
 
-start.$(OBJEXT): ../../../../../../bsps/lm32/shared/start/start.S
-	$(CPPASCOMPILE) -o $@ -c $<
+noinst_LIBRARIES = libbspstart.a
+libbspstart_a_SOURCES = ../../lm32/shared/start/start.S
 project_lib_DATA = start.$(OBJEXT)
 
-project_lib_DATA += linkcmds
+dist_project_lib_DATA += startup/linkcmds
 
-project_lib_LIBRARIES = librtemsbsp.a
-librtemsbsp_a_SOURCES =
-librtemsbsp_a_LIBADD =
+noinst_LIBRARIES += libbsp.a
+libbsp_a_SOURCES =
+libbsp_a_LIBADD =
 
 # startup
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/milkymist/start/bspclean.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/start/bspstart.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-empty.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
+libbsp_a_SOURCES += startup/bspclean.c
+libbsp_a_SOURCES += ../../shared/bsplibc.c
+libbsp_a_SOURCES += ../../shared/bsppost.c
+libbsp_a_SOURCES += ../shared/startup/bspstart.c
+libbsp_a_SOURCES += ../../shared/bsppretaskinghook.c
+libbsp_a_SOURCES += ../../shared/bspgetworkarea.c
+libbsp_a_SOURCES += ../../shared/bootcard.c
+libbsp_a_SOURCES += ../../shared/sbrk.c
+libbsp_a_SOURCES += ../../shared/gnatinstallhandler.c
 
 # irq
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/irq/irq.c
+libbsp_a_SOURCES += ../../lm32/shared/irq/irq.c
 
 # clock
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_clock/ckinit.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_clock/ckinit.c
 
 # console
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_console/console.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_console/uart.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_console/console.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_console/uart.c
 
 # timer
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_timer/timer.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_timer/timer.c
 
 # framebuffer
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_framebuffer/framebuffer.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_framebuffer/framebuffer.c
 
 # GPIO
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_gpio/gpio.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_gpio/gpio.c
 
 # buttons
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_buttons/buttons.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_buttons/buttons.c
 
 # ac97
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_ac97/ac97.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_ac97/ac97.c
 
 # usbinput
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_usbinput/usbinput.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_usbinput/usbinput.c
 
 # PFPU
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_pfpu/pfpu.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_pfpu/pfpu.c
 
 # TMU
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_tmu/tmu.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_tmu/tmu.c
 
 # memory card
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_memcard/memcard.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_memcard/memcard.c
 
 # flash
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_flash/flash.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_flash/flash.c
 
 # DMX
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_dmx/dmx.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_dmx/dmx.c
 
 # MIDI
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_midi/midi.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_midi/midi.c
 
 # IR
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_ir/ir.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_ir/ir.c
 
 # video input
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_video/video.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_video/video.c
 
 # versions
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/milkymist_versions/versions.c
+libbsp_a_SOURCES += ../../lm32/shared/milkymist_versions/versions.c
 
 # Cache
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/cache/nocache.c
+libbsp_a_SOURCES += ../../../libcpu/shared/src/cache_manager.c
+libbsp_a_SOURCES += ../../shared/include/cache_.h
+libbsp_a_CPPFLAGS = -I$(srcdir)/../../shared/include
 
 if HAS_NETWORKING
-librtemsbsp_a_SOURCES += ../../../../../../bsps/lm32/shared/net/network.c
+noinst_PROGRAMS += network.rel
+network_rel_SOURCES = ../../lm32/shared/milkymist_networking/network.c
+network_rel_CPPFLAGS = $(AM_CPPFLAGS) -D__INSIDE_RTEMS_BSD_TCPIP_STACK__
+network_rel_LDFLAGS = $(RTEMS_RELLDFLAGS)
+libbsp_a_LIBADD += network.rel
 endif
 
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
-include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/lm32/milkymist/headers.am

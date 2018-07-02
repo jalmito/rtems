@@ -47,17 +47,21 @@ ssize_t
 msdos_file_read(rtems_libio_t *iop, void *buffer, size_t count)
 {
     ssize_t            ret = 0;
+    rtems_status_code  sc = RTEMS_SUCCESSFUL;
     msdos_fs_info_t   *fs_info = iop->pathinfo.mt_entry->fs_info;
     fat_file_fd_t     *fat_fd = iop->pathinfo.node_access;
 
-    msdos_fs_lock(fs_info);
+    sc = rtems_semaphore_obtain(fs_info->vol_sema, RTEMS_WAIT,
+                                MSDOS_VOLUME_SEMAPHORE_TIMEOUT);
+    if (sc != RTEMS_SUCCESSFUL)
+        rtems_set_errno_and_return_minus_one(EIO);
 
     ret = fat_file_read(&fs_info->fat, fat_fd, iop->offset, count,
                         buffer);
     if (ret > 0)
         iop->offset += ret;
 
-    msdos_fs_unlock(fs_info);
+    rtems_semaphore_release(fs_info->vol_sema);
     return ret;
 }
 
@@ -78,19 +82,23 @@ ssize_t
 msdos_file_write(rtems_libio_t *iop,const void *buffer, size_t count)
 {
     ssize_t            ret = 0;
+    rtems_status_code  sc = RTEMS_SUCCESSFUL;
     msdos_fs_info_t   *fs_info = iop->pathinfo.mt_entry->fs_info;
     fat_file_fd_t     *fat_fd = iop->pathinfo.node_access;
 
-    msdos_fs_lock(fs_info);
+    sc = rtems_semaphore_obtain(fs_info->vol_sema, RTEMS_WAIT,
+                                MSDOS_VOLUME_SEMAPHORE_TIMEOUT);
+    if (sc != RTEMS_SUCCESSFUL)
+        rtems_set_errno_and_return_minus_one(EIO);
 
-    if (rtems_libio_iop_is_append(iop))
+    if ((iop->flags & LIBIO_FLAGS_APPEND) != 0)
         iop->offset = fat_fd->fat_file_size;
 
     ret = fat_file_write(&fs_info->fat, fat_fd, iop->offset, count,
                          buffer);
     if (ret < 0)
     {
-        msdos_fs_unlock(fs_info);
+        rtems_semaphore_release(fs_info->vol_sema);
         return -1;
     }
 
@@ -105,7 +113,7 @@ msdos_file_write(rtems_libio_t *iop,const void *buffer, size_t count)
     if (ret > 0)
         fat_file_set_ctime_mtime(fat_fd, time(NULL));
 
-    msdos_fs_unlock(fs_info);
+    rtems_semaphore_release(fs_info->vol_sema);
     return ret;
 }
 
@@ -124,11 +132,15 @@ msdos_file_stat(
     struct stat *buf
 )
 {
+    rtems_status_code  sc = RTEMS_SUCCESSFUL;
     msdos_fs_info_t   *fs_info = loc->mt_entry->fs_info;
     fat_file_fd_t     *fat_fd = loc->node_access;
     uint32_t           cl_mask = fs_info->fat.vol.bpc - 1;
 
-    msdos_fs_lock(fs_info);
+    sc = rtems_semaphore_obtain(fs_info->vol_sema, RTEMS_WAIT,
+                                MSDOS_VOLUME_SEMAPHORE_TIMEOUT);
+    if (sc != RTEMS_SUCCESSFUL)
+        rtems_set_errno_and_return_minus_one(EIO);
 
     buf->st_dev = rtems_disk_get_device_identifier(fs_info->fat.vol.dd);
     buf->st_ino = fat_fd->ino;
@@ -142,7 +154,7 @@ msdos_file_stat(
     buf->st_ctime = fat_fd->ctime;
     buf->st_mtime = fat_fd->mtime;
 
-    msdos_fs_unlock(fs_info);
+    rtems_semaphore_release(fs_info->vol_sema);
     return RC_OK;
 }
 
@@ -160,11 +172,15 @@ int
 msdos_file_ftruncate(rtems_libio_t *iop, off_t length)
 {
     int                rc = RC_OK;
+    rtems_status_code  sc = RTEMS_SUCCESSFUL;
     msdos_fs_info_t   *fs_info = iop->pathinfo.mt_entry->fs_info;
     fat_file_fd_t     *fat_fd = iop->pathinfo.node_access;
     uint32_t old_length;
 
-    msdos_fs_lock(fs_info);
+    sc = rtems_semaphore_obtain(fs_info->vol_sema, RTEMS_WAIT,
+                                MSDOS_VOLUME_SEMAPHORE_TIMEOUT);
+    if (sc != RTEMS_SUCCESSFUL)
+        rtems_set_errno_and_return_minus_one(EIO);
 
     old_length = fat_fd->fat_file_size;
     if (length < old_length) {
@@ -190,7 +206,7 @@ msdos_file_ftruncate(rtems_libio_t *iop, off_t length)
         fat_file_set_ctime_mtime(fat_fd, time(NULL));
     }
 
-    msdos_fs_unlock(fs_info);
+    rtems_semaphore_release(fs_info->vol_sema);
 
     return rc;
 }
@@ -209,21 +225,27 @@ int
 msdos_file_sync(rtems_libio_t *iop)
 {
     int                rc = RC_OK;
+    rtems_status_code  sc = RTEMS_SUCCESSFUL;
     msdos_fs_info_t   *fs_info = iop->pathinfo.mt_entry->fs_info;
     fat_file_fd_t     *fat_fd = iop->pathinfo.node_access;
 
-    msdos_fs_lock(fs_info);
+    sc = rtems_semaphore_obtain(fs_info->vol_sema, RTEMS_WAIT,
+                                MSDOS_VOLUME_SEMAPHORE_TIMEOUT);
+    if (sc != RTEMS_SUCCESSFUL)
+        rtems_set_errno_and_return_minus_one(EIO);
 
     rc = fat_file_update(&fs_info->fat, fat_fd);
     if (rc != RC_OK)
     {
-        msdos_fs_unlock(fs_info);
+        rtems_semaphore_release(fs_info->vol_sema);
         return rc;
     }
 
     rc = fat_sync(&fs_info->fat);
 
-    msdos_fs_unlock(fs_info);
+    rtems_semaphore_release(fs_info->vol_sema);
+    if ( rc != 0 )
+      rtems_set_errno_and_return_minus_one(EIO);
 
     return RC_OK;
 }

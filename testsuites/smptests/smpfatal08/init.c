@@ -16,9 +16,8 @@
   #include "config.h"
 #endif
 
-#include "tmacros.h"
-
 #include <rtems.h>
+#include <rtems/test.h>
 #include <rtems/score/smpimpl.h>
 
 #include <bsp.h>
@@ -90,40 +89,42 @@ static void Init(rtems_task_argument arg)
 
 static void fatal_extension(
   rtems_fatal_source source,
-  bool always_set_to_false,
+  bool is_internal,
   rtems_fatal_code code
 )
 {
-  TEST_BEGIN();
+  rtems_test_begink();
 
   if (
     source == RTEMS_FATAL_SOURCE_SMP
-      && !always_set_to_false
+      && !is_internal
       && code == SMP_FATAL_START_OF_MANDATORY_PROCESSOR_FAILED
   ) {
-    TEST_END();
+    rtems_test_endk();
   }
 }
 
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 
 #define CONFIGURE_INITIAL_EXTENSIONS \
   { .fatal = fatal_extension }, \
   RTEMS_TEST_INITIAL_EXTENSION
 
-#define CONFIGURE_MAXIMUM_PROCESSORS 2
+#define CONFIGURE_SMP_APPLICATION
+
+#define CONFIGURE_SMP_MAXIMUM_PROCESSORS 2
 
 #define CONFIGURE_SCHEDULER_SIMPLE_SMP
 
 #include <rtems/scheduler.h>
 
-RTEMS_SCHEDULER_SIMPLE_SMP(a);
+RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(a);
 
-#define CONFIGURE_SCHEDULER_TABLE_ENTRIES \
-  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(a, rtems_build_name('S', 'I', 'M', 'P'))
+#define CONFIGURE_SCHEDULER_CONTROLS \
+  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(a, rtems_build_name('S', 'I', 'M', 'P'))
 
-#define CONFIGURE_SCHEDULER_ASSIGNMENTS \
+#define CONFIGURE_SMP_SCHEDULER_ASSIGNMENTS \
   RTEMS_SCHEDULER_ASSIGN(0, RTEMS_SCHEDULER_ASSIGN_PROCESSOR_MANDATORY), \
   RTEMS_SCHEDULER_ASSIGN(0, RTEMS_SCHEDULER_ASSIGN_PROCESSOR_MANDATORY)
 

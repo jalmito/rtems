@@ -18,11 +18,22 @@
 #include "config.h"
 #endif
 
-#include <rtems/posix/semaphoreimpl.h>
+#include <stdarg.h>
 
-int sem_wait( sem_t *sem )
+#include <errno.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <limits.h>
+
+#include <rtems/system.h>
+#include <rtems/posix/semaphoreimpl.h>
+#include <rtems/posix/time.h>
+#include <rtems/seterr.h>
+
+int sem_wait(
+  sem_t *sem
+)
 {
-  POSIX_SEMAPHORE_VALIDATE_OBJECT( sem );
-  _Semaphore_Wait( &sem->_Semaphore );
-  return 0;
+  return _POSIX_Semaphore_Wait_support( sem, true, WATCHDOG_NO_TIMEOUT );
 }

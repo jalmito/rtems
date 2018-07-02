@@ -27,7 +27,6 @@
 #include <rtems/posix/pthreadimpl.h>
 #include <rtems/posix/psignalimpl.h>
 #include <rtems/score/isr.h>
-#include <rtems/score/schedulerimpl.h>
 #include <rtems/score/statesimpl.h>
 #include <rtems/seterr.h>
 
@@ -53,9 +52,9 @@
  */
 
 #define _POSIX_signals_Is_interested( _api, _mask ) \
-  ( (_api)->signals_unblocked & (_mask) )
+  ( ~(_api)->signals_blocked & (_mask) )
 
-int _POSIX_signals_Send(
+int killinfo(
   pid_t               pid,
   int                 sig,
   const union sigval *value
@@ -71,13 +70,11 @@ int _POSIX_signals_Send(
   Thread_Control              *the_thread;
   Thread_Control              *interested;
   Priority_Control             interested_priority;
+  Chain_Control               *the_chain;
   Chain_Node                  *the_node;
   siginfo_t                    siginfo_struct;
   siginfo_t                   *siginfo;
   POSIX_signals_Siginfo_node  *psiginfo;
-  Thread_queue_Heads          *heads;
-  Thread_queue_Context         queue_context;
-  Per_CPU_Control             *cpu_self;
 
   /*
    *  Only supported for the "calling process" (i.e. this node).
@@ -122,14 +119,13 @@ int _POSIX_signals_Send(
     siginfo->si_value = *value;
   }
 
-  /* FIXME: https://devel.rtems.org/ticket/2690 */
-  cpu_self = _Thread_Dispatch_disable();
+  _Thread_Disable_dispatch();
 
   /*
    *  Is the currently executing thread interested?  If so then it will
    *  get it an execute it as soon as the dispatcher executes.
    */
-  the_thread = _Per_CPU_Get_executing( cpu_self );
+  the_thread = _Thread_Executing;
 
   api = the_thread->API_Extensions[ THREAD_API_POSIX ];
   if ( _POSIX_signals_Is_interested( api, mask ) ) {
@@ -144,37 +140,32 @@ int _POSIX_signals_Send(
 
   /* XXX violation of visibility -- need to define thread queue support */
 
-  heads = _POSIX_signals_Wait_queue.Queue.heads;
-  if ( heads != NULL ) {
-    Chain_Control *the_chain = &heads->Heads.Fifo;
+  the_chain = &_POSIX_signals_Wait_queue.Queues.Fifo;
 
-    for ( the_node = _Chain_First( the_chain );
-          !_Chain_Is_tail( the_chain, the_node ) ;
-          the_node = the_node->next ) {
-      Scheduler_Node *scheduler_node;
+  for ( the_node = _Chain_First( the_chain );
+        !_Chain_Is_tail( the_chain, the_node ) ;
+        the_node = the_node->next ) {
 
-      scheduler_node = SCHEDULER_NODE_OF_WAIT_PRIORITY_NODE( the_node );
-      the_thread = _Scheduler_Node_get_owner( scheduler_node );
-      api = the_thread->API_Extensions[ THREAD_API_POSIX ];
+    the_thread = THREAD_CHAIN_NODE_TO_THREAD( the_node );
+    api = the_thread->API_Extensions[ THREAD_API_POSIX ];
 
-      #if defined(DEBUG_SIGNAL_PROCESSING)
-        printk( "Waiting Thread=%p option=0x%08x mask=0x%08x blocked=0x%08x\n",
-          the_thread, the_thread->Wait.option, mask, ~api->signals_unblocked);
-      #endif
+    #if defined(DEBUG_SIGNAL_PROCESSING)
+      printk( "Waiting Thread=%p option=0x%08x mask=0x%08x blocked=0x%08x\n",
+        the_thread, the_thread->Wait.option, mask, api->signals_blocked);
+    #endif
 
-      /*
-       * Is this thread is actually blocked waiting for the signal?
-       */
-      if (the_thread->Wait.option & mask)
-        goto process_it;
+    /*
+     * Is this thread is actually blocked waiting for the signal?
+     */
+    if (the_thread->Wait.option & mask)
+      goto process_it;
 
-      /*
-       * Is this thread is blocked waiting for another signal but has
-       * not blocked this one?
-       */
-      if (api->signals_unblocked & mask)
-        goto process_it;
-    }
+    /*
+     * Is this thread is blocked waiting for another signal but has
+     * not blocked this one?
+     */
+    if (~api->signals_blocked & mask)
+      goto process_it;
   }
 
   /*
@@ -193,7 +184,7 @@ int _POSIX_signals_Send(
    *    + rtems internal threads do not receive signals.
    */
   interested = NULL;
-  interested_priority = UINT64_MAX;
+  interested_priority = PRIORITY_MAXIMUM + 1;
 
   for (the_api = OBJECTS_CLASSIC_API; the_api <= OBJECTS_APIS_LAST; the_api++) {
 
@@ -204,8 +195,16 @@ int _POSIX_signals_Send(
       continue;
 
     the_info = _Objects_Information_table[ the_api ][ 1 ];
-    if ( !the_info )
-      continue;
+
+    #if defined(RTEMS_DEBUG)
+      /*
+       *  This cannot happen in the current (as of June 2009) implementation
+       *  of initialization but at some point, the object information
+       *  structure for a particular manager may not be installed.
+       */
+      if ( !the_info )
+        continue;
+    #endif
 
     maximum = the_info->maximum;
     object_table = the_info->local_table;
@@ -220,7 +219,7 @@ int _POSIX_signals_Send(
         printk("\n 0x%08x/0x%08x %d/%d 0x%08x 1",
           the_thread->Object.id,
           ((interested) ? interested->Object.id : 0),
-          _Thread_Get_priority( the_thread ), interested_priority,
+          the_thread->current_priority, interested_priority,
           the_thread->current_state
         );
       #endif
@@ -229,7 +228,7 @@ int _POSIX_signals_Send(
        *  If this thread is of lower priority than the interested thread,
        *  go on to the next thread.
        */
-      if ( _Thread_Get_priority( the_thread ) > interested_priority )
+      if ( the_thread->current_priority > interested_priority )
         continue;
       DEBUG_STEP("2");
 
@@ -256,9 +255,9 @@ int _POSIX_signals_Send(
        *        so we never have to worry about deferencing a NULL
        *        interested thread.
        */
-      if ( _Thread_Get_priority( the_thread ) < interested_priority ) {
+      if ( the_thread->current_priority < interested_priority ) {
         interested   = the_thread;
-        interested_priority = _Thread_Get_priority( the_thread );
+        interested_priority = the_thread->current_priority;
         continue;
       }
       DEBUG_STEP("4");
@@ -276,7 +275,7 @@ int _POSIX_signals_Send(
         DEBUG_STEP("5");
         if ( _States_Is_ready( the_thread->current_state ) ) {
           interested          = the_thread;
-          interested_priority = _Thread_Get_priority( the_thread );
+          interested_priority = the_thread->current_priority;
           continue;
         }
 
@@ -287,7 +286,7 @@ int _POSIX_signals_Send(
           if ( _States_Is_interruptible_by_signal(the_thread->current_state) ) {
             DEBUG_STEP("8");
             interested          = the_thread;
-            interested_priority = _Thread_Get_priority( the_thread );
+            interested_priority = the_thread->current_priority;
             continue;
           }
         }
@@ -325,7 +324,7 @@ process_it:
    *  blocked waiting for the signal.
    */
   if ( _POSIX_signals_Unblock_thread( the_thread, sig, siginfo ) ) {
-    _Thread_Dispatch_enable( cpu_self );
+    _Thread_Enable_dispatch();
     return 0;
   }
 
@@ -337,29 +336,21 @@ post_process_signal:
    */
   _POSIX_signals_Set_process_signals( mask );
 
-  _Thread_queue_Context_initialize( &queue_context );
-  _POSIX_signals_Acquire( &queue_context );
-
   if ( _POSIX_signals_Vectors[ sig ].sa_flags == SA_SIGINFO ) {
 
     psiginfo = (POSIX_signals_Siginfo_node *)
-      _Chain_Get_unprotected( &_POSIX_signals_Inactive_siginfo );
+               _Chain_Get( &_POSIX_signals_Inactive_siginfo );
     if ( !psiginfo ) {
-      _POSIX_signals_Release( &queue_context );
-      _Thread_Dispatch_enable( cpu_self );
+      _Thread_Enable_dispatch();
       rtems_set_errno_and_return_minus_one( EAGAIN );
     }
 
     psiginfo->Info = *siginfo;
 
-    _Chain_Append_unprotected(
-      &_POSIX_signals_Siginfo[ sig ],
-      &psiginfo->Node
-    );
+    _Chain_Append( &_POSIX_signals_Siginfo[ sig ], &psiginfo->Node );
   }
 
-  _POSIX_signals_Release( &queue_context );
   DEBUG_STEP("\n");
-  _Thread_Dispatch_enable( cpu_self );
+  _Thread_Enable_dispatch();
   return 0;
 }

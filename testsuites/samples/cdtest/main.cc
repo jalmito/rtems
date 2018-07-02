@@ -23,12 +23,10 @@
  */
 
 #include <rtems.h>
-#include <rtems/bspIo.h>
 #include <rtems/test.h>
 
 #include <cstdio>
 #include <cstdlib>
-#include <stdexcept>
 
 #ifdef RTEMS_TEST_IO_STREAM
 #include <iostream>
@@ -36,7 +34,7 @@
 
 const char rtems_test_name[] = "CONSTRUCTOR/DESTRUCTOR";
 
-extern "C"
+extern "C" 
 {
 #include <tmacros.h>
 extern rtems_task main_task(rtems_task_argument);
@@ -44,25 +42,10 @@ extern rtems_task main_task(rtems_task_argument);
 
 static int num_inst = 0;
 
-static void check_begin_of_test(void)
-{
-  if ( num_inst == 0 ) {
-    TEST_BEGIN();
-  }
-}
-
-static void check_end_of_test(void)
-{
-  if ( num_inst == 0 ) {
-    TEST_END();
-  }
-}
-
 class AClass {
 public:
   AClass(const char *p = "LOCAL" ) : ptr( p )
     {
-        check_begin_of_test();
         num_inst++;
         printf(
           "%s: Hey I'm in base class constructor number %d for %p.\n",
@@ -86,7 +69,6 @@ public:
         );
         printk("Derived class - %s\n", string);
         num_inst--;
-        check_end_of_test();
     };
 
     virtual void print()  { printf("%s\n", string); };
@@ -98,9 +80,8 @@ protected:
 
 class BClass : public AClass {
 public:
-  BClass(const char *p = "LOCAL" ) : AClass( p )
+  BClass(const char *p = "LOCAL" ) : AClass( p ) 
     {
-        check_begin_of_test();
         num_inst++;
         printf(
           "%s: Hey I'm in derived class constructor number %d for %p.\n",
@@ -124,28 +105,27 @@ public:
         );
         printk("Derived class - %s\n", string);
         num_inst--;
-        check_end_of_test();
     };
 
     void print()  { printf("Derived class - %s\n", string); }
 };
 
 
-class RtemsException
+class RtemsException 
 {
 public:
-
+    
     RtemsException( const char *module, int ln, int err = 0 )
     : error( err ), line( ln ), file( module )
     {
       printf( "RtemsException raised=File:%s, Line:%d, Error=%X\n",
-               file, line, error );
+               file, line, error ); 
     }
 
     void show()
     {
       printf( "RtemsException ---> File:%s, Line:%d, Error=%X\n",
-               file, line, error );
+               file, line, error ); 
     }
 
 private:
@@ -184,26 +164,30 @@ cdtest(void)
 
 static void foo_function()
 {
-    try
+    try 
     {
-      throw "foo_function() throw this exception";
+      throw "foo_function() throw this exception";  
     }
     catch( const char *e )
     {
      printf( "foo_function() catch block called:\n   < %s  >\n", e );
-     throw "foo_function() re-throwing execption...";
+     throw "foo_function() re-throwing execption...";  
     }
 }
 
 rtems_task main_task(
-  rtems_task_argument
+  rtems_task_argument 
 )
 {
+    TEST_BEGIN();
+
     cdtest();
+
+    TEST_END();
 
     printf( "*** TESTING C++ EXCEPTIONS ***\n\n" );
 
-    try
+    try 
     {
       foo_function();
     }
@@ -211,27 +195,17 @@ rtems_task main_task(
     {
        printf( "Success catching a char * exception\n%s\n", e );
     }
-
-    try
-    {
-      throw std::runtime_error("thrown std::runtime object");
-    }
-    catch (std::exception const& e)
-    {
-       printf("throw std::runtime: caught: %s\n", e.what());
-    }
-
-    try
+    try 
     {
       printf( "throw an instance based exception\n" );
-		throw RtemsException( __FILE__, __LINE__, 0x55 );
+		throw RtemsException( __FILE__, __LINE__, 0x55 ); 
     }
-    catch( RtemsException & ex )
+    catch( RtemsException & ex ) 
     {
        printf( "Success catching RtemsException...\n" );
        ex.show();
     }
-    catch(...)
+    catch(...) 
     {
       printf( "Caught another exception.\n" );
     }

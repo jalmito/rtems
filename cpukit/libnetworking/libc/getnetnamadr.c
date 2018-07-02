@@ -32,7 +32,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <rtems/rtems_netdb.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <errno.h>

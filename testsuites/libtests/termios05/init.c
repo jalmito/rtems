@@ -21,7 +21,6 @@
 #include <unistd.h>
 #include <termios.h>
 #include <rtems/dumpbuf.h>
-#include <rtems/termiostypes.h>
 
 const char rtems_test_name[] = "TERMIOS 5";
 
@@ -147,13 +146,16 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 #define CONFIGURE_APPLICATION_EXTRA_DRIVERS \
   TERMIOS_TEST_DRIVER_TABLE_ENTRY
 
 /* include an extra slot for registering the termios one dynamically */
 #define CONFIGURE_MAXIMUM_DRIVERS 3
+
+/* one for the console and one for the test port */
+#define CONFIGURE_NUMBER_OF_TERMIOS_PORTS 3
 
 /* we need to be able to open the test device */
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 4
@@ -163,8 +165,6 @@ rtems_task Init(
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
-
-#define CONFIGURE_DISABLE_SMP_CONFIGURATION
 
 #define CONFIGURE_INIT
 

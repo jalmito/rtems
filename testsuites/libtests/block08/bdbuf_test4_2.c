@@ -94,7 +94,7 @@ bdbuf_test4_2_main()
     /* Exit from thread #1 */
     CONTINUE_THREAD(1);
 
-    TEST_STOP();
+    TEST_END();
 }
 
 static rtems_task
@@ -159,3 +159,5 @@ bdbuf_test4_2_thread2(rtems_task_argument arg)
     }
     THREAD_END();
 }
+
+

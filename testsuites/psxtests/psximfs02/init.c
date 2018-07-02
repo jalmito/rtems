@@ -25,6 +25,10 @@
 
 const char rtems_test_name[] = "PSXIMFS 2";
 
+#if !HAVE_DECL_SETEUID
+extern int seteuid(uid_t euid);
+#endif
+
 /* forward declarations to avoid warnings */
 rtems_task Init(rtems_task_argument argument);
 
@@ -46,8 +50,8 @@ rtems_task Init(
 
   int status = 0;
   void *opaque;
-  char linkname_n[32] = {0};
-  char linkname_p[32] = {0};
+  char linkname_n[20] = {0};
+  char linkname_p[20] = {0};
   int i;
   struct stat stat_buf;
 
@@ -70,8 +74,8 @@ rtems_task Init(
   rtems_test_assert( status == 0 );
 
   for( i = 1 ; ; ++i ) {
-    sprintf( linkname_p, "dir01-link%04d", i-1 );
-    sprintf( linkname_n, "dir01-link%04d", i );
+    sprintf( linkname_p, "dir01-link%d", i-1 );
+    sprintf( linkname_n, "dir01-link%d", i );
     printf( "\nCreating link %s for %s\n", linkname_n, linkname_p );
     status = link( linkname_p, linkname_n );
     if( status != 0 ) {
@@ -156,6 +160,7 @@ rtems_task Init(
   status = seteuid( 10 );
   rtems_test_assert( status == 0 );
 
+#if defined(RTEMS_POSIX_API)
   puts( "Attempt chmod on /node -- expect EPERM" );
   status = chmod( "/node", S_IRUSR );
   rtems_test_assert( status == -1 );
@@ -165,6 +170,10 @@ rtems_task Init(
   status = chown( "/node", 10, 10 );
   rtems_test_assert( status == -1 );
   rtems_test_assert( errno == EPERM );
+#else
+  puts( "Attempt chmod on /node -- EPERM only when POSIX enabled" );
+  puts( "Attempt chown on /node -- EPERM only when POSIX enabled" );
+#endif
 
   puts( "Changing euid back to 0 [root]" );
   status = seteuid( 0 );
@@ -196,7 +205,7 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_FILESYSTEM_IMFS
@@ -206,7 +215,6 @@ rtems_task Init(
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 4
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
-#define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
 
 #define CONFIGURE_INIT

@@ -18,13 +18,19 @@
 #include "config.h"
 #endif
 
-#include <rtems/posix/semaphoreimpl.h>
-#include <rtems/config.h>
-#include <rtems/sysinit.h>
+#include <stdarg.h>
 
+#include <errno.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <semaphore.h>
 #include <limits.h>
 
-Objects_Information _POSIX_Semaphore_Information;
+#include <rtems/system.h>
+#include <rtems/config.h>
+#include <rtems/posix/semaphoreimpl.h>
+#include <rtems/posix/time.h>
+#include <rtems/seterr.h>
 
 /*
  *  _POSIX_Semaphore_Manager_initialization
@@ -36,7 +42,7 @@ Objects_Information _POSIX_Semaphore_Information;
  *  Output parameters:  NONE
  */
 
-static void _POSIX_Semaphore_Manager_initialization(void)
+void _POSIX_Semaphore_Manager_initialization(void)
 {
   _Objects_Initialize_information(
     &_POSIX_Semaphore_Information, /* object information table */
@@ -47,13 +53,11 @@ static void _POSIX_Semaphore_Manager_initialization(void)
     sizeof( POSIX_Semaphore_Control ),
                                 /* size of this object's control block */
     true,                       /* true if names for this object are strings */
-    _POSIX_PATH_MAX,            /* maximum length of each object's name */
+    _POSIX_PATH_MAX             /* maximum length of each object's name */
+#if defined(RTEMS_MULTIPROCESSING)
+    ,
+    false,                      /* true if this is a global object class */
     NULL                        /* Proxy extraction support callout */
+#endif
   );
 }
-
-RTEMS_SYSINIT_ITEM(
-  _POSIX_Semaphore_Manager_initialization,
-  RTEMS_SYSINIT_POSIX_SEMAPHORE,
-  RTEMS_SYSINIT_ORDER_MIDDLE
-);

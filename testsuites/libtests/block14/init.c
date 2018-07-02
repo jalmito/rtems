@@ -155,7 +155,7 @@ static void test_actions(rtems_disk_device *dd)
     );
   }
 
-  rtems_blkdev_print_stats(&dd->stats, 0, 1, 2, &rtems_test_printer);
+  rtems_blkdev_print_stats(&dd->stats, rtems_printf_plugin, NULL);
 }
 
 static void test(void)
@@ -201,7 +201,7 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_LIBBLOCK
 
 #define CONFIGURE_BDBUF_BUFFER_MIN_SIZE 1
@@ -218,7 +218,6 @@ static void Init(rtems_task_argument arg)
 
 #define CONFIGURE_INIT_TASK_INITIAL_MODES RTEMS_DEFAULT_MODES
 #define CONFIGURE_INIT_TASK_PRIORITY 2
-#define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
 
 #define CONFIGURE_INIT
 

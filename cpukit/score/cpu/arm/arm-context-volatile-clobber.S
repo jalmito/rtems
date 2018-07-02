@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2017 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2013-2014 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
  *  Dornierstr. 4
@@ -20,11 +20,7 @@
 
 	.section	.text
 
-#ifdef __thumb__
 FUNCTION_THUMB_ENTRY(_CPU_Context_volatile_clobber)
-#else
-FUNCTION_ENTRY(_CPU_Context_volatile_clobber)
-#endif
 
 .macro clobber_register reg
 	sub	r0, r0, #1
@@ -33,7 +29,8 @@ FUNCTION_ENTRY(_CPU_Context_volatile_clobber)
 
 #ifdef ARM_MULTILIB_VFP
 	vmrs	r1, FPSCR
-	ldr	r2, =0xf000001f
+	movs	r2, #0x001f
+	movt	r2, #0xf800
 	bic	r1, r1, r2
 	and	r2, r2, r0
 	orr	r1, r1, r2

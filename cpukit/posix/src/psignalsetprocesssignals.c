@@ -30,16 +30,16 @@
 #include <rtems/posix/threadsup.h>
 #include <rtems/posix/psignalimpl.h>
 #include <rtems/posix/pthreadimpl.h>
+#include <rtems/posix/time.h>
 #include <stdio.h>
 
 void _POSIX_signals_Set_process_signals(
   sigset_t   mask
 )
 {
-  Thread_queue_Context queue_context;
+  ISR_lock_Context lock_context;
 
-  _Thread_queue_Context_initialize( &queue_context );
-  _POSIX_signals_Acquire( &queue_context );
+  _POSIX_signals_Acquire( &lock_context );
     _POSIX_signals_Pending |= mask;
-  _POSIX_signals_Release( &queue_context );
+  _POSIX_signals_Release( &lock_context );
 }

@@ -14,11 +14,14 @@
 #define _PRITIME_H
 
 #include <inttypes.h>
-#include <rtems/score/cpuopts.h>
 
-#if __RTEMS_SIZEOF_TIME_T__ == 8
+#ifndef SIZEOF_TIME_T
+#error "missing SIZEOF_TIME_T"
+#endif
+
+#if SIZEOF_TIME_T == 8
 #define PRIdtime_t PRId64
-#elif __RTEMS_SIZEOF_TIME_T__ == 4
+#elif SIZEOF_TIME_T == 4
 #define PRIdtime_t PRId32
 #else
 #error "unsupported size of time_t"

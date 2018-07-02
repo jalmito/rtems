@@ -106,7 +106,7 @@ rtems_task Last_task(
     end_time,
     OPERATION_COUNT,
     0,
-    0
+    CALLING_OVERHEAD_TASK_DELETE
   );
 
   TEST_END();

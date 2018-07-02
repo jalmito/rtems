@@ -18,28 +18,14 @@
 #include "config.h"
 #endif
 
+#include <pthread.h>
+#include <errno.h>
+
+#include <rtems/system.h>
+#include <rtems/score/watchdog.h>
 #include <rtems/posix/condimpl.h>
-
-#include <string.h>
-
-bool _POSIX_Condition_variables_Auto_initialization(
-  POSIX_Condition_variables_Control *the_cond
-)
-{
-  POSIX_Condition_variables_Control zero;
-  unsigned long                     flags;
-
-  memset( &zero, 0, sizeof( zero ) );
-
-  if ( memcmp( the_cond, &zero, sizeof( *the_cond ) ) != 0 ) {
-    return false;
-  }
-
-  flags = (uintptr_t) the_cond ^ POSIX_CONDITION_VARIABLES_MAGIC;
-  flags &= ~POSIX_CONDITION_VARIABLES_FLAGS_MASK;
-  the_cond->flags = flags;
-  return true;
-}
+#include <rtems/posix/time.h>
+#include <rtems/posix/muteximpl.h>
 
 /*
  *  11.4.4 Waiting on a Condition, P1003.1c/Draft 10, p. 105
@@ -53,6 +39,7 @@ int pthread_cond_wait(
   return _POSIX_Condition_variables_Wait_support(
     cond,
     mutex,
-    NULL
+    WATCHDOG_NO_TIMEOUT,
+    false
   );
 }

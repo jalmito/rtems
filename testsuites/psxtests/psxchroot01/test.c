@@ -73,8 +73,6 @@ int main(
 
   int status;
   void *opaque;
-  struct stat st;
-
 /*
  *  This test is the C equivalent of this sequence.
 #mkdir /one
@@ -114,10 +112,6 @@ int main(
   status = chroot( "/one/one.test" );
   rtems_test_assert( status == -1 );
   rtems_test_assert( errno == ENOTDIR );
-
-  /* Perform deferred global location releases */
-  status = stat( ".", &st );
-  rtems_test_assert( status == 0 );
 
   puts( "allocate most of memory - attempt to fail chroot - expect ENOMEM" );
   opaque = rtems_heap_greedy_allocate( global_location_size, 1 );

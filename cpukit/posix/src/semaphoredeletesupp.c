@@ -18,13 +18,32 @@
 #include "config.h"
 #endif
 
-#include <rtems/posix/semaphoreimpl.h>
+#include <stdarg.h>
 
-void _POSIX_Semaphore_Delete( POSIX_Semaphore_Control *the_semaphore )
+#include <errno.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <limits.h>
+
+#include <rtems/system.h>
+#include <rtems/posix/semaphoreimpl.h>
+#include <rtems/posix/time.h>
+#include <rtems/seterr.h>
+
+void _POSIX_Semaphore_Delete(
+  POSIX_Semaphore_Control *the_semaphore
+)
 {
   if ( !the_semaphore->linked && !the_semaphore->open_count ) {
-    _Objects_Close( &_POSIX_Semaphore_Information, &the_semaphore->Object );
-    _POSIX_Semaphore_Destroy( &the_semaphore->Semaphore );
+      _Objects_Close( &_POSIX_Semaphore_Information, &the_semaphore->Object );
+
+      _CORE_semaphore_Flush(
+        &the_semaphore->Semaphore,
+        NULL,
+        -1
+      );
+
     _POSIX_Semaphore_Free( the_semaphore );
   }
 }

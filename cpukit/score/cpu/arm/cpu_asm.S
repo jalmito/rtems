@@ -19,7 +19,7 @@
  *  COPYRIGHT (c) 2000 Canon Research Centre France SA.
  *  Emmanuel Raguet, mailto:raguet@crf.canon.fr
  *
- *  Copyright (c) 2013, 2017 embedded brains GmbH
+ *  Copyright (c) 2013-2014 embedded brains GmbH
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
@@ -55,25 +55,22 @@
 
 DEFINE_FUNCTION_ARM(_CPU_Context_switch)
 /* Start saving context */
-	GET_SELF_CPU_CONTROL	r2
-	ldr	r3, [r2, #PER_CPU_ISR_DISPATCH_DISABLE]
-	stm	r0, {r4, r5, r6, r7, r8, r9, r10, r11, r13, r14}
+	mrs	r2, CPSR
+	stmia	r0,  {r2, r4, r5, r6, r7, r8, r9, r10, r11, r13, r14}
 
 #ifdef ARM_MULTILIB_VFP
-	add	r5, r0, #ARM_CONTEXT_CONTROL_D8_OFFSET
-	vstm	r5, {d8-d15}
+	add	r3, r0, #ARM_CONTEXT_CONTROL_D8_OFFSET
+	vstm	r3, {d8-d15}
 #endif
 
-	str	r3, [r0, #ARM_CONTEXT_CONTROL_ISR_DISPATCH_DISABLE]
+#ifdef ARM_MULTILIB_HAS_THREAD_ID_REGISTER
+	mrc	p15, 0, r3, c13, c0, 3
+	str	r3, [r0, #ARM_CONTEXT_CONTROL_THREAD_ID_OFFSET]
+#endif
 
 #ifdef RTEMS_SMP
-	/*
-	 * The executing thread no longer executes on this processor.  Switch
-	 * the stack to the temporary interrupt stack of this processor.  Mark
-	 * the context of the executing thread as not executing.
-	 */
+	/* The executing context no longer executes on this processor */
 	dmb
-	add	sp, r2, #(PER_CPU_INTERRUPT_FRAME_AREA + CPU_INTERRUPT_FRAME_SIZE)
 	mov	r3, #0
 	strb	r3, [r0, #ARM_CONTEXT_CONTROL_IS_EXECUTING_OFFSET]
 
@@ -83,13 +80,13 @@ DEFINE_FUNCTION_ARM(_CPU_Context_switch)
 	add	r3, r1, #ARM_CONTEXT_CONTROL_IS_EXECUTING_OFFSET
 	ldrexb	r4, [r3]
 	cmp	r4, #0
-	bne	.L_get_potential_new_heir
+	bne	.L_check_thread_dispatch_necessary
 
 	/* Try to update the is executing indicator of the heir context */
 	mov	r4, #1
 	strexb	r5, r4, [r3]
 	cmp	r5, #0
-	bne	.L_get_potential_new_heir
+	bne	.L_check_thread_dispatch_necessary
 	dmb
 #endif
 
@@ -101,29 +98,22 @@ DEFINE_FUNCTION_ARM(_CPU_Context_switch)
 
 #ifdef ARM_MULTILIB_HAS_THREAD_ID_REGISTER
 	ldr	r3, [r1, #ARM_CONTEXT_CONTROL_THREAD_ID_OFFSET]
-#endif
-
-	ldr	r4, [r1, #ARM_CONTEXT_CONTROL_ISR_DISPATCH_DISABLE]
-
-#ifdef ARM_MULTILIB_VFP
-	add	r5, r1, #ARM_CONTEXT_CONTROL_D8_OFFSET
-	vldm	r5, {d8-d15}
-#endif
-
-#ifdef ARM_MULTILIB_HAS_THREAD_ID_REGISTER
 	mcr	p15, 0, r3, c13, c0, 3
 #endif
 
-	str	r4, [r2, #PER_CPU_ISR_DISPATCH_DISABLE]
-
-	/* In ARMv5T and above the load of PC is an interworking branch */
-#if __ARM_ARCH >= 5
-	ldm	r1, {r4, r5, r6, r7, r8, r9, r10, r11, r13, pc}
-#else
-	ldm	r1, {r4, r5, r6, r7, r8, r9, r10, r11, r13, r14}
-	bx	lr
+#ifdef ARM_MULTILIB_VFP
+	add	r3, r1, #ARM_CONTEXT_CONTROL_D8_OFFSET
+	vldm	r3, {d8-d15}
 #endif
 
+	ldmia	r1,  {r2, r4, r5, r6, r7, r8, r9, r10, r11, r13, r14}
+	msr	CPSR_fsxc, r2
+#ifdef __thumb__
+	bx	lr
+	nop
+#else
+	mov	pc, lr
+#endif
 /*
  *  void _CPU_Context_restore( new_context )
  *
@@ -133,24 +123,28 @@ DEFINE_FUNCTION_ARM(_CPU_Context_switch)
  */
 DEFINE_FUNCTION_ARM(_CPU_Context_restore)
         mov     r1, r0
-	GET_SELF_CPU_CONTROL	r2
         b       .L_restore
 
 #ifdef RTEMS_SMP
-.L_get_potential_new_heir:
+.L_check_thread_dispatch_necessary:
 
-	/* We may have a new heir */
+	GET_SELF_CPU_CONTROL	r2, r3
+
+	/* Check if a thread dispatch is necessary */
+	ldrb	r4, [r2, #PER_CPU_DISPATCH_NEEDED]
+	cmp	r4, #0
+	beq	.L_check_is_executing
+
+	/* We have a new heir */
+
+	/* Clear the thread dispatch necessary flag */
+	mov	r4, #0
+	strb	r4, [r2, #PER_CPU_DISPATCH_NEEDED]
+	dmb
 
 	/* Read the executing and heir */
 	ldr	r4, [r2, #PER_CPU_OFFSET_EXECUTING]
 	ldr	r5, [r2, #PER_CPU_OFFSET_HEIR]
-
-	/*
-	 * Update the executing only if necessary to avoid cache line
-	 * monopolization.
-	 */
-	cmp	r4, r5
-	beq	.L_check_is_executing
 
 	/* Calculate the heir context pointer */
 	sub	r4, r1, r4

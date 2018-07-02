@@ -57,10 +57,7 @@
 
 #include <rtems/userenv.h>
 #include <rtems/error.h>
-
-#ifdef RTEMS_NETWORKING
 #include <rtems/rtems_bsdnet.h>
-#endif
 
 #define PARANOIA
 
@@ -90,16 +87,9 @@ rtems_id telnetd_dflt_spawn(
 );
 
 /***********************************************************/
-static rtems_telnetd_config_table *telnetd_config;
-static rtems_id                    telnetd_task_id;
+static rtems_id telnetd_task_id = RTEMS_ID_NONE;
 
-/*
- * chrisj: this variable was global and with no declared interface in a header
- *         file and with no means to set it so I have stopped it being global;
- *         if this breaks any user they will have be to provide a formal
- *         interface to get this change reverted.
- */
-static const rtems_id (*telnetd_spawn_task)(
+rtems_id (*telnetd_spawn_task)(
   const char *,
   unsigned,
   unsigned,
@@ -217,24 +207,24 @@ rtems_task_telnetd(void *task_argument)
   };
 
   /* we don't redirect stdio as this probably
-   * was started from the console anyway ..
+   * was started from the console anyways..
    */
   do {
-    if (telnetd_config->keep_stdio) {
+    if (rtems_telnetd_config.keep_stdio) {
       bool start = true;
       char device_name [32];
 
       ttyname_r( 1, device_name, sizeof( device_name));
-      if (telnetd_config->login_check != NULL) {
+      if (rtems_telnetd_config.login_check != NULL) {
         start = rtems_shell_login_prompt(
           stdin,
           stderr,
           device_name,
-          telnetd_config->login_check
+          rtems_telnetd_config.login_check
         );
       }
       if (start) {
-        telnetd_config->command( device_name, arg->arg);
+        rtems_telnetd_config.command( device_name, arg->arg);
       } else {
         syslog(
           LOG_AUTHPRIV | LOG_WARNING,
@@ -254,13 +244,13 @@ rtems_task_telnetd(void *task_argument)
       arg = malloc( sizeof(*arg) );
 
       arg->devname = devname;
-      arg->arg = telnetd_config->arg;
+      arg->arg = rtems_telnetd_config.arg;
       strncpy(arg->peername, peername, sizeof(arg->peername));
 
       telnetd_task_id = telnetd_spawn_task(
         devname,
-        telnetd_config->priority,
-        telnetd_config->stack_size,
+        rtems_telnetd_config.priority,
+        rtems_telnetd_config.stack_size,
         spawned_shell,
         arg
       );
@@ -297,70 +287,55 @@ rtems_task_telnetd(void *task_argument)
   telnetd_task_id = RTEMS_ID_NONE;
 }
 
-rtems_status_code rtems_telnetd_start(const rtems_telnetd_config_table* config)
+rtems_status_code rtems_telnetd_initialize( void)
 {
-  if (telnetd_config != NULL) {
+  if (telnetd_task_id != RTEMS_ID_NONE) {
     fprintf(stderr, "telnetd already started\n");
     return RTEMS_RESOURCE_IN_USE;
   }
 
-  if (config->command == NULL) {
+  if (rtems_telnetd_config.command == NULL) {
     fprintf(stderr, "telnetd setup with invalid command\n");
     return RTEMS_IO_ERROR;
   }
 
-  telnetd_config = calloc(1, sizeof(*telnetd_config));
-  if (telnetd_config == NULL) {
-    fprintf(stderr, "telnetd cannot alloc telnetd config table\n");
-    return RTEMS_NO_MEMORY;
-  }
-
-
   if ( !telnet_pty_initialize() ) {
     fprintf(stderr, "telnetd cannot initialize PTY driver\n");
-    free(telnetd_config);
-    telnetd_config = NULL;
     return RTEMS_IO_ERROR;
   }
 
-  *telnetd_config = *config;
-
   /* Check priority */
-#ifdef RTEMS_NETWORKING
-  if (telnetd_config->priority <= 0) {
-    telnetd_config->priority = rtems_bsdnet_config.network_task_priority;
+  if (rtems_telnetd_config.priority <= 0) {
+    rtems_telnetd_config.priority = rtems_bsdnet_config.network_task_priority;
   }
-#endif
-  if (telnetd_config->priority < 2) {
-    telnetd_config->priority = 100;
+  if (rtems_telnetd_config.priority < 2) {
+    rtems_telnetd_config.priority = 100;
   }
 
   /* Check stack size */
-  if (telnetd_config->stack_size <= 0) {
-    telnetd_config->stack_size = (size_t)32 * 1024;
+  if (rtems_telnetd_config.stack_size <= 0) {
+    rtems_telnetd_config.stack_size = (size_t)32 * 1024;
   }
 
   /* Spawn task */
   telnetd_task_id = telnetd_spawn_task(
     "TNTD",
-    telnetd_config->priority,
-    telnetd_config->stack_size,
+    rtems_telnetd_config.priority,
+    rtems_telnetd_config.stack_size,
     rtems_task_telnetd,
     0
   );
   if (telnetd_task_id == RTEMS_ID_NONE) {
-    free(telnetd_config);
-    telnetd_config = NULL;
     return RTEMS_IO_ERROR;
   }
 
   /* Print status */
-  if (!telnetd_config->keep_stdio) {
+  if (!rtems_telnetd_config.keep_stdio) {
     fprintf(
       stderr,
       "telnetd started with stacksize = %u and priority = %d\n",
-      (unsigned) telnetd_config->stack_size,
-      (unsigned) telnetd_config->priority
+      (unsigned) rtems_telnetd_config.stack_size,
+      (unsigned) rtems_telnetd_config.priority
     );
   }
 
@@ -414,17 +389,17 @@ spawned_shell(void *targ)
   #endif
 
   /* call their routine */
-  if (telnetd_config->login_check != NULL) {
+  if (rtems_telnetd_config.login_check != NULL) {
     start = rtems_shell_login_prompt(
       stdin,
       stderr,
       arg->devname,
-      telnetd_config->login_check
+      rtems_telnetd_config.login_check
     );
     login_failed = !start;
   }
   if (start) {
-    telnetd_config->command( arg->devname, arg->arg);
+    rtems_telnetd_config.command( arg->devname, arg->arg);
   }
 
   stdin  = ostd[0];
@@ -507,19 +482,18 @@ telnetd_dflt_spawn(const char *name, unsigned int priority, unsigned int stackSi
 static __inline__ FILE *
 _stdin(void)  { return stdin; }
 #undef stdin
-FILE *stdin(void);
 FILE *stdin(void)  { return _stdin(); }
 #endif
 #ifdef stdout
-static __inline__ FILE * _stdout(void) { return stdout; }
+static __inline__ FILE *
+_stdout(void) { return stdout; }
 #undef stdout
-FILE *stdout(void);
 FILE *stdout(void) { return _stdout(); }
 #endif
 #ifdef stderr
-static __inline__ FILE * _stderr(void) { return stderr; }
+static __inline__ FILE *
+_stderr(void) { return stderr; }
 #undef stderr
-FILE *stderr(void);
 FILE *stderr(void) { return _stderr(); }
 #endif
 

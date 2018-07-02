@@ -75,7 +75,6 @@ void *_Freechain_Get(
 void _Freechain_Put( Freechain_Control *freechain, void *node )
 {
   if ( node != NULL ) {
-    _Chain_Initialize_node( node );
     _Chain_Prepend_unprotected( &freechain->Free, node );
   }
 }

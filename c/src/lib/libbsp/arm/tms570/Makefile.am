@@ -8,15 +8,17 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
-include $(top_srcdir)/../../bsp.am
 
-dist_project_lib_DATA = ../../../../../../bsps/arm/tms570/start/bsp_specs
+include_bspdir = $(includedir)/bsp
+
+include_bsp_ti_herculesdir = $(includedir)/bsp/ti_herc
+
+dist_project_lib_DATA = bsp_specs
 
 # ----------------------------
 # ------  Headers
 # ----------------------------
 
-<<<<<<< HEAD
 include_HEADERS = include/bsp.h
 
 nodist_include_HEADERS = ../../shared/include/coverhd.h
@@ -40,9 +42,6 @@ include_bsp_HEADERS += include/tms570-pom.h
 include_bsp_HEADERS += include/tms570-sci-driver.h
 include_bsp_HEADERS += include/system-clocks.h
 include_bsp_HEADERS += include/tms570-pinmux.h
-
-include_bsp_HEADERS += include/tms570-pins.h
-include_bsp_HEADERS += include/tms570ls3137zwt-pins.h
 
 include_bsp_ti_hercules_HEADERS = include/ti_herc/reg_adc.h
 include_bsp_ti_hercules_HEADERS += include/ti_herc/reg_ccmsr.h
@@ -83,142 +82,110 @@ include_bsp_ti_hercules_HEADERS += include/ti_herc/reg_pcr.h
 
 include_HEADERS += ../../shared/include/tm27.h
 
-=======
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 # ----------------------------
 # ------  Data
 # ----------------------------
 
-start.$(OBJEXT): ../../../../../../bsps/arm/shared/start/start.S
-	$(CPPASCOMPILE) -o $@ -c $<
-project_lib_DATA = start.$(OBJEXT)
+noinst_LIBRARIES = libbspstart.a
 
-<<<<<<< HEAD
+libbspstart_a_SOURCES = ../shared/start/start.S
+
+project_lib_DATA = start.$(OBJEXT)
+project_lib_DATA += startup/linkcmds
+
 EXTRA_DIST =
 EXTRA_DIST += startup/linkcmds.tms570ls3137_hdk
 EXTRA_DIST += startup/linkcmds.tms570ls3137_hdk_with_loader
 EXTRA_DIST += startup/linkcmds.tms570ls3137_hdk_sdram
 EXTRA_DIST += startup/linkcmds.tms570ls3137_hdk_intram
-=======
-project_lib_DATA += linkcmds
-dist_project_lib_DATA += ../../../../../../bsps/arm/tms570/start/linkcmds.tms570ls3137_hdk
-dist_project_lib_DATA += ../../../../../../bsps/arm/tms570/start/linkcmds.tms570ls3137_hdk_intram
-dist_project_lib_DATA += ../../../../../../bsps/arm/tms570/start/linkcmds.tms570ls3137_hdk_sdram
-dist_project_lib_DATA += ../../../../../../bsps/arm/tms570/start/linkcmds.tms570ls3137_hdk_with_loader
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 
 # ----------------------------
 # ------  LibBSP
 # ----------------------------
 
-project_lib_LIBRARIES = librtemsbsp.a
+noinst_LIBRARIES += libbsp.a
 
-librtemsbsp_a_SOURCES =
+libbsp_a_SOURCES =
+libbsp_a_CPPFLAGS =
+libbsp_a_LIBADD =
 
 # Shared
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/stackalloc.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/cpucounter/cpucounterdiff.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/cp15/arm-cp15-set-exception-handler.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/cp15/arm-cp15-set-ttb-entries.c
+libbsp_a_SOURCES += ../../shared/bootcard.c
+libbsp_a_SOURCES += ../../shared/bspclean.c
+libbsp_a_SOURCES += ../../shared/bspgetworkarea.c
+libbsp_a_SOURCES += ../../shared/bsplibc.c
+libbsp_a_SOURCES += ../../shared/bsppost.c
+libbsp_a_SOURCES += ../../shared/bsppredriverhook.c
+libbsp_a_SOURCES += ../../shared/gnatinstallhandler.c
+libbsp_a_SOURCES += ../../shared/sbrk.c
+libbsp_a_SOURCES += ../../shared/src/stackalloc.c
+libbsp_a_SOURCES += ../../shared/cpucounterdiff.c
 
 # Startup
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/start/bsp-start-memcpy.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/start/bsp-start-init-registers.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/bspreset.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/bspstart.c
+libbsp_a_SOURCES += ../shared/startup/bsp-start-memcpy.S
+libbsp_a_SOURCES += ../shared/startup/bsp-start-init-registers.S
+libbsp_a_SOURCES += ../../shared/bsppretaskinghook.c
+libbsp_a_SOURCES += startup/bspreset.c
+libbsp_a_SOURCES += startup/bspstart.c
 
 # POM
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/tms570-pom.c
+libbsp_a_SOURCES += pom/tms570-pom.c
 
 # IRQ
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/irq/irq-default-handler.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/irq/irq.c
+libbsp_a_SOURCES += ../../shared/src/irq-default-handler.c
+libbsp_a_SOURCES += ../../shared/src/irq-generic.c
+libbsp_a_SOURCES += ../../shared/src/irq-info.c
+libbsp_a_SOURCES += ../../shared/src/irq-legacy.c
+libbsp_a_SOURCES += ../../shared/src/irq-server.c
+libbsp_a_SOURCES += ../../shared/src/irq-shell.c
+libbsp_a_SOURCES += irq/irq.c
 
 # Console
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/console-termios.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/console/printk-support.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/console/tms570-sci.c
+libbsp_a_SOURCES += ../../shared/console-termios.c
+libbsp_a_SOURCES += console/printk-support.c
+libbsp_a_SOURCES += console/tms570-sci.c
 
 # Clock
-librtemsbsp_a_SOURCES +=../../../../../../bsps/arm/tms570/clock/clock.c
+libbsp_a_SOURCES += ../../shared/clockdrv_shell.h
+libbsp_a_SOURCES += clock/clock.c
+libbsp_a_SOURCES += clock/benchmark_timer.c
 
 # RTC
 
 # GPIO
-<<<<<<< HEAD
 libbsp_a_SOURCES += pinmux/pinmux.c
 # Timer
-=======
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/pinmux.c
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 
 # Benchmark Timer
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/btimer/btimer-cpucounter.c
 
 # Misc
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/cpucounter/cpucounterread.c
+libbsp_a_SOURCES += misc/cpucounterread.c
 
 # Watchdog
 
 # Cache
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/cache/nocache.c
+libbsp_a_SOURCES += ../../../libcpu/shared/src/cache_manager.c
+libbsp_a_SOURCES += ../../../libcpu/arm/shared/include/cache_.h
+libbsp_a_CPPFLAGS += -I$(srcdir)/../../../libcpu/arm/shared/include
 
-if TMS570_USE_HWINIT_STARTUP
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/tms570_sys_core.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/fail_notification.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/init_emif_sdram.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/init_esm.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/init_pinmux.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/init_system.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/tms570_selftest.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/tms570_selftest_par_can.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/tms570_selftest_par_mibspi.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/tms570_selftest_par_std.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/tms570_selftest_parity.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/tms570_tcram_tests.c
-
-if TMS570_USE_HWINIT_STARTUP
-libbsp_a_SOURCES += hwinit/tms570_sys_core.S
-libbsp_a_SOURCES += hwinit/fail_notification.c
-libbsp_a_SOURCES += hwinit/init_emif_sdram.c
-libbsp_a_SOURCES += hwinit/init_esm.c
-libbsp_a_SOURCES += hwinit/init_pinmux.c
-libbsp_a_SOURCES += hwinit/init_system.c
-libbsp_a_SOURCES += hwinit/tms570_selftest.c
-libbsp_a_SOURCES += hwinit/tms570_selftest_par_can.c
-libbsp_a_SOURCES += hwinit/tms570_selftest_par_mibspi.c
-libbsp_a_SOURCES += hwinit/tms570_selftest_par_std.c
-libbsp_a_SOURCES += hwinit/tms570_selftest_parity.c
-libbsp_a_SOURCES += hwinit/tms570_tcram_tests.c
-
-include_bsp_HEADERS += hwinit/tms570_selftest_parity.h
-include_bsp_HEADERS += hwinit/tms570_hwinit.h
-include_bsp_HEADERS += hwinit/tms570_selftest.h
+network_CPPFLAGS = -D__INSIDE_RTEMS_BSD_TCPIP_STACK__
+noinst_PROGRAMS = network.rel
+network_rel_SOURCES = network/include/emac.h
+network_rel_SOURCES += network/source/network.c network/source/emac.c network/source/mdio.c  network/source/phy_dp83640.c
+network_rel_CPPFLAGS = $(AM_CPPFLAGS) $(network_CPPFLAGS)
+#network_rel_CPPFLAGS += -I network/include 
+network_rel_LDFLAGS = $(RTEMS_RELLDFLAGS)
 
 # Start hooks
-libbsp_a_SOURCES += hwinit/bspstarthooks-hwinit.c
-else
-# Start hooks
-<<<<<<< HEAD
 libbsp_a_SOURCES += startup/bspstarthooks.c
-=======
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/bspstarthooks-hwinit.c
-else
-# Start hooks
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/tms570/start/bspstarthooks.c
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
-endif
 
 # ----------------------------
 # ------  Special Rules
 # ----------------------------
 
+DISTCLEANFILES = include/bspopts.h
 
+libbsp_a_LIBADD += network.rel
+
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
-include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
-include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/arm/tms570/headers.am

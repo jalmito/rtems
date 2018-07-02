@@ -57,6 +57,7 @@ msdos_initialize_support(
     )
 {
     int                rc = RC_OK;
+    rtems_status_code  sc = RTEMS_SUCCESSFUL;
     msdos_fs_info_t   *fs_info = NULL;
     fat_file_fd_t     *fat_fd = NULL;
     fat_dir_pos_t      root_pos;
@@ -96,7 +97,7 @@ msdos_initialize_support(
 
     /* again: unfortunately "fat-file" is just almost fat file :( */
     fat_fd->fat_file_type = FAT_DIRECTORY;
-    fat_fd->size_limit = MSDOS_MAX_DIR_LENGTH;
+    fat_fd->size_limit = MSDOS_MAX_DIR_LENGHT;
     fat_fd->cln = fs_info->fat.vol.rdir_cl;
 
     fat_fd->map.file_cln = 0;
@@ -132,8 +133,19 @@ msdos_initialize_support(
         rtems_set_errno_and_return_minus_one(ENOMEM);
     }
 
-    rtems_recursive_mutex_init(&fs_info->vol_mutex,
-                               RTEMS_FILESYSTEM_TYPE_DOSFS);
+    sc = rtems_semaphore_create(3,
+                                1,
+                                RTEMS_BINARY_SEMAPHORE | RTEMS_FIFO,
+                                0,
+                                &fs_info->vol_sema);
+    if (sc != RTEMS_SUCCESSFUL)
+    {
+        fat_file_close(&fs_info->fat, fat_fd);
+        fat_shutdown_drive(&fs_info->fat);
+        free(fs_info->cl_buf);
+        free(fs_info);
+        rtems_set_errno_and_return_minus_one( EIO );
+    }
 
     temp_mt_entry->mt_fs_root->location.node_access = fat_fd;
     temp_mt_entry->mt_fs_root->location.handlers = directory_handlers;

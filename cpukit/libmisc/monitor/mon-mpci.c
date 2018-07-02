@@ -79,7 +79,7 @@ rtems_monitor_mpci_next(
     if ( ! c->User_multiprocessing_table)
         goto failed;
 
-    _Objects_Allocator_lock();
+    _Thread_Disable_dispatch();
 
     *next_id += 1;
     return (void *) c;

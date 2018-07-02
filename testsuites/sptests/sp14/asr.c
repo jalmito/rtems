@@ -32,6 +32,7 @@ rtems_asr Process_asr(
     case RTEMS_SIGNAL_0:
     case RTEMS_SIGNAL_1:
       puts( "ASR - rtems_task_wake_after - yield processor" );
+      FLUSH_OUTPUT();
       status = rtems_task_wake_after( RTEMS_YIELD_PROCESSOR );
       directive_failed( status, "rtems_task_wake_after yield" );
       break;
@@ -43,4 +44,5 @@ rtems_asr Process_asr(
     "ASR - EXIT  - signal => %08" PRIxrtems_signal_set "\n",
      the_signal_set
   );
+  FLUSH_OUTPUT();
 }

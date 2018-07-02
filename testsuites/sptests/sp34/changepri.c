@@ -29,8 +29,6 @@
 #include <stdio.h>
 #include "tmacros.h"
 
-#include <rtems/score/threadimpl.h>
-
 const char rtems_test_name[] = "SP 34";
 
 rtems_task BlockingTasks(rtems_task_argument arg);
@@ -46,7 +44,7 @@ const char *CallerName(void)
   Thread_Control *executing = _Thread_Get_executing();
 #if defined(TEST_PRINT_TASK_ID)
   sprintf( buffer, "0x%08x -- %d",
-      rtems_task_self(), _Thread_Get_priority( executing ) );
+      rtems_task_self(), executing->current_priority );
 #else
   volatile union {
     uint32_t u;
@@ -60,7 +58,7 @@ const char *CallerName(void)
   #endif
     sprintf( buffer, "%c%c%c%c -- %" PRIdPriority_Control,
       TempName.c[0], TempName.c[1], TempName.c[2], TempName.c[3],
-      _Thread_Get_priority( executing )
+      executing->current_priority
   );
 #endif
   return buffer;
@@ -180,7 +178,7 @@ rtems_task Init(rtems_task_argument ignored)
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION

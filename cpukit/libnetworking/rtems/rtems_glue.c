@@ -12,8 +12,9 @@
 #include <rtems.h>
 #include <rtems/libio.h>
 #include <rtems/error.h>
-#include <rtems/thread.h>
 #include <rtems/rtems_bsdnet.h>
+#include <rtems/rtems/semimpl.h>
+#include <rtems/score/coremuteximpl.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/domain.h>
@@ -23,12 +24,12 @@
 #include <sys/sockio.h>
 #include <sys/callout.h>
 #include <sys/proc.h>
-#include <sys/sockio.h>
-#include <sys/systm.h>
+#include <sys/ioctl.h>
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
 #include <vm/vm.h>
+#include <arpa/inet.h>
 
 #include <net/netisr.h>
 #include <net/route.h>
@@ -36,16 +37,23 @@
 #include "loop.h"
 
 /*
+ * Sysctl init all.
+ */
+void sysctl_register_all(void *arg);
+
+/*
  * Memory allocation
  */
-static uint32_t nmbuf       = (64L * 1024L) / _SYS_MBUF_LEGACY_MSIZE;
+static uint32_t nmbuf       = (64L * 1024L) / MSIZE;
        uint32_t nmbclusters = (128L * 1024L) / MCLBYTES;
 
 /*
  * Network task synchronization
  */
-static rtems_recursive_mutex networkMutex =
-    RTEMS_RECURSIVE_MUTEX_INITIALIZER("_Network");
+static rtems_id networkSemaphore;
+#ifdef RTEMS_FAST_MUTEX
+Semaphore_Control   *the_networkSemaphore;
+#endif
 static rtems_id networkDaemonTid;
 static uint32_t   networkDaemonPriority;
 #ifdef RTEMS_SMP
@@ -108,19 +116,31 @@ rtems_bsdnet_initialize_sockaddr_in(struct sockaddr_in *addr)
 uint32_t
 rtems_bsdnet_semaphore_release_recursive(void)
 {
+#ifdef RTEMS_FAST_MUTEX
 	uint32_t nest_count;
+	uint32_t i;
 
-	nest_count = networkMutex._nest_level;
-	networkMutex._nest_level = 0;
-	rtems_recursive_mutex_unlock(&networkMutex);
+	nest_count =
+		the_networkSemaphore ?
+		the_networkSemaphore->Core_control.mutex.nest_count : 0;
+	for (i = 0; i < nest_count; ++i) {
+		rtems_bsdnet_semaphore_release();
+	}
+
 	return nest_count;
+#else
+	#error "not implemented"
+#endif
 }
 
 void
 rtems_bsdnet_semaphore_obtain_recursive(uint32_t nest_count)
 {
-	rtems_recursive_mutex_lock(&networkMutex);
-	networkMutex._nest_level = nest_count;
+	uint32_t i;
+
+	for (i = 0; i < nest_count; ++i) {
+		rtems_bsdnet_semaphore_obtain();
+	}
 }
 
 /*
@@ -206,8 +226,8 @@ bsd_init (void)
 	 * Set up mbuf data structures
 	 */
 
-	p = rtems_bsdnet_malloc_mbuf(nmbuf * _SYS_MBUF_LEGACY_MSIZE + _SYS_MBUF_LEGACY_MSIZE - 1,MBUF_MALLOC_MBUF);
-	p = (char *)(((uintptr_t)p + _SYS_MBUF_LEGACY_MSIZE - 1) & ~(_SYS_MBUF_LEGACY_MSIZE - 1));
+	p = rtems_bsdnet_malloc_mbuf(nmbuf * MSIZE + MSIZE - 1,MBUF_MALLOC_MBUF);
+	p = (char *)(((uintptr_t)p + MSIZE - 1) & ~(MSIZE - 1));
 	if (p == NULL) {
 		printf ("Can't get network memory.\n");
 		return -1;
@@ -215,7 +235,7 @@ bsd_init (void)
 	for (i = 0; i < nmbuf; i++) {
 		((struct mbuf *)p)->m_next = mmbfree;
 		mmbfree = (struct mbuf *)p;
-		p += _SYS_MBUF_LEGACY_MSIZE;
+		p += MSIZE;
 	}
 	mbstat.m_mbufs = nmbuf;
 	mbstat.m_mtypes[MT_FREE] = nmbuf;
@@ -245,28 +265,26 @@ bsd_init (void)
 }
 
 /*
+ * RTEMS Specific Helper Routines
+ */
+extern void rtems_set_udp_buffer_sizes( u_long, u_long );
+extern void rtems_set_tcp_buffer_sizes( u_long, u_long );
+extern void rtems_set_sb_efficiency( u_long );
+
+/*
  * Initialize and start network operations
  */
 static int
 rtems_bsdnet_initialize (void)
 {
-	rtems_bsdnet_semaphore_obtain ();
+	rtems_status_code sc;
 
 	/*
 	 * Set the priority of all network tasks
 	 */
 	if (rtems_bsdnet_config.network_task_priority == 0)
 		networkDaemonPriority = 100;
-#ifdef RTEMS_MULTIPROCESSING
-	/*
-	 * Allow network tasks to run with priority 0 (PRIORITY_PSEUDO_ISR) using
-	 * UINT32_MAX for the network task priority in the network configuration.
-	 * This enables MPCI via a TCP/IP network.
-	 */
-	else if (rtems_bsdnet_config.network_task_priority != UINT32_MAX)
-#else
 	else
-#endif
 		networkDaemonPriority = rtems_bsdnet_config.network_task_priority;
 
 	/*
@@ -281,7 +299,7 @@ rtems_bsdnet_initialize (void)
 	 * Set the memory allocation limits
 	 */
 	if (rtems_bsdnet_config.mbuf_bytecount)
-		nmbuf = rtems_bsdnet_config.mbuf_bytecount / _SYS_MBUF_LEGACY_MSIZE;
+		nmbuf = rtems_bsdnet_config.mbuf_bytecount / MSIZE;
 	if (rtems_bsdnet_config.mbuf_cluster_bytecount)
 		nmbclusters = rtems_bsdnet_config.mbuf_cluster_bytecount / MCLBYTES;
 
@@ -298,6 +316,30 @@ rtems_bsdnet_initialize (void)
         rtems_set_sb_efficiency( rtems_bsdnet_config.sb_efficiency );
 
 	/*
+	 * Create the task-synchronization semaphore
+	 */
+	sc = rtems_semaphore_create (rtems_build_name('B', 'S', 'D', 'n'),
+					0,
+					RTEMS_PRIORITY |
+						RTEMS_BINARY_SEMAPHORE |
+						RTEMS_INHERIT_PRIORITY |
+						RTEMS_NO_PRIORITY_CEILING |
+						RTEMS_LOCAL,
+					0,
+					&networkSemaphore);
+	if (sc != RTEMS_SUCCESSFUL) {
+		printf ("Can't create network seamphore: `%s'\n", rtems_status_text (sc));
+		return -1;
+	}
+#ifdef RTEMS_FAST_MUTEX
+	{
+	Objects_Locations location;
+	the_networkSemaphore = _Semaphore_Get( networkSemaphore, &location );
+	_Thread_Enable_dispatch();
+	}
+#endif
+
+	/*
 	 * Compute clock tick conversion factors
 	 */
 	rtems_bsdnet_ticks_per_second = rtems_clock_get_ticks_per_second();
@@ -309,10 +351,8 @@ rtems_bsdnet_initialize (void)
 	/*
 	 * Set up BSD-style sockets
 	 */
-	if (bsd_init () < 0) {
-		rtems_bsdnet_semaphore_release ();
+	if (bsd_init () < 0)
 		return -1;
-	}
 
 	/*
 	 * Start network daemon
@@ -335,7 +375,32 @@ rtems_bsdnet_initialize (void)
 void
 rtems_bsdnet_semaphore_obtain (void)
 {
-	rtems_recursive_mutex_lock(&networkMutex);
+#ifdef RTEMS_FAST_MUTEX
+	ISR_lock_Context lock_context;
+	Thread_Control *executing;
+	_ISR_lock_ISR_disable(&lock_context);
+	if (!the_networkSemaphore)
+		rtems_panic ("rtems-net: network sema obtain: network not initialised\n");
+	executing = _Thread_Executing;
+	_CORE_mutex_Seize (
+		&the_networkSemaphore->Core_control.mutex,
+		executing,
+		networkSemaphore,
+		1,		/* wait */
+		0,		/* forever */
+		&lock_context
+		);
+	if (executing->Wait.return_code)
+		rtems_panic ("rtems-net: can't obtain network sema: %d\n",
+                 executing->Wait.return_code);
+#else
+	rtems_status_code sc;
+
+	sc = rtems_semaphore_obtain (networkSemaphore, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
+	if (sc != RTEMS_SUCCESSFUL)
+		rtems_panic ("rtems-net: can't obtain network semaphore: `%s'\n",
+                 rtems_status_text (sc));
+#endif
 }
 
 /*
@@ -344,7 +409,29 @@ rtems_bsdnet_semaphore_obtain (void)
 void
 rtems_bsdnet_semaphore_release (void)
 {
-	rtems_recursive_mutex_unlock(&networkMutex);
+#ifdef RTEMS_FAST_MUTEX
+        ISR_lock_Context lock_context;
+	CORE_mutex_Status status;
+
+	if (!the_networkSemaphore)
+		rtems_panic ("rtems-net: network sema obtain: network not initialised\n");
+        _ISR_lock_ISR_disable(&lock_context);
+	status = _CORE_mutex_Surrender (
+		&the_networkSemaphore->Core_control.mutex,
+		networkSemaphore,
+		NULL,
+                &lock_context
+		);
+	if (status != CORE_MUTEX_STATUS_SUCCESSFUL)
+		rtems_panic ("rtems-net: can't release network sema: %i\n");
+#else
+	rtems_status_code sc;
+
+	sc = rtems_semaphore_release (networkSemaphore);
+	if (sc != RTEMS_SUCCESSFUL)
+		rtems_panic ("rtems-net: can't release network semaphore: `%s'\n",
+                 rtems_status_text (sc));
+#endif
 }
 
 static int
@@ -607,9 +694,6 @@ rtems_bsdnet_newproc (char *name, int stacksize, void(*entry)(void *), void *arg
 		networkDaemonPriority,
 		stacksize,
 		RTEMS_PREEMPT|RTEMS_NO_TIMESLICE|RTEMS_NO_ASR|RTEMS_INTERRUPT_LEVEL(0),
-#ifdef RTEMS_MULTIPROCESSING
-		RTEMS_SYSTEM_TASK |
-#endif
 		RTEMS_NO_FLOATING_POINT|RTEMS_LOCAL,
 		&tid);
 	if (sc != RTEMS_SUCCESSFUL)
@@ -748,13 +832,8 @@ rtems_bsdnet_log (int priority, const char *fmt, ...)
 /*
  * IP header checksum routine for processors which don't have an inline version
  */
-
-struct ip;
-
-u_int in_cksum_hdr(const struct ip *);
-
 u_int
-in_cksum_hdr (const struct ip *ip)
+in_cksum_hdr (const void *ip)
 {
 	uint32_t   sum;
 	const uint16_t   *sp;

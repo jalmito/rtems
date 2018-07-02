@@ -46,7 +46,6 @@ const char rtems_test_name[] = "FSDOSFSNAME 1";
 #define RAMDISK_PATH "/dev/rda"
 #define BLOCK_NUM 47
 #define BLOCK_SIZE 512
-#define VOLUME_LABEL "MyDisk"
 
 #define NUMBER_OF_DIRECTORIES 8
 #define NUMBER_OF_FILES 13
@@ -79,7 +78,7 @@ static rtems_resource_snapshot            before_mount;
 
 static const msdos_format_request_param_t rqdata = {
   .OEMName             = "RTEMS",
-  .VolLabel            = VOLUME_LABEL,
+  .VolLabel            = "RTEMSDisk",
   .sectors_per_cluster = 2,
   .fat_num             = 0,
   .files_per_root_dir  = 0,
@@ -1097,30 +1096,6 @@ static void test_end_of_string_matches( void )
   rtems_test_assert( rc == 0 );
 }
 
-static void test_end_of_string_matches_2( void )
-{
-  int rc;
-  int fd;
-
-  fd = open( MOUNT_DIR "/ets.beam", O_RDWR | O_CREAT,
-             S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH );
-  rtems_test_assert( fd >= 0 );
-  rc = close( fd );
-  rtems_test_assert( rc == 0 );
-
-  fd = open( MOUNT_DIR "/sets.beam", O_RDWR | O_CREAT,
-             S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH );
-  rtems_test_assert( fd >= 0 );
-  rc = close( fd );
-  rtems_test_assert( rc == 0 );
-
-  rc = unlink( MOUNT_DIR "/sets.beam" );
-  rtems_test_assert( rc == 0 );
-
-  rc = unlink( MOUNT_DIR "/ets.beam" );
-  rtems_test_assert( rc == 0 );
-}
-
 static void test_full_8_3_name( void )
 {
   int rc;
@@ -1132,53 +1107,10 @@ static void test_full_8_3_name( void )
   rtems_test_assert( rc == 0 );
 }
 
-static void test_dir_with_same_name_as_volume_label( void )
-{
-  int  rc;
-  DIR *dirp;
-
-  rc = mkdir( MOUNT_DIR "/" VOLUME_LABEL, S_IRWXU | S_IRWXG | S_IRWXO );
-  rtems_test_assert( rc == 0 );
-
-  dirp = opendir( MOUNT_DIR "/" VOLUME_LABEL );
-  rtems_test_assert( NULL != dirp );
-
-  rc = closedir( dirp );
-  rtems_test_assert( rc == 0 );
-
-  rc = unlink( MOUNT_DIR "/" VOLUME_LABEL );
-  rtems_test_assert( rc == 0 );
-}
-
-static void test_file_with_same_name_as_volume_label( void )
-{
-  int rc;
-  int fd;
-
-  fd = open( MOUNT_DIR "/" VOLUME_LABEL, O_RDWR | O_CREAT,
-             S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH );
-  rtems_test_assert( fd >= 0 );
-
-  rc = close( fd );
-  rtems_test_assert( rc == 0 );
-
-  fd = open( MOUNT_DIR "/" VOLUME_LABEL, O_RDWR );
-  rtems_test_assert( fd >= 0 );
-
-  rc = close( fd );
-  rtems_test_assert( rc == 0 );
-
-  rc = unlink( MOUNT_DIR "/" VOLUME_LABEL );
-  rtems_test_assert( rc == 0 );
-}
-
 static void test_special_cases( void )
 {
   test_end_of_string_matches();
-  test_end_of_string_matches_2();
   test_full_8_3_name();
-  test_file_with_same_name_as_volume_label();
-  test_dir_with_same_name_as_volume_label();
 }
 
 /*
@@ -1423,7 +1355,7 @@ size_t rtems_ramdisk_configuration_size = RTEMS_ARRAY_SIZE(rtems_ramdisk_configu
 
 #define CONFIGURE_INIT_TASK_STACK_SIZE ( 1024 * 64 )
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_MAXIMUM_DRIVERS 4
 #define CONFIGURE_MAXIMUM_SEMAPHORES (2 * RTEMS_DOSFS_SEMAPHORES_PER_INSTANCE)
 #define CONFIGURE_APPLICATION_EXTRA_DRIVERS RAMDISK_DRIVER_TABLE_ENTRY
@@ -1441,8 +1373,6 @@ size_t rtems_ramdisk_configuration_size = RTEMS_ARRAY_SIZE(rtems_ramdisk_configu
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
-
-#define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
 
 #define CONFIGURE_INIT
 

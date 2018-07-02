@@ -24,8 +24,12 @@ int msdos_statvfs(
 {
   msdos_fs_info_t *fs_info = root_loc->mt_entry->fs_info;
   fat_vol_t *vol = &fs_info->fat.vol;
+  rtems_status_code sc = RTEMS_SUCCESSFUL;
 
-  msdos_fs_lock(fs_info);
+  sc = rtems_semaphore_obtain(fs_info->vol_sema, RTEMS_WAIT,
+                              MSDOS_VOLUME_SEMAPHORE_TIMEOUT);
+  if (sc != RTEMS_SUCCESSFUL)
+      rtems_set_errno_and_return_minus_one(EIO);
 
   sb->f_bsize = FAT_SECTOR512_SIZE;
   sb->f_frsize = vol->bpc;
@@ -50,7 +54,7 @@ int msdos_statvfs(
       rc = fat_get_fat_cluster(&fs_info->fat, cur_cl, &value);
       if (rc != RC_OK)
       {
-        msdos_fs_unlock(fs_info);
+        rtems_semaphore_release(fs_info->vol_sema);
         return rc;
       }
 
@@ -67,6 +71,6 @@ int msdos_statvfs(
     sb->f_bavail = vol->free_cls;
   }
 
-  msdos_fs_unlock(fs_info);
+  rtems_semaphore_release(fs_info->vol_sema);
   return RC_OK;
 }

@@ -17,7 +17,7 @@
   #include "config.h"
 #endif
 
-#include <rtems/imfs.h>
+#include "imfs.h"
 
 IMFS_jnode_t *IMFS_node_initialize_directory(
   IMFS_jnode_t *node,

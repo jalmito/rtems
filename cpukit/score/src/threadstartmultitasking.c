@@ -19,7 +19,6 @@
 #endif
 
 #include <rtems/score/threadimpl.h>
-#include <rtems/score/assert.h>
 
 void _Thread_Start_multitasking( void )
 {
@@ -58,7 +57,6 @@ void _Thread_Start_multitasking( void )
      */
     _CPU_Context_Set_is_executing( &trash, true );
     _CPU_Context_switch( &trash, &heir->Registers );
-    RTEMS_UNREACHABLE();
   }
 #else
   _CPU_Context_Restart_self( &heir->Registers );

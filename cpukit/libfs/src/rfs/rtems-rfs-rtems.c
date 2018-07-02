@@ -25,7 +25,13 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include <rtems/inttypes.h>
+#if SIZEOF_MODE_T == 8
+#define PRIomode_t PRIo64
+#elif SIZEOF_MODE_T == 4
+#define PRIomode_t PRIo32
+#else
+#error "unsupport size of mode_t"
+#endif
 
 #include <rtems/rfs/rtems-rfs-file.h>
 #include <rtems/rfs/rtems-rfs-dir.h>
@@ -268,6 +274,9 @@ rtems_rfs_rtems_chown (const rtems_filesystem_location_info_t *pathloc,
   rtems_rfs_file_system* fs = rtems_rfs_rtems_pathloc_dev (pathloc);
   rtems_rfs_ino          ino = rtems_rfs_rtems_get_pathloc_ino (pathloc);
   rtems_rfs_inode_handle inode;
+#if defined (RTEMS_POSIX_API)
+  uid_t                  uid;
+#endif
   int                    rc;
 
   if (rtems_rfs_rtems_trace (RTEMS_RFS_RTEMS_DEBUG_CHOWN))
@@ -279,6 +288,20 @@ rtems_rfs_rtems_chown (const rtems_filesystem_location_info_t *pathloc,
   {
     return rtems_rfs_rtems_error ("chown: opening inode", rc);
   }
+
+  /*
+   *  Verify I am the owner of the node or the super user.
+   */
+
+#if defined (RTEMS_POSIX_API)
+  uid = geteuid();
+
+  if ((uid != rtems_rfs_inode_get_uid (&inode)) && (uid != 0))
+  {
+    rtems_rfs_inode_close (fs, &inode);
+    return rtems_rfs_rtems_error ("chown: not able", EPERM);
+  }
+#endif
 
   rtems_rfs_inode_set_uid_gid (&inode, owner, group);
 
@@ -701,7 +724,6 @@ const rtems_filesystem_file_handlers_r rtems_rfs_rtems_link_handlers =
   .fdatasync_h = rtems_filesystem_default_fsync_or_fdatasync,
   .fcntl_h     = rtems_filesystem_default_fcntl,
   .kqfilter_h  = rtems_filesystem_default_kqfilter,
-  .mmap_h      = rtems_filesystem_default_mmap,
   .poll_h      = rtems_filesystem_default_poll,
   .readv_h     = rtems_filesystem_default_readv,
   .writev_h    = rtems_filesystem_default_writev

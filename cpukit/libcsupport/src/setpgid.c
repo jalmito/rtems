@@ -17,11 +17,9 @@
  *  4.3.3 Set Process Group ID for Job Control, P1003.1b-1993, p. 89
  */
 int setpgid(
-  pid_t  pid,
-  pid_t  pgid
+  pid_t  pid __attribute__((unused)),
+  pid_t  pgid __attribute__((unused))
 )
 {
-  (void) pid;
-  (void) pgid;
   rtems_set_errno_and_return_minus_one( ENOSYS );
 }

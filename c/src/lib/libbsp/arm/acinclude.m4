@@ -4,8 +4,6 @@ AC_DEFUN([RTEMS_CHECK_BSPDIR],
   case "$1" in
   altera-cyclone-v )
     AC_CONFIG_SUBDIRS([altera-cyclone-v]);;
-  atsam )
-    AC_CONFIG_SUBDIRS([atsam]);;
   beagle )
     AC_CONFIG_SUBDIRS([beagle]);;
   csb336 )
@@ -14,12 +12,14 @@ AC_DEFUN([RTEMS_CHECK_BSPDIR],
     AC_CONFIG_SUBDIRS([csb337]);;
   edb7312 )
     AC_CONFIG_SUBDIRS([edb7312]);;
+  gba )
+    AC_CONFIG_SUBDIRS([gba]);;
   gdbarmsim )
     AC_CONFIG_SUBDIRS([gdbarmsim]);;
+  gp32 )
+    AC_CONFIG_SUBDIRS([gp32]);;
   gumstix )
     AC_CONFIG_SUBDIRS([gumstix]);;
-  imx )
-    AC_CONFIG_SUBDIRS([imx]);;
   lm3s69xx )
     AC_CONFIG_SUBDIRS([lm3s69xx]);;
   lpc176x )
@@ -28,6 +28,8 @@ AC_DEFUN([RTEMS_CHECK_BSPDIR],
     AC_CONFIG_SUBDIRS([lpc24xx]);;
   lpc32xx )
     AC_CONFIG_SUBDIRS([lpc32xx]);;
+  nds )
+    AC_CONFIG_SUBDIRS([nds]);;
   raspberrypi )
     AC_CONFIG_SUBDIRS([raspberrypi]);;
   realview-pbx-a9 )

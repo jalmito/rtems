@@ -70,11 +70,6 @@ void rtems_print_buffer(const unsigned char *buffer, const int length)
   }
 }
 
-<<<<<<< HEAD
-=======
-static char const hexlist[] = "0123456789abcdef";
-
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 /**
  * @brief Print \p length bytes from \p buffer, both in hex and ASCII.
  * @details Non-printable chars will appear as dots.
@@ -85,7 +80,6 @@ static char const hexlist[] = "0123456789abcdef";
 static void Dump_Line(const unsigned char *buffer, const unsigned int length)
 {
   unsigned int i;
-<<<<<<< HEAD
   static char line_buffer[ROW_LENGTH] = "";
   size_t tmp_len;
 
@@ -93,21 +87,10 @@ static void Dump_Line(const unsigned char *buffer, const unsigned int length)
   for (i = 0; i < length; ++i) {
     snprintf(&line_buffer[i * HEX_FMT_LENGTH], HEX_FMT_LENGTH + 1,
              "%02x ", buffer[i]);
-=======
-
-  /* Output the hex value of each byte. */
-  for (i = 0; i < length; ++i) {
-    unsigned char c = buffer[i];
-
-    rtems_putc(hexlist[(c >> 4) & 0xf]);
-    rtems_putc(hexlist[0xf]);
-    rtems_putc(' ');
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
   }
 
   /* Fill the remaining space with whitespace (if necessary). */
   for (; i < BYTES_PER_ROW; ++i) {
-<<<<<<< HEAD
     strncat(line_buffer, "   ", HEX_FMT_LENGTH);
   }
 
@@ -119,37 +102,13 @@ static void Dump_Line(const unsigned char *buffer, const unsigned int length)
   for (i = 0; i < length; ++i) {
     snprintf(&line_buffer[tmp_len + i], ASCII_FMT_LENGTH + 1,
              "%c", isprint(buffer[i]) ? buffer[i] : '.');
-=======
-    rtems_putc(' ');
-    rtems_putc(' ');
-    rtems_putc(' ');
-  }
-
-  /* Append a bar. */
-  rtems_putc('|');
-
-  /* Now output the ASCII glyphs of printable chars. */
-  for (i = 0; i < length; ++i) {
-    unsigned char c = buffer[i];
-
-    rtems_putc(isprint(c) ? c : '.');
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
   }
 
   /* Fill the remaining space with whitespace (if necessary). */
   for(; i < BYTES_PER_ROW; i++) {
-<<<<<<< HEAD
     strncat(line_buffer, " ", ASCII_FMT_LENGTH);
   }
 
   /* Append another bar and print the resulting string. */
   printk("%s|\n", line_buffer);
-=======
-    rtems_putc(' ');
-  }
-
-  /* Append another bar and print the resulting string. */
-  rtems_putc('|');
-  rtems_putc('\n');
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 }

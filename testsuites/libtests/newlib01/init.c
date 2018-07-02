@@ -19,7 +19,6 @@
 #include <stdio.h>
 
 #include <rtems.h>
-#include <rtems/console.h>
 #include <rtems/imfs.h>
 #include <rtems/libcsupport.h>
 
@@ -63,13 +62,13 @@ static void wait(void)
 static void worker_task(rtems_task_argument arg)
 {
   test_context *ctx = &test_instance;
+  FILE *file = freopen(&file_path[0], "r+", stdout);
   char buf[1] = { 'x' };
   size_t n;
 
-  stdout = fopen(&file_path[0], "r+");
-  rtems_test_assert(stdout != NULL);
+  rtems_test_assert(file != NULL);
 
-  n = fwrite(&buf[0], sizeof(buf), 1, stdout);
+  n = fwrite(&buf[0], sizeof(buf), 1, file);
   rtems_test_assert(n == 1);
 
   rtems_test_assert(ctx->current == OPEN);
@@ -135,7 +134,7 @@ static ssize_t handler_write(
 
 static int handler_ioctl(
   rtems_libio_t *iop,
-  ioctl_command_t request,
+  uint32_t request,
   void *buffer
 )
 {
@@ -245,15 +244,8 @@ static void test(void)
   rtems_status_code sc;
   int rv;
   rtems_resource_snapshot snapshot;
-  FILE *file;
 
   ctx->main_task_id = rtems_task_self();
-
-  /* Fill dynamic file pool in Newlib _GLOBAL_REENT */
-  file = fopen(CONSOLE_DEVICE_NAME, "r+");
-  rtems_test_assert(file != NULL);
-  rv = fclose(file);
-  rtems_test_assert(rv == 0);
 
   rtems_resource_snapshot_take(&snapshot);
 
@@ -300,7 +292,7 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 4
 

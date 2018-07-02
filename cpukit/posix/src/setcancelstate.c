@@ -9,8 +9,6 @@
  *  COPYRIGHT (c) 1989-2009.
  *  On-Line Applications Research Corporation (OAR).
  *
- *  Copyright (c) 2016 embedded brains GmbH.
- *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
  *  http://www.rtems.org/license/LICENSE.
@@ -23,8 +21,13 @@
 #include <pthread.h>
 #include <errno.h>
 
+#include <rtems/system.h>
+#include <rtems/score/chain.h>
 #include <rtems/score/isr.h>
-#include <rtems/score/threadimpl.h>
+#include <rtems/score/thread.h>
+#include <rtems/posix/cancel.h>
+#include <rtems/posix/pthreadimpl.h>
+#include <rtems/posix/threadsup.h>
 
 /*
  *  18.2.2 Setting Cancelability State, P1003.1c/Draft 10, p. 183
@@ -35,30 +38,37 @@ int pthread_setcancelstate(
   int *oldstate
 )
 {
-  Thread_Life_state new_life_protection;
-  Thread_Life_state previous_life_state;
+  POSIX_API_Control *thread_support;
+  Thread_Control    *executing;
 
-  if ( _ISR_Is_in_progress() ) {
+  /*
+   *  Don't even think about deleting a resource from an ISR.
+   *  Besides this request is supposed to be for _Thread_Executing
+   *  and the ISR context is not a thread.
+   */
+
+  if ( _ISR_Is_in_progress() )
     return EPROTO;
-  }
 
-  if ( state == PTHREAD_CANCEL_DISABLE ) {
-    new_life_protection = THREAD_LIFE_PROTECTED;
-  } else if ( state == PTHREAD_CANCEL_ENABLE ) {
-    new_life_protection = 0;
-  } else {
+  if ( !oldstate )
     return EINVAL;
-  }
 
-  previous_life_state = _Thread_Set_life_protection( new_life_protection );
+  if ( state != PTHREAD_CANCEL_ENABLE && state != PTHREAD_CANCEL_DISABLE )
+    return EINVAL;
 
-  if ( oldstate != NULL ) {
-    if ( ( previous_life_state & THREAD_LIFE_PROTECTED ) != 0 ) {
-      *oldstate = PTHREAD_CANCEL_DISABLE;
-    } else {
-      *oldstate = PTHREAD_CANCEL_ENABLE;
-    }
-  }
+  _Thread_Disable_dispatch();
+
+    executing = _Thread_Executing;
+    thread_support =  executing ->API_Extensions[ THREAD_API_POSIX ];
+
+    *oldstate = thread_support->cancelability_state;
+    thread_support->cancelability_state = state;
+
+    _POSIX_Thread_Evaluate_cancellation_and_enable_dispatch( executing );
+
+  /*
+   *  _Thread_Enable_dispatch is invoked by above call.
+   */
 
   return 0;
 }

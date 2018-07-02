@@ -28,6 +28,7 @@
 #include <rtems/seterr.h>
 #include <rtems/score/thread.h>
 #include <rtems/posix/sigset.h>
+#include <rtems/posix/time.h>
 #include <rtems/posix/timerimpl.h>
 #include <rtems/score/watchdogimpl.h>
 
@@ -91,8 +92,7 @@ int timer_create(
   ptimer->timer_data.it_interval.tv_sec  = 0;
   ptimer->timer_data.it_interval.tv_nsec = 0;
 
-  _Watchdog_Preinitialize( &ptimer->Timer, _Per_CPU_Get_snapshot() );
-  _Watchdog_Initialize( &ptimer->Timer, _POSIX_Timer_TSR );
+  _Watchdog_Preinitialize( &ptimer->Timer );
   _Objects_Open_u32(&_POSIX_Timer_Information, &ptimer->Object, 0);
 
   *timerid  = ptimer->Object.id;

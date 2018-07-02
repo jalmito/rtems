@@ -27,26 +27,38 @@ rtems_status_code rtems_event_send(
   rtems_event_set event_in
 )
 {
-  Thread_Control    *the_thread;
+  rtems_status_code  sc;
+  Thread_Control    *thread;
+  Objects_Locations  location;
   RTEMS_API_Control *api;
   ISR_lock_Context   lock_context;
 
-  the_thread = _Thread_Get( id, &lock_context );
-
-  if ( the_thread == NULL ) {
-#if defined(RTEMS_MULTIPROCESSING)
-    return _Event_MP_Send( id, event_in );
-#else
-    return RTEMS_INVALID_ID;
+  thread = _Thread_Get_interrupt_disable( id, &location, &lock_context );
+  switch ( location ) {
+    case OBJECTS_LOCAL:
+      api = thread->API_Extensions[ THREAD_API_RTEMS ];
+      _Event_Surrender(
+        thread,
+        event_in,
+        &api->Event,
+        THREAD_WAIT_CLASS_EVENT,
+        &lock_context
+      );
+      sc = RTEMS_SUCCESSFUL;
+      break;
+#ifdef RTEMS_MULTIPROCESSING
+    case OBJECTS_REMOTE:
+      sc = _Event_MP_Send_request_packet(
+        EVENT_MP_SEND_REQUEST,
+        id,
+        event_in
+      );
+      break;
 #endif
+    default:
+      sc = RTEMS_INVALID_ID;
+      break;
   }
 
-  api = the_thread->API_Extensions[ THREAD_API_RTEMS ];
-  return _Event_Surrender(
-    the_thread,
-    event_in,
-    &api->Event,
-    THREAD_WAIT_CLASS_EVENT,
-    &lock_context
-  );
+  return sc;
 }

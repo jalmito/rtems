@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2016 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2014 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
  *  Dornierstr. 4
@@ -27,7 +27,6 @@
 #define PRIO_HIGH 2
 #define PRIO_MID 3
 #define PRIO_LOW 4
-#define PRIO_VERY_LOW 5
 
 const char rtems_test_name[] = "SPTHREADLIFE 1";
 
@@ -57,10 +56,6 @@ typedef enum {
   DELETE_4,
   DELETE_5,
   DELETE_6,
-  DELETE_SELF,
-  DELETE_7,
-  DELETE_8,
-  DELETE_9,
   INVALID
 } test_state;
 
@@ -172,18 +167,14 @@ static void delete_extension(
   rtems_test_assert(executing != deleted);
   rtems_test_assert(ctx->main_task_id == rtems_task_self());
 
+  assert_priority(PRIO_INIT);
+
   switch (ctx->current) {
     case DELETE_2:
-      assert_priority(PRIO_INIT);
       ctx->current = DELETE_3;
       break;
     case DELETE_5:
-      assert_priority(PRIO_INIT);
       ctx->current = DELETE_6;
-      break;
-    case DELETE_8:
-      assert_priority(PRIO_VERY_LOW);
-      ctx->current = DELETE_9;
       break;
     default:
       rtems_test_assert(0);
@@ -198,25 +189,19 @@ static void terminate_extension(Thread_Control *executing)
 
   rtems_test_assert(ctx->worker_task_id == rtems_task_self());
 
+  assert_priority(PRIO_INIT);
+
   switch (ctx->current) {
     case DELETE_0:
-      assert_priority(PRIO_INIT);
       ctx->current = DELETE_1;
       sc = rtems_task_delete(RTEMS_SELF);
       rtems_test_assert(sc == RTEMS_SUCCESSFUL);
       break;
     case DELETE_1:
-      assert_priority(PRIO_INIT);
       ctx->current = DELETE_2;
       break;
     case DELETE_4:
-      assert_priority(PRIO_INIT);
       ctx->current = DELETE_5;
-      break;
-    case DELETE_7:
-      assert_priority(PRIO_LOW);
-      ctx->current = DELETE_8;
-      wake_up_main(ctx);
       break;
     default:
       rtems_test_assert(0);
@@ -231,8 +216,7 @@ static void worker_task(rtems_task_argument arg)
   while (true) {
     test_state state = ctx->current;
     rtems_status_code sc;
-    Thread_Life_state previous_thread_life_state;
-    Per_CPU_Control *cpu_self;
+    bool previous_thread_life_protection;
 
     switch (state) {
       case SET_PRIO:
@@ -273,27 +257,17 @@ static void worker_task(rtems_task_argument arg)
         assert_priority(PRIO_HIGH);
         break;
       case SET_PROTECTION:
-        cpu_self = _Thread_Dispatch_disable();
-        previous_thread_life_state =
-          _Thread_Set_life_protection(THREAD_LIFE_PROTECTED);
-        rtems_test_assert(
-          (previous_thread_life_state & THREAD_LIFE_PROTECTED) == 0
-        );
-        _Thread_Dispatch_enable(cpu_self);
+        _Thread_Disable_dispatch();
+        previous_thread_life_protection = _Thread_Set_life_protection(true);
+        rtems_test_assert(!previous_thread_life_protection);
+        _Thread_Enable_dispatch();
         break;
       case CLEAR_PROTECTION:
-        cpu_self = _Thread_Dispatch_disable();
-        previous_thread_life_state = _Thread_Set_life_protection(0);
-        rtems_test_assert(
-          (previous_thread_life_state & THREAD_LIFE_PROTECTED) != 0
-        );
+        _Thread_Disable_dispatch();
+        previous_thread_life_protection = _Thread_Set_life_protection(false);
+        rtems_test_assert(previous_thread_life_protection);
         ctx->current = DELETE_4;
-        _Thread_Dispatch_enable(cpu_self);
-        break;
-      case DELETE_SELF:
-        ctx->current = DELETE_7;
-        rtems_task_delete(RTEMS_SELF);
-        rtems_test_assert(0);
+        _Thread_Enable_dispatch();
         break;
       default:
         rtems_test_assert(0);
@@ -396,14 +370,7 @@ static void test(void)
 
   rtems_test_assert(rtems_resource_snapshot_check(&snapshot));
 
-  create_and_start_worker(ctx);
-
-  change_state(ctx, DELETE_6, DELETE_SELF, INVALID);
-  set_priority(PRIO_VERY_LOW);
-
-  rtems_test_assert(rtems_resource_snapshot_check(&snapshot));
-
-  rtems_test_assert(ctx->current == DELETE_9);
+  rtems_test_assert(ctx->current == DELETE_6);
 }
 
 static void Init(rtems_task_argument arg)
@@ -417,7 +384,7 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS 2
 #define CONFIGURE_MAXIMUM_SEMAPHORES 1
@@ -429,8 +396,6 @@ static void Init(rtems_task_argument arg)
     .thread_terminate = terminate_extension \
   }, \
   RTEMS_TEST_INITIAL_EXTENSION
-
-#define CONFIGURE_INIT_TASK_INITIAL_MODES RTEMS_DEFAULT_MODES
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
 

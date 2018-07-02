@@ -104,7 +104,7 @@ rtems_task High_task(
     end_time,
     1,
     0,
-    0
+    CALLING_OVERHEAD_MESSAGE_QUEUE_BROADCAST
   );
 
   status = rtems_task_suspend(RTEMS_SELF);
@@ -158,7 +158,7 @@ rtems_task Low_task(
     end_time,
     OPERATION_COUNT,
     1,
-    0
+    CALLING_OVERHEAD_MESSAGE_QUEUE_BROADCAST
   );
 
   (void) rtems_message_queue_receive(
@@ -178,7 +178,7 @@ rtems_task Low_task(
     end_time,
     1,
     0,
-    0
+    CALLING_OVERHEAD_MESSAGE_QUEUE_BROADCAST
   );
 
   TEST_END();

@@ -181,6 +181,8 @@ rtems_device_driver termios_test_driver_initialize(
   void                      *arg
 )
 {
+  rtems_status_code status;
+
   rtems_termios_initialize();
 
   /*
@@ -188,45 +190,15 @@ rtems_device_driver termios_test_driver_initialize(
    */
   (void) rtems_io_register_name( TERMIOS_TEST_DRIVER_DEVICE_NAME, major, 0 );
 
-  return RTEMS_SUCCESSFUL;
-}
-
-static int first_open(int major, int minor, void *arg)
-{
-  rtems_status_code status;
-
   status = rtems_timer_create(rtems_build_name('T', 'M', 'R', 'X'), &Rx_Timer);
-  if ( status != RTEMS_SUCCESSFUL )
+  if ( status )
     rtems_fatal_error_occurred(1);
 
   status = rtems_timer_create(rtems_build_name('T', 'M', 'T', 'X'), &Tx_Timer);
-  if ( status != RTEMS_SUCCESSFUL )
+  if ( status )
     rtems_fatal_error_occurred(1);
 
-  return 0;
-}
-
-static int last_close(int major, int minor, void *arg)
-{
-  rtems_status_code status;
-
-  status = rtems_timer_cancel(Rx_Timer);
-  if ( status != RTEMS_SUCCESSFUL )
-    rtems_fatal_error_occurred(1);
-
-  status = rtems_timer_cancel(Tx_Timer);
-  if ( status != RTEMS_SUCCESSFUL )
-    rtems_fatal_error_occurred(1);
-
-  status = rtems_timer_delete(Rx_Timer);
-  if ( status != RTEMS_SUCCESSFUL )
-    rtems_fatal_error_occurred(1);
-
-  status = rtems_timer_delete(Tx_Timer);
-  if ( status != RTEMS_SUCCESSFUL )
-    rtems_fatal_error_occurred(1);
-
-  return 0;
+  return RTEMS_SUCCESSFUL;
 }
 
 rtems_device_driver termios_test_driver_open(
@@ -238,8 +210,8 @@ rtems_device_driver termios_test_driver_open(
   rtems_status_code sc;
   rtems_libio_open_close_args_t *args = arg;
   static const rtems_termios_callbacks Callbacks = {
-    first_open,                              /* firstOpen */
-    last_close,                              /* lastClose */
+    NULL,                                    /* firstOpen */
+    NULL,                                    /* lastClose */
     #if defined(TASK_DRIVEN)
       termios_test_driver_inbyte_nonblocking,/* pollRead */
     #else

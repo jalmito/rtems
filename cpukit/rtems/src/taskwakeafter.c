@@ -34,15 +34,21 @@ rtems_status_code rtems_task_wake_after(
   Per_CPU_Control *cpu_self;
 
   cpu_self = _Thread_Dispatch_disable();
-    executing = _Per_CPU_Get_executing( cpu_self );
+    executing = _Thread_Executing;
 
     if ( ticks == 0 ) {
       _Thread_Yield( executing );
     } else {
-      _Thread_Set_state( executing, STATES_WAITING_FOR_TIME );
+      _Thread_Set_state( executing, STATES_DELAYING );
       _Thread_Wait_flags_set( executing, THREAD_WAIT_STATE_BLOCKED );
-      _Thread_Add_timeout_ticks( executing, cpu_self, ticks );
+      _Watchdog_Initialize(
+        &executing->Timer,
+        _Thread_Timeout,
+        0,
+        executing
+      );
+      _Watchdog_Insert_ticks( &executing->Timer, ticks );
     }
-  _Thread_Dispatch_direct( cpu_self );
+  _Thread_Dispatch_enable( cpu_self );
   return RTEMS_SUCCESSFUL;
 }

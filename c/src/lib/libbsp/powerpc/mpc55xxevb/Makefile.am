@@ -1,114 +1,143 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
-include $(top_srcdir)/../../bsp.am
 
-dist_project_lib_DATA = ../../../../../../bsps/powerpc/mpc55xxevb/start/bsp_specs
+include_bspdir = $(includedir)/bsp
 
+dist_project_lib_DATA = bsp_specs
 
+nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
+DISTCLEANFILES = include/bspopts.h
 
 noinst_PROGRAMS =
 
-start.$(OBJEXT): ../../../../../../bsps/powerpc/mpc55xxevb/start/start.S
-	$(CPPASCOMPILE) -o $@ -c $<
+noinst_LIBRARIES = libbspstart.a
+libbspstart_a_SOURCES = start/start.S
 project_lib_DATA = start.$(OBJEXT)
 
-rtems_crti.$(OBJEXT): ../../../../../../bsps/powerpc/shared/start/rtems_crti.S
-	$(CPPASCOMPILE) -o $@ -c $<
+libbspstart_a_SOURCES += ../shared/start/rtems_crti.S
 project_lib_DATA += rtems_crti.$(OBJEXT)
 
 # Link commands
-project_lib_DATA += linkcmds
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/shared/start/linkcmds.base
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/mpc55xxevb/start/linkcmds.gwlcfm
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/mpc55xxevb/start/linkcmds.mpc5566evb
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/mpc55xxevb/start/linkcmds.mpc5566evb_spe
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/mpc55xxevb/start/linkcmds.mpc55xx
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/mpc55xxevb/start/linkcmds.mpc5643l_dpu
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/mpc55xxevb/start/linkcmds.mpc5643l_evb
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/mpc55xxevb/start/linkcmds.mpc5668g
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/mpc55xxevb/start/linkcmds.mpc5674f_ecu508
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/mpc55xxevb/start/linkcmds.mpc5674f_ecu508_app
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/mpc55xxevb/start/linkcmds.mpc5674f_ecu508_boot
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/mpc55xxevb/start/linkcmds.mpc5674fevb
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/mpc55xxevb/start/linkcmds.mpc5674fevb_spe
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/mpc55xxevb/start/linkcmds.mpc5674f_rsm6
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/mpc55xxevb/start/linkcmds.mpc5674f_rsm6_base
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/mpc55xxevb/start/linkcmds.phycore_mpc5554
+project_lib_DATA += startup/linkcmds
+dist_project_lib_DATA += ../shared/startup/linkcmds.base	
+dist_project_lib_DATA += startup/linkcmds.mpc55xx
+dist_project_lib_DATA += startup/linkcmds.gwlcfm
+dist_project_lib_DATA += startup/linkcmds.mpc5566evb
+dist_project_lib_DATA += startup/linkcmds.mpc5566evb_spe
+dist_project_lib_DATA += startup/linkcmds.mpc5643l_evb
+dist_project_lib_DATA += startup/linkcmds.mpc5643l_dpu
+dist_project_lib_DATA += startup/linkcmds.mpc5674fevb
+dist_project_lib_DATA += startup/linkcmds.mpc5674fevb_spe
+dist_project_lib_DATA += startup/linkcmds.phycore_mpc5554
+dist_project_lib_DATA += startup/linkcmds.mpc5668g
+dist_project_lib_DATA += startup/linkcmds.mpc5674f_ecu508
+dist_project_lib_DATA += startup/linkcmds.mpc5674f_ecu508_boot
+dist_project_lib_DATA += startup/linkcmds.mpc5674f_ecu508_app
+dist_project_lib_DATA += startup/linkcmds.mpc5674f_rsm6
+dist_project_lib_DATA += startup/linkcmds.mpc5674f_rsm6_base
 
-project_lib_LIBRARIES = librtemsbsp.a
-librtemsbsp_a_SOURCES =
+noinst_LIBRARIES += libbsp.a
+libbsp_a_SOURCES =
+
+# Includes
+include_HEADERS = include/bsp.h
+include_HEADERS += ../../shared/include/tm27.h
+
+nodist_include_HEADERS = include/bspopts.h \
+    ../../shared/include/coverhd.h
+include_bsp_HEADERS =
+include_bsp_HEADERS += ../../../libcpu/powerpc/mpc83xx/i2c/mpc83xx_i2cdrv.h
+include_bsp_HEADERS += ../../shared/include/irq-generic.h
+include_bsp_HEADERS += ../../shared/include/irq-info.h
+include_bsp_HEADERS += ../../shared/include/stackalloc.h
+include_bsp_HEADERS += ../../shared/include/utility.h
+include_bsp_HEADERS += ../shared/include/linker-symbols.h
+include_bsp_HEADERS += ../shared/include/start.h
+include_bsp_HEADERS += ../shared/include/tictac.h
+include_bsp_HEADERS += include/mpc55xx-config.h
+include_bsp_HEADERS += include/smsc9218i.h
+include_bsp_HEADERS += include/console-esci.h
+include_bsp_HEADERS += include/console-generic.h
+include_bsp_HEADERS += include/console-linflex.h
 
 # startup
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/stackalloc.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/start/bsp-start-zero.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/start/memcpy.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/start/tictac.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/exceptions/ppc-exc-handler-table.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/bspstart.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/bspgetworkarea.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/exc-vector-base.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/get-system-clock.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/bspreset.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/restart.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/idle-thread.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/start-config-clock.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/start-config-ebi.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/start-config-ebi-cs.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/start-config-ebi-cs-cal.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/start-config-mmu.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/start-config-mmu-early.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/start-config-siu-pcr.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/start-prologue.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/start-early.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/start-cache.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/start-clock.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/start-flash.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/start-watchdog.c
+libbsp_a_SOURCES += ../../shared/bootcard.c
+libbsp_a_SOURCES += ../../shared/bspclean.c
+libbsp_a_SOURCES += ../../shared/bsplibc.c
+libbsp_a_SOURCES += ../../shared/bsppost.c
+libbsp_a_SOURCES += ../../shared/bsppredriverhook.c
+libbsp_a_SOURCES += ../../shared/bsppretaskinghook.c
+libbsp_a_SOURCES += ../../shared/src/stackalloc.c
+libbsp_a_SOURCES += ../shared/src/bsp-start-zero.S
+libbsp_a_SOURCES += ../shared/src/memcpy.c
+libbsp_a_SOURCES += ../shared/src/tictac.c
+libbsp_a_SOURCES += ../shared/src/ppc-exc-handler-table.c
+libbsp_a_SOURCES += startup/bspstart.c
+libbsp_a_SOURCES += startup/bspgetworkarea.c
+libbsp_a_SOURCES += startup/exc-vector-base.S
+libbsp_a_SOURCES += startup/get-system-clock.c
+libbsp_a_SOURCES += startup/bspreset.c
+libbsp_a_SOURCES += startup/restart.c
+libbsp_a_SOURCES += startup/idle-thread.c
+libbsp_a_SOURCES += startup/start-config-clock.c
+libbsp_a_SOURCES += startup/start-config-ebi.c
+libbsp_a_SOURCES += startup/start-config-ebi-cs.c
+libbsp_a_SOURCES += startup/start-config-ebi-cs-cal.c
+libbsp_a_SOURCES += startup/start-config-mmu.c
+libbsp_a_SOURCES += startup/start-config-mmu-early.c
+libbsp_a_SOURCES += startup/start-config-siu-pcr.c
+libbsp_a_SOURCES += startup/start-prologue.c
+libbsp_a_SOURCES += startup/start-early.c
+libbsp_a_SOURCES += startup/start-cache.S
+libbsp_a_SOURCES += startup/start-clock.c
+libbsp_a_SOURCES += startup/start-flash.S
+libbsp_a_SOURCES += startup/start-watchdog.c
 
 # clock
-librtemsbsp_a_SOURCES +=../../../../../../bsps/powerpc/mpc55xxevb/clock/clock-config.c
+libbsp_a_SOURCES += clock/clock-config.c
 
 # console
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/console/console-config.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/console/console-esci.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/console/console-generic.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/console/console-linflex.c
+libbsp_a_SOURCES += console/console-config.c
+libbsp_a_SOURCES += console/console-esci.c
+libbsp_a_SOURCES += console/console-generic.c
+libbsp_a_SOURCES += console/console-linflex.c
 
 # irq_generic
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/irq/irq-default-handler.c
+libbsp_a_SOURCES += ../../shared/src/irq-default-handler.c
+libbsp_a_SOURCES += ../../shared/src/irq-generic.c
+libbsp_a_SOURCES += ../../shared/src/irq-info.c
+libbsp_a_SOURCES += ../../shared/src/irq-legacy.c
+libbsp_a_SOURCES += ../../shared/src/irq-server.c
+libbsp_a_SOURCES += ../../shared/src/irq-shell.c
 
 # Misc
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/sd-card-init.c
+libbsp_a_SOURCES += startup/sd-card-init.c
 
 # I2C
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/i2c/i2c_init.c
+libbsp_a_SOURCES += i2c/i2c_init.c \
+    ../../../libcpu/powerpc/mpc83xx/i2c/mpc83xx_i2cdrv.c
 
 # Network
 if HAS_NETWORKING
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/net/smsc9218i.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/net/if_smc.c
+libbsp_a_SOURCES += network/smsc9218i.c
+libbsp_a_SOURCES += network/if_smc.c
 endif
 
 # BSP library
 
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/cache/cache.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/btimer/btimer-ppc-dec.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/gen83xx/dev/mpc83xx_i2cdrv.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/dev/dspi.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/copy.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/edma.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/emios.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/flash_support.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/irq.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/mpc55xxevb/start/siu.c
+libbsp_a_LIBADD = ../../../libcpu/@RTEMS_CPU@/shared/cpuIdent.rel \
+    ../../../libcpu/@RTEMS_CPU@/shared/cache.rel \
+    ../../../libcpu/@RTEMS_CPU@/shared/stack.rel \
+    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/misc.rel \
+    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/irq.rel \
+    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/siu.rel \
+    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/edma.rel \
+    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/emios.rel \
+    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/dspi.rel \
+    ../../../libcpu/@RTEMS_CPU@/@exceptions@/rtems-cpu.rel \
+    ../../../libcpu/@RTEMS_CPU@/@exceptions@/exc_bspsupport.rel \
+    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/timer.rel
 
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
-include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
-include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
-include $(srcdir)/../../../../../../bsps/powerpc/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/powerpc/shared/exceptions-sources.am
-include $(srcdir)/../../../../../../bsps/powerpc/mpc55xxevb/headers.am

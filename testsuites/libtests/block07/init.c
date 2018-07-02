@@ -27,7 +27,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
 #include "tmacros.h"
 
 #include <rtems.h>
@@ -87,23 +86,23 @@ static void task_low(rtems_task_argument arg)
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   rtems_bdbuf_buffer *bd = NULL;
 
-  printf("L: try access: 0\n");
+  printk("L: try access: 0\n");
 
   sc = rtems_bdbuf_get(dd, 0, &bd);
   ASSERT_SC(sc);
 
-  printf("L: access: 0\n");
+  printk("L: access: 0\n");
 
   rtems_test_assert(bd->group->bds_per_group == 2);
 
-  printf("L: release: 0\n");
+  printk("L: release: 0\n");
 
   sc = rtems_bdbuf_release(bd);
   ASSERT_SC(sc);
 
-  printf("L: release done: 0\n");
+  printk("L: release done: 0\n");
 
-  TEST_END();
+  rtems_test_endk();
 
   exit(0);
 }
@@ -113,21 +112,21 @@ static void task_mid(rtems_task_argument arg)
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   rtems_bdbuf_buffer *bd = NULL;
 
-  printf("M: try access: 0\n");
+  printk("M: try access: 0\n");
 
   sc = rtems_bdbuf_get(dd, 0, &bd);
   ASSERT_SC(sc);
 
-  printf("M: access: 0\n");
+  printk("M: access: 0\n");
 
   rtems_test_assert(bd->group->bds_per_group == 1);
 
-  printf("M: release: 0\n");
+  printk("M: release: 0\n");
 
   sc = rtems_bdbuf_release(bd);
   ASSERT_SC(sc);
 
-  printf("M: release done: 0\n");
+  printk("M: release done: 0\n");
 
   rtems_task_delete(RTEMS_SELF);
 }
@@ -139,21 +138,21 @@ static void task_high(rtems_task_argument arg)
 
   change_block_size();
 
-  printf("H: try access: 0\n");
+  printk("H: try access: 0\n");
 
   sc = rtems_bdbuf_get(dd, 0, &bd);
   ASSERT_SC(sc);
 
-  printf("H: access: 0\n");
+  printk("H: access: 0\n");
 
   rtems_test_assert(bd->group->bds_per_group == 1);
 
-  printf("H: release: 0\n");
+  printk("H: release: 0\n");
 
   sc = rtems_bdbuf_release(bd);
   ASSERT_SC(sc);
 
-  printf("H: release done: 0\n");
+  printk("H: release done: 0\n");
 
   rtems_task_delete(RTEMS_SELF);
 }
@@ -165,7 +164,7 @@ static rtems_task Init(rtems_task_argument argument)
   rtems_bdbuf_buffer *bd = NULL;
   dev_t dev = 0;
 
-  TEST_BEGIN();
+  rtems_test_begink();
 
   sc = rtems_disk_io_initialize();
   ASSERT_SC(sc);
@@ -227,12 +226,12 @@ static rtems_task Init(rtems_task_argument argument)
   sc = rtems_bdbuf_release(bd);
   ASSERT_SC(sc);
 
-  printf("I: try access: 0\n");
+  printk("I: try access: 0\n");
 
   sc = rtems_bdbuf_get(dd, 0, &bd);
   ASSERT_SC(sc);
 
-  printf("I: access: 0\n");
+  printk("I: access: 0\n");
 
   sc = rtems_task_set_priority(RTEMS_SELF, PRIORITY_IDLE, &cur_prio);
   ASSERT_SC(sc);
@@ -246,12 +245,12 @@ static rtems_task Init(rtems_task_argument argument)
   sc = rtems_task_set_priority(RTEMS_SELF, PRIORITY_INIT, &cur_prio);
   ASSERT_SC(sc);
 
-  printf("I: release: 0\n");
+  printk("I: release: 0\n");
 
   sc = rtems_bdbuf_release(bd);
   ASSERT_SC(sc);
 
-  printf("I: release done: 0\n");
+  printk("I: release done: 0\n");
 
   rtems_task_delete(RTEMS_SELF);
 }
@@ -259,7 +258,7 @@ static rtems_task Init(rtems_task_argument argument)
 #define CONFIGURE_INIT
 
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_LIBBLOCK
 
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 4

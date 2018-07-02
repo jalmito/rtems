@@ -16,12 +16,10 @@
 #include "config.h"
 #endif
 
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <time.h>
 
 #include <rtems.h>
 #include <rtems/shell.h>

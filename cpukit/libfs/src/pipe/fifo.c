@@ -19,21 +19,21 @@
 #endif
 
 #include <sys/param.h>
-#include <sys/filio.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <rtems.h>
 #include <rtems/libio_.h>
-#include <rtems/pipe.h>
 #include <rtems/rtems/barrierimpl.h>
 #include <rtems/score/statesimpl.h>
 
-#define LIBIO_ACCMODE(_iop) (rtems_libio_iop_flags(_iop) & LIBIO_FLAGS_READ_WRITE)
-#define LIBIO_NODELAY(_iop) rtems_libio_iop_is_no_delay(_iop)
+#include "pipe.h"
 
-static rtems_mutex pipe_mutex = RTEMS_MUTEX_INITIALIZER("Pipes");
+#define LIBIO_ACCMODE(_iop) ((_iop)->flags & LIBIO_FLAGS_READ_WRITE)
+#define LIBIO_NODELAY(_iop) ((_iop)->flags & LIBIO_FLAGS_NO_DELAY)
+
+static rtems_id pipe_semaphore = RTEMS_ID_NONE;
 
 
 #define PIPE_EMPTY(_pipe) (_pipe->Length == 0)
@@ -41,9 +41,11 @@ static rtems_mutex pipe_mutex = RTEMS_MUTEX_INITIALIZER("Pipes");
 #define PIPE_SPACE(_pipe) (_pipe->Size - _pipe->Length)
 #define PIPE_WSTART(_pipe) ((_pipe->Start + _pipe->Length) % _pipe->Size)
 
-#define PIPE_LOCK(_pipe) rtems_mutex_lock(&(_pipe)->Mutex)
+#define PIPE_LOCK(_pipe)  \
+  ( rtems_semaphore_obtain(_pipe->Semaphore, RTEMS_WAIT, RTEMS_NO_TIMEOUT)  \
+   == RTEMS_SUCCESSFUL )
 
-#define PIPE_UNLOCK(_pipe) rtems_mutex_unlock(&(_pipe)->Mutex)
+#define PIPE_UNLOCK(_pipe)  rtems_semaphore_release(_pipe->Semaphore)
 
 #define PIPE_READWAIT(_pipe)  \
   ( rtems_barrier_wait(_pipe->readBarrier, RTEMS_NO_TIMEOUT)  \
@@ -93,13 +95,18 @@ static int pipe_alloc(
         RTEMS_BARRIER_MANUAL_RELEASE, 0,
         &pipe->writeBarrier) != RTEMS_SUCCESSFUL)
     goto err_wbar;
-  rtems_mutex_init(&pipe->Mutex, "Pipe");
+  if (rtems_semaphore_create(
+        rtems_build_name ('P', 'I', 's', c), 1,
+        RTEMS_BINARY_SEMAPHORE | RTEMS_FIFO,
+        RTEMS_NO_PRIORITY, &pipe->Semaphore) != RTEMS_SUCCESSFUL)
+    goto err_sem;
 
   *pipep = pipe;
   if (c ++ == 'z')
     c = 'a';
   return 0;
 
+err_sem:
   rtems_barrier_delete(pipe->writeBarrier);
 err_wbar:
   rtems_barrier_delete(pipe->readBarrier);
@@ -117,19 +124,55 @@ static inline void pipe_free(
 {
   rtems_barrier_delete(pipe->readBarrier);
   rtems_barrier_delete(pipe->writeBarrier);
-  rtems_mutex_destroy(&pipe->Mutex);
+  rtems_semaphore_delete(pipe->Semaphore);
   free(pipe->Buffer);
   free(pipe);
 }
 
-static void pipe_lock(void)
+static int pipe_lock(void)
 {
-  rtems_mutex_lock(&pipe_mutex);
+  rtems_status_code sc = RTEMS_SUCCESSFUL;
+
+  if (pipe_semaphore == RTEMS_ID_NONE) {
+    rtems_libio_lock();
+
+    if (pipe_semaphore == RTEMS_ID_NONE) {
+      sc = rtems_semaphore_create(
+        rtems_build_name('P', 'I', 'P', 'E'),
+        1,
+        RTEMS_BINARY_SEMAPHORE | RTEMS_INHERIT_PRIORITY | RTEMS_PRIORITY,
+        RTEMS_NO_PRIORITY,
+        &pipe_semaphore
+      );
+    }
+
+    rtems_libio_unlock();
+  }
+
+  if (sc == RTEMS_SUCCESSFUL) {
+    sc = rtems_semaphore_obtain(pipe_semaphore, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
+  }
+
+  if (sc == RTEMS_SUCCESSFUL) {
+    return 0;
+  } else {
+    return -ENOMEM;
+  }
 }
 
 static void pipe_unlock(void)
 {
-  rtems_mutex_unlock(&pipe_mutex);
+#ifdef RTEMS_DEBUG
+  rtems_status_code sc = RTEMS_SUCCESSFUL;
+
+  sc =
+#endif
+   rtems_semaphore_release(pipe_semaphore);
+  #ifdef RTEMS_DEBUG
+    if (sc != RTEMS_SUCCESSFUL) {
+      rtems_fatal_error_occurred(0xdeadbeef);
+    }
+  #endif
 }
 
 /*
@@ -145,7 +188,9 @@ static int pipe_new(
   int err = 0;
 
   _Assert( pipep );
-  pipe_lock();
+  err = pipe_lock();
+  if (err)
+    return err;
 
   pipe = *pipep;
   if (pipe == NULL) {
@@ -154,7 +199,8 @@ static int pipe_new(
       goto out;
   }
 
-  PIPE_LOCK(pipe);
+  if (!PIPE_LOCK(pipe))
+    err = -EINTR;
 
   if (*pipep == NULL) {
     if (err)
@@ -176,8 +222,15 @@ void pipe_release(
   pipe_control_t *pipe = *pipep;
   uint32_t mode;
 
-  pipe_lock();
-  PIPE_LOCK(pipe);
+  #if defined(RTEMS_DEBUG)
+    /* WARN pipe not freed and pipep not set to NULL! */
+    if (pipe_lock())
+      rtems_fatal_error_occurred(0xdeadbeef);
+
+    /* WARN pipe not released! */
+    if (!PIPE_LOCK(pipe))
+      rtems_fatal_error_occurred(0xdeadbeef);
+  #endif
 
   mode = LIBIO_ACCMODE(iop);
   if (mode & LIBIO_FLAGS_READ)
@@ -211,7 +264,7 @@ void pipe_release(
     return;
 
   /* This is safe for IMFS, but how about other FSes? */
-  rtems_libio_iop_flags_clear( iop, LIBIO_FLAGS_OPEN );
+  iop->flags &= ~LIBIO_FLAGS_OPEN;
   if(iop->pathinfo.ops->unlink_h(&iop->pathinfo))
     return;
 #endif
@@ -250,7 +303,8 @@ int fifo_open(
           PIPE_UNLOCK(pipe);
           if (! PIPE_READWAIT(pipe))
             goto out_error;
-          PIPE_LOCK(pipe);
+          if (! PIPE_LOCK(pipe))
+            goto out_error;
         } while (prevCounter == pipe->writerCounter);
       }
       break;
@@ -274,7 +328,8 @@ int fifo_open(
           PIPE_UNLOCK(pipe);
           if (! PIPE_WRITEWAIT(pipe))
             goto out_error;
-          PIPE_LOCK(pipe);
+          if (! PIPE_LOCK(pipe))
+            goto out_error;
         } while (prevCounter == pipe->readerCounter);
       }
       break;
@@ -306,7 +361,8 @@ ssize_t pipe_read(
 {
   int chunk, chunk1, read = 0, ret = 0;
 
-  PIPE_LOCK(pipe);
+  if (! PIPE_LOCK(pipe))
+    return -EINTR;
 
   while (PIPE_EMPTY(pipe)) {
     /* Not an error */
@@ -323,7 +379,11 @@ ssize_t pipe_read(
     PIPE_UNLOCK(pipe);
     if (! PIPE_READWAIT(pipe))
       ret = -EINTR;
-    PIPE_LOCK(pipe);
+    if (! PIPE_LOCK(pipe)) {
+      /* WARN waitingReaders not restored! */
+      ret = -EINTR;
+      goto out_nolock;
+    }
     pipe->waitingReaders --;
     if (ret != 0)
       goto out_locked;
@@ -353,6 +413,7 @@ ssize_t pipe_read(
 out_locked:
   PIPE_UNLOCK(pipe);
 
+out_nolock:
   if (read > 0)
     return read;
   return ret;
@@ -371,7 +432,8 @@ ssize_t pipe_write(
   if (count == 0)
     return 0;
 
-  PIPE_LOCK(pipe);
+  if (! PIPE_LOCK(pipe))
+    return -EINTR;
 
   if (pipe->Readers == 0) {
     ret = -EPIPE;
@@ -393,7 +455,11 @@ ssize_t pipe_write(
       PIPE_UNLOCK(pipe);
       if (! PIPE_WRITEWAIT(pipe))
         ret = -EINTR;
-      PIPE_LOCK(pipe);
+      if (! PIPE_LOCK(pipe)) {
+        /* WARN waitingWriters not restored! */
+        ret = -EINTR;
+        goto out_nolock;
+      }
       pipe->waitingWriters --;
       if (ret != 0)
         goto out_locked;
@@ -424,6 +490,7 @@ ssize_t pipe_write(
 out_locked:
   PIPE_UNLOCK(pipe);
 
+out_nolock:
 #ifdef RTEMS_POSIX_API
   /* Signal SIGPIPE */
   if (ret == -EPIPE)
@@ -446,7 +513,8 @@ int pipe_ioctl(
     if (buffer == NULL)
       return -EFAULT;
 
-    PIPE_LOCK(pipe);
+    if (! PIPE_LOCK(pipe))
+      return -EINTR;
 
     /* Return length of pipe */
     *(unsigned int *)buffer = pipe->Length;

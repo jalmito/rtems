@@ -22,6 +22,8 @@
 
 const char rtems_test_name[] = "SMPPSXAFFINITY 2";
 
+#if HAVE_DECL_PTHREAD_GETAFFINITY_NP
+
 pthread_t           Init_id;
 pthread_t           Med_id[NUM_CPUS-1];
 pthread_t           Low_id[NUM_CPUS];
@@ -43,11 +45,11 @@ void Validate_setaffinity_errors(void)
   int                 sc;
   cpu_set_t           cpuset;
 
-  /* Verify pthread_setaffinity_np checks that more cpu's don't hurt. */
+  /* Verify pthread_setaffinity_np checks that all cpu's exist. */
   CPU_FILL(&cpuset);
-  puts( "Init - pthread_setaffinity_np - Lots of cpus - SUCCESS" );
+  puts( "Init - pthread_setaffinity_np - Invalid cpu - EINVAL" );
   sc = pthread_setaffinity_np( Init_id, sizeof(cpu_set_t), &cpuset );
-  rtems_test_assert( sc == 0 );
+  rtems_test_assert( sc == EINVAL );
 
   /* Verify pthread_setaffinity_np checks that at least one cpu is set */
   CPU_ZERO(&cpuset);
@@ -64,7 +66,7 @@ void Validate_setaffinity_errors(void)
 
   /* Verify pthread_setaffinity_np validates cpusetsize */
   puts( "Init - pthread_setaffinity_np - Invalid cpusetsize - EINVAL" );
-  sc = pthread_setaffinity_np( Init_id,  1, &cpuset );
+  sc = pthread_setaffinity_np( Init_id,  sizeof(cpu_set_t) * 2, &cpuset );
   rtems_test_assert( sc == EINVAL );
 
   /* Verify pthread_setaffinity_np validates cpuset */
@@ -87,7 +89,7 @@ void Validate_getaffinity_errors(void)
 
   /* Verify pthread_getaffinity_np validates cpusetsize */
   puts( "Init - pthread_getaffinity_np - Invalid cpusetsize - EINVAL" );
-  sc = pthread_getaffinity_np( Init_id,  1, &cpuset );
+  sc = pthread_getaffinity_np( Init_id,  sizeof(cpu_set_t) * 2, &cpuset );
   rtems_test_assert( sc == EINVAL );
 
   /* Verify pthread_getaffinity_np validates cpuset */
@@ -111,10 +113,6 @@ void Validate_affinity(void )
   puts( "Init - Set Init priority to high");
   sc = pthread_getattr_np( Init_id, &attr );
   rtems_test_assert( sc == 0 );
-
-  sc = pthread_attr_setstack( &attr, NULL, 0 );
-  rtems_test_assert( sc == 0 );
-
   sc = pthread_attr_getschedparam( &attr, &param );
   rtems_test_assert( sc == 0 );
   param.sched_priority = sched_get_priority_max( SCHED_FIFO );
@@ -170,7 +168,7 @@ void Validate_affinity(void )
 
   /* Change the affinity for each low priority task */
   puts("Init - Change affinity on Low priority tasks");
-  CPU_COPY(&cpuset0, &cpuset1);
+  CPU_COPY(&cpuset1, &cpuset0);
   for (i=0; i<cpu_count; i++){
 
     CPU_CLR(i, &cpuset1);
@@ -185,7 +183,7 @@ void Validate_affinity(void )
   }
 
   puts("Init - Validate affinity on Low priority tasks");
-  CPU_COPY(&cpuset0, &cpuset1);
+  CPU_COPY(&cpuset1, &cpuset0);
   for (i=0; i<cpu_count; i++){
     CPU_CLR(i, &cpuset1);
 
@@ -215,14 +213,27 @@ void *POSIX_Init(
   rtems_test_exit(0);
 }
 
+#else
+void *POSIX_Init(
+  void *ignored
+)
+{
+  TEST_BEGIN();
+  puts( " Affinity NOT Supported");
+  TEST_END();
+  rtems_test_exit(0);
+}
+
+#endif
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
 
+#define CONFIGURE_SMP_APPLICATION
 #define CONFIGURE_SCHEDULER_PRIORITY_AFFINITY_SMP
 
-#define CONFIGURE_MAXIMUM_PROCESSORS NUM_CPUS
+#define CONFIGURE_SMP_MAXIMUM_PROCESSORS NUM_CPUS
 
 #define CONFIGURE_MAXIMUM_POSIX_THREADS (NUM_CPUS*2)
 

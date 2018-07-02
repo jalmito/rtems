@@ -18,7 +18,14 @@
 #include "config.h"
 #endif
 
+#include <pthread.h>
+#include <errno.h>
+
+#include <rtems/system.h>
+#include <rtems/score/watchdog.h>
 #include <rtems/posix/condimpl.h>
+#include <rtems/posix/time.h>
+#include <rtems/posix/muteximpl.h>
 
 /*
  *  _POSIX_Condition_variables_Signal_support
@@ -32,38 +39,30 @@ int _POSIX_Condition_variables_Signal_support(
   bool                       is_broadcast
 )
 {
-  POSIX_Condition_variables_Control *the_cond;
-  unsigned long                      flags;
-  const Thread_queue_Operations     *operations;
-  Thread_queue_Heads                *heads;
+  POSIX_Condition_variables_Control          *the_cond;
+  Objects_Locations                           location;
+  Thread_Control                             *the_thread;
 
-  the_cond = _POSIX_Condition_variables_Get( cond );
-  POSIX_CONDITION_VARIABLES_VALIDATE_OBJECT( the_cond, flags );
-  operations = POSIX_CONDITION_VARIABLES_TQ_OPERATIONS;
+  the_cond = _POSIX_Condition_variables_Get( cond, &location );
+  switch ( location ) {
 
-  do {
-    Thread_queue_Context queue_context;
+    case OBJECTS_LOCAL:
+      do {
+        the_thread = _Thread_queue_Dequeue( &the_cond->Wait_queue );
+        if ( !the_thread )
+          the_cond->Mutex = POSIX_CONDITION_VARIABLES_NO_MUTEX;
+      } while ( is_broadcast && the_thread );
 
-    _Thread_queue_Context_initialize( &queue_context );
-    _POSIX_Condition_variables_Acquire( the_cond, &queue_context );
+      _Objects_Put( &the_cond->Object );
 
-    heads = the_cond->Queue.Queue.heads;
+      return 0;
 
-    if ( heads != NULL ) {
-      Thread_Control *the_thread;
+#if defined(RTEMS_MULTIPROCESSING)
+    case OBJECTS_REMOTE:
+#endif
+    case OBJECTS_ERROR:
+      break;
+  }
 
-      the_thread = ( *operations->first )( heads );
-      _Thread_queue_Extract_critical(
-        &the_cond->Queue.Queue,
-        operations,
-        the_thread,
-        &queue_context
-      );
-    } else {
-      the_cond->mutex = POSIX_CONDITION_VARIABLES_NO_MUTEX;
-      _POSIX_Condition_variables_Release( the_cond, &queue_context );
-    }
-  } while ( is_broadcast && heads != NULL );
-
-  return 0;
+  return EINVAL;
 }

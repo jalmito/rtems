@@ -46,11 +46,6 @@ rtems_isr Isr_handler(
   rtems_vector_number vector
 );
 
-static void set_thread_executing( Thread_Control *thread )
-{
-  _Per_CPU_Get_snapshot()->executing = thread;
-}
-
 rtems_task Init(
   rtems_task_argument argument
 )
@@ -112,7 +107,7 @@ rtems_task Task_1(
 )
 {
   Scheduler_priority_Context *scheduler_context =
-    _Scheduler_priority_Get_context( _Thread_Scheduler_get_home( _Thread_Get_executing() ) );
+    _Scheduler_priority_Get_context( _Scheduler_Get( _Thread_Get_executing() ) );
 #if defined(RTEMS_SMP)
   rtems_interrupt_level level;
 #endif
@@ -156,7 +151,7 @@ rtems_task Task_1(
    *  No preempt .. nested
    */
 
-  _Thread_Dispatch_disable();
+  _Thread_Disable_dispatch();
 
   Interrupt_nest = 1;
 
@@ -170,7 +165,7 @@ rtems_task Task_1(
 #endif
   Interrupt_return_time = benchmark_timer_read();
 
-  _Thread_Dispatch_enable( _Per_CPU_Get() );
+  _Thread_Unnest_dispatch();
 
   put_time(
     "rtems interrupt: entry overhead returns to nested interrupt",
@@ -193,17 +188,16 @@ rtems_task Task_1(
    */
 
 #if defined(RTEMS_SMP)
-  _ISR_Local_disable(level);
+  _ISR_Disable_without_giant(level);
 #endif
 
-  set_thread_executing(
-    (Thread_Control *) _Chain_First(&scheduler_context->Ready[LOW_PRIORITY])
-  );
+  _Thread_Executing =
+        (Thread_Control *) _Chain_First(&scheduler_context->Ready[LOW_PRIORITY]);
 
   _Thread_Dispatch_necessary = 1;
 
 #if defined(RTEMS_SMP)
-  _ISR_Local_enable(level);
+  _ISR_Enable_without_giant(level);
 #endif
 
   Interrupt_occurred = 0;
@@ -231,15 +225,9 @@ rtems_task Task_2(
 )
 {
   Thread_Control *executing = _Thread_Get_executing();
-  const Scheduler_Control    *scheduler;
-  Scheduler_priority_Context *scheduler_context;
-  ISR_lock_Context state_lock_context;
-  ISR_lock_Context scheduler_lock_context;
-
-  _Thread_State_acquire( executing, &state_lock_context );
-  scheduler = _Thread_Scheduler_get_home( executing );
-  scheduler_context = _Scheduler_priority_Get_context( scheduler );
-  _Thread_State_release( executing, &state_lock_context );
+  Scheduler_priority_Context *scheduler_context =
+    _Scheduler_priority_Get_context( _Scheduler_Get( executing ) );
+  ISR_lock_Context lock_context;
 
 #if (MUST_WAIT_FOR_INTERRUPT == 1)
   while ( Interrupt_occurred == 0 );
@@ -268,17 +256,14 @@ rtems_task Task_2(
    *  Switch back to the other task to exit the test.
    */
 
-  _Thread_State_acquire( executing, &state_lock_context );
-  _Scheduler_Acquire_critical( scheduler, &scheduler_lock_context );
+  _Scheduler_Acquire( executing, &lock_context );
 
-  set_thread_executing(
-    (Thread_Control *) _Chain_First(&scheduler_context->Ready[LOW_PRIORITY])
-  );
+  _Thread_Executing =
+        (Thread_Control *) _Chain_First(&scheduler_context->Ready[LOW_PRIORITY]);
 
   _Thread_Dispatch_necessary = 1;
 
-  _Scheduler_Release_critical( scheduler, &scheduler_lock_context );
-  _Thread_State_release( executing, &state_lock_context );
+  _Scheduler_Release( executing, &lock_context );
 
   _Thread_Dispatch();
 

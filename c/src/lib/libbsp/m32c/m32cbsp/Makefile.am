@@ -3,35 +3,46 @@ ACLOCAL_AMFLAGS = -I ../../../../aclocal
 include $(top_srcdir)/../../../../automake/compile.am
 include $(top_srcdir)/../../bsp.am
 
-dist_project_lib_DATA = ../../../../../../bsps/m32c/m32cbsp/start/bsp_specs
+include_bspdir = $(includedir)/bsp
 
+dist_project_lib_DATA = bsp_specs
+
+include_HEADERS = include/bsp.h
+include_HEADERS += ../../shared/include/tm27.h
+
+nodist_include_HEADERS = include/bspopts.h
+nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
+nodist_include_bsp_HEADERS += ../../shared/include/console-polled.h
+DISTCLEANFILES = include/bspopts.h
 noinst_PROGRAMS =
 
+nodist_include_HEADERS += ../../shared/include/coverhd.h
 
-start.$(OBJEXT): ../../../../../../bsps/m32c/m32cbsp/start/start.S
+EXTRA_DIST = start/start.S
+start.$(OBJEXT): start/start.S
 	$(CPPASCOMPILE) -o $@ -c $<
 project_lib_DATA = start.$(OBJEXT)
 
-project_lib_DATA += linkcmds
+dist_project_lib_DATA += startup/linkcmds
 
-project_lib_LIBRARIES = librtemsbsp.a
-librtemsbsp_a_SOURCES =
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-empty.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m32c/m32cbsp/start/bspstart.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m32c/m32cbsp/start/crtn.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/clock/clock-simidle.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/console-polled.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m32c/m32cbsp/console/console-io.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m32c/m32cbsp/console/syscalls.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m32c/m32cbsp/btimer/btimer.c
+startup_SOURCES = ../../shared/bspclean.c ../../shared/bsplibc.c \
+    ../../shared/bsppredriverhook.c ../../shared/bsppretaskinghook.c \
+    ../../shared/bspgetworkarea.c ../../shared/bsppost.c \
+    startup/bspstart.c ../../shared/bootcard.c ../../shared/sbrk.c \
+    ../../shared/gnatinstallhandler.c startup/crtn.S
+clock_SOURCES = ../../shared/clock_driver_simidle.c
+console_SOURCES = ../../shared/console-polled.c console/console-io.c \
+   console/syscalls.S
+timer_SOURCES = timer/timer.c
+
+noinst_LIBRARIES = libbsp.a
+libbsp_a_SOURCES = $(startup_SOURCES) $(clock_SOURCES) $(console_SOURCES) \
+    $(timer_SOURCES)
 
 # Cache
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/cache/nocache.c
+libbsp_a_SOURCES += ../../../libcpu/shared/src/cache_manager.c
+libbsp_a_SOURCES += ../../shared/include/cache_.h
+libbsp_a_CPPFLAGS = -I$(srcdir)/../../shared/include
 
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
-include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/m32c/m32cbsp/headers.am

@@ -10,7 +10,7 @@
  * Copyright (C) 2001 OKTET Ltd., St.-Petersburg, Russia
  * Author: Victor V. Vengerov <vvv@oktet.ru>
  *
- * Copyright (c) 2009, 2017 embedded brains GmbH.
+ * Copyright (c) 2009-2012 embedded brains GmbH.
  */
 
 #if HAVE_CONFIG_H
@@ -26,7 +26,6 @@
 #include <rtems/diskdevs.h>
 #include <rtems/blkdev.h>
 #include <rtems/bdbuf.h>
-#include <rtems/thread.h>
 
 #define DISKTAB_INITIAL_SIZE 8
 
@@ -43,7 +42,7 @@ static rtems_disk_device_table *disktab;
 static rtems_device_major_number disktab_size;
 
 /* Mutual exclusion semaphore for disk devices table */
-static rtems_mutex diskdevs_mutex = RTEMS_MUTEX_INITIALIZER("diskdevs");
+static rtems_id diskdevs_mutex;
 
 /* diskdevs data structures protection flag.
  * Normally, only table lookup operations performed. It is quite fast, so
@@ -60,20 +59,33 @@ static volatile bool diskdevs_protected;
 
 RTEMS_INTERRUPT_LOCK_DEFINE(static, diskdevs_lock, "diskdevs")
 
-static rtems_status_code disk_delete_locked(dev_t dev);
-
-static void
+static rtems_status_code
 disk_lock(void)
 {
-  rtems_mutex_lock(&diskdevs_mutex);
-  diskdevs_protected = true;
+  rtems_status_code sc = RTEMS_SUCCESSFUL;
+
+  sc = rtems_semaphore_obtain(diskdevs_mutex, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
+  if (sc == RTEMS_SUCCESSFUL) {
+    diskdevs_protected = true;
+
+    return RTEMS_SUCCESSFUL;
+  } else {
+    return RTEMS_NOT_CONFIGURED;
+  }
 }
 
 static void
 disk_unlock(void)
 {
+  rtems_status_code sc = RTEMS_SUCCESSFUL;
+
   diskdevs_protected = false;
-  rtems_mutex_unlock(&diskdevs_mutex);
+
+  sc = rtems_semaphore_release(diskdevs_mutex);
+  if (sc != RTEMS_SUCCESSFUL) {
+    /* FIXME: Error number */
+    rtems_fatal_error_occurred(0xdeadbeef);
+  }
 }
 
 static rtems_disk_device *
@@ -235,7 +247,10 @@ rtems_status_code rtems_disk_create_phys(
     return RTEMS_INVALID_ADDRESS;
   }
 
-  disk_lock();
+  sc = disk_lock();
+  if (sc != RTEMS_SUCCESSFUL) {
+    return sc;
+  }
 
   sc = create_disk(dev, name, &dd, &alloc_name);
   if (sc != RTEMS_SUCCESSFUL) {
@@ -257,7 +272,7 @@ rtems_status_code rtems_disk_create_phys(
 
   if (sc != RTEMS_SUCCESSFUL) {
     dd->ioctl = null_handler;
-    disk_delete_locked(dev);
+    rtems_disk_delete(dev);
     disk_unlock();
 
     return sc;
@@ -287,7 +302,10 @@ rtems_status_code rtems_disk_create_log(
   rtems_disk_device *dd = NULL;
   char *alloc_name = NULL;
 
-  disk_lock();
+  sc = disk_lock();
+  if (sc != RTEMS_SUCCESSFUL) {
+    return sc;
+  }
 
   phys_dd = get_disk_entry(phys, true);
   if (phys_dd == NULL) {
@@ -317,7 +335,7 @@ rtems_status_code rtems_disk_create_log(
 
   if (sc != RTEMS_SUCCESSFUL) {
     dd->ioctl = null_handler;
-    disk_delete_locked(dev);
+    rtems_disk_delete(dev);
     disk_unlock();
 
     return sc;
@@ -386,37 +404,36 @@ rtems_disk_cleanup(rtems_disk_device *disk_to_remove)
   }
 }
 
-static rtems_status_code
-disk_delete_locked(dev_t dev)
+rtems_status_code
+rtems_disk_delete(dev_t dev)
 {
+  rtems_status_code sc = RTEMS_SUCCESSFUL;
   rtems_disk_device *dd = NULL;
+
+  sc = disk_lock();
+  if (sc != RTEMS_SUCCESSFUL) {
+    return sc;
+  }
 
   dd = get_disk_entry(dev, true);
   if (dd == NULL) {
+    disk_unlock();
+
     return RTEMS_INVALID_ID;
   }
 
   dd->deleted = true;
   rtems_disk_cleanup(dd);
 
-  return RTEMS_SUCCESSFUL;
-}
-
-rtems_status_code
-rtems_disk_delete(dev_t dev)
-{
-  rtems_status_code sc;
-
-  disk_lock();
-  sc = disk_delete_locked(dev);
   disk_unlock();
 
-  return sc;
+  return RTEMS_SUCCESSFUL;
 }
 
 rtems_disk_device *
 rtems_disk_obtain(dev_t dev)
 {
+  rtems_status_code sc = RTEMS_SUCCESSFUL;
   rtems_disk_device *dd = NULL;
   rtems_interrupt_lock_context lock_context;
 
@@ -428,9 +445,11 @@ rtems_disk_obtain(dev_t dev)
   } else {
     rtems_interrupt_lock_release(&diskdevs_lock, &lock_context);
 
-    disk_lock();
-    dd = get_disk_entry(dev, false);
-    disk_unlock();
+    sc = disk_lock();
+    if (sc == RTEMS_SUCCESSFUL) {
+      dd = get_disk_entry(dev, false);
+      disk_unlock();
+    }
   }
 
   return dd;
@@ -459,6 +478,7 @@ rtems_disk_release(rtems_disk_device *dd)
 rtems_disk_device *
 rtems_disk_next(dev_t dev)
 {
+  rtems_status_code sc = RTEMS_SUCCESSFUL;
   rtems_disk_device_table *dtab = NULL;
   rtems_device_major_number major = 0;
   rtems_device_minor_number minor = 0;
@@ -479,7 +499,10 @@ rtems_disk_next(dev_t dev)
     }
   }
 
-  disk_lock();
+  sc = disk_lock();
+  if (sc != RTEMS_SUCCESSFUL) {
+    return NULL;
+  }
 
   if (major >= disktab_size) {
     disk_unlock();
@@ -524,8 +547,24 @@ rtems_disk_io_initialize(void)
     return RTEMS_NO_MEMORY;
   }
 
+  diskdevs_protected = false;
+  sc = rtems_semaphore_create(
+    rtems_build_name('D', 'D', 'E', 'V'),
+    1,
+    RTEMS_FIFO | RTEMS_BINARY_SEMAPHORE | RTEMS_NO_INHERIT_PRIORITY
+      | RTEMS_NO_PRIORITY_CEILING | RTEMS_LOCAL,
+    0,
+    &diskdevs_mutex
+  );
+  if (sc != RTEMS_SUCCESSFUL) {
+    free(disktab);
+
+    return RTEMS_NO_MEMORY;
+  }
+
   sc = rtems_bdbuf_init();
   if (sc != RTEMS_SUCCESSFUL) {
+    rtems_semaphore_delete(diskdevs_mutex);
     free(disktab);
 
     return RTEMS_UNSATISFIED;
@@ -556,6 +595,9 @@ rtems_disk_io_done(void)
   }
   free(disktab);
 
+  rtems_semaphore_delete(diskdevs_mutex);
+
+  diskdevs_mutex = RTEMS_ID_NONE;
   disktab = NULL;
   disktab_size = 0;
 

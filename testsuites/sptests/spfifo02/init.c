@@ -26,7 +26,9 @@ const char rtems_test_name[] = "SPFIFO 2";
 /* forward declarations to avoid warnings */
 rtems_task Init(rtems_task_argument argument);
 void create_all_barriers(void);
+void create_all_semaphores(void);
 void delete_barrier(void);
+void delete_semaphore(void);
 void create_fifo(void);
 void open_fifo(int expected, int flags);
 
@@ -64,6 +66,31 @@ void create_all_barriers(void)
   }
 }
 
+void create_all_semaphores(void)
+{
+  rtems_status_code status;
+  int               i;
+
+  SemaphoreCount = 0;
+
+  for ( i=0 ; i<MAXIMUM ; i++ ) {
+    status = rtems_semaphore_create(
+      rtems_build_name( 'S', 'E', 'M', 0x30+i ),
+      0,
+      RTEMS_DEFAULT_ATTRIBUTES,
+      0,
+      &Semaphores[i]
+    );
+    if ( status == RTEMS_TOO_MANY ) {
+      printf( "%d Semaphores created\n", SemaphoreCount+1 );
+      return;
+    } 
+
+    directive_failed( status, "semaphore create" );
+    SemaphoreCount++;
+  }
+}
+
 void delete_barrier(void)
 {
   rtems_status_code status;
@@ -73,6 +100,17 @@ void delete_barrier(void)
     (unsigned int)Barriers[BarrierCount] );
   status = rtems_barrier_delete( Barriers[BarrierCount] );
   directive_failed( status, "barrier delete" );
+}
+
+void delete_semaphore(void)
+{
+  rtems_status_code status;
+  
+  SemaphoreCount--;
+  printf( "Deleting semaphore id=0x%08x\n",
+    (unsigned int) Semaphores[SemaphoreCount] );
+  status = rtems_semaphore_delete( Semaphores[SemaphoreCount] );
+  directive_failed( status, "semaphore delete" );
 }
 
 void create_fifo(void)
@@ -111,8 +149,16 @@ rtems_task Init(
   puts( "Creating all barriers" );
   create_all_barriers();
 
+  puts( "Creating all semaphores" );
+  create_all_semaphores();
+
   puts( "Creating FIFO" );
   create_fifo();
+
+  puts( "Opening FIFO.. expect ENOMEM (semaphore for pipe could not be created)" );
+  open_fifo(ENOMEM, O_RDWR);
+
+  delete_semaphore();
 
   alloc_ptr = malloc( malloc_free_space() - 4 );
   puts("Opening FIFO.. expect ENOMEM since no memory is available");
@@ -127,6 +173,10 @@ rtems_task Init(
   open_fifo(ENOMEM, O_RDWR);
 
   delete_barrier();
+  puts( "Opening FIFO.. expect ENOMEM (semaphore-1 for pipe could not be created" );
+  open_fifo(ENOMEM, O_RDWR);
+
+  delete_semaphore();
   puts( "Opening FIFO in RDWR mode. Expect OK" );
   open_fifo(0, O_RDWR);
   ++num_opens;
@@ -155,7 +205,7 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS             1

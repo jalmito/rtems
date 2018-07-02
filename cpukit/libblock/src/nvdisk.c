@@ -25,10 +25,9 @@
 #include <string.h>
 #include <inttypes.h>
 
-#include <rtems/blkdev.h>
-#include <rtems/diskdevs.h>
-#include <rtems/nvdisk.h>
-#include <rtems/thread.h>
+#include "rtems/blkdev.h"
+#include "rtems/diskdevs.h"
+#include "rtems/nvdisk.h"
 
 /**
  * @note
@@ -103,7 +102,7 @@ typedef struct rtems_mvdisk
   rtems_nvdisk_device_ctl*  devices;      /**< The NV devices for this disk. */
   uint32_t                  device_count; /**< The number of NV devices. */
   uint32_t                  cs_pages;     /**< The num of pages of checksums. */
-  rtems_mutex               lock;         /**< Mutex for threading protection.*/
+  rtems_id                  lock;         /**< Mutex for threading protection.*/
   uint32_t info_level;                    /**< The info trace level. */
 } rtems_nvdisk;
 
@@ -691,6 +690,7 @@ rtems_nvdisk_ioctl (rtems_disk_device *dd, uint32_t req, void* argp)
   dev_t                     dev = rtems_disk_get_device_identifier (dd);
   rtems_device_minor_number minor = rtems_filesystem_dev_minor_t (dev);
   rtems_blkdev_request*     r = argp;
+  rtems_status_code         sc;
 
   if (minor >= rtems_nvdisk_count)
   {
@@ -706,41 +706,48 @@ rtems_nvdisk_ioctl (rtems_disk_device *dd, uint32_t req, void* argp)
 
   errno = 0;
 
-  rtems_mutex_lock (&rtems_nvdisks[minor].lock);
-
-  switch (req)
+  sc = rtems_semaphore_obtain (rtems_nvdisks[minor].lock, RTEMS_WAIT, 0);
+  if (sc != RTEMS_SUCCESSFUL)
+    errno = EIO;
+  else
   {
-    case RTEMS_BLKIO_REQUEST:
-      switch (r->req)
-      {
-        case RTEMS_BLKDEV_REQ_READ:
-          errno = rtems_nvdisk_read (&rtems_nvdisks[minor], r);
-          break;
+    errno = 0;
+    switch (req)
+    {
+      case RTEMS_BLKIO_REQUEST:
+        switch (r->req)
+        {
+          case RTEMS_BLKDEV_REQ_READ:
+            errno = rtems_nvdisk_read (&rtems_nvdisks[minor], r);
+            break;
 
-        case RTEMS_BLKDEV_REQ_WRITE:
-          errno = rtems_nvdisk_write (&rtems_nvdisks[minor], r);
-          break;
+          case RTEMS_BLKDEV_REQ_WRITE:
+            errno = rtems_nvdisk_write (&rtems_nvdisks[minor], r);
+            break;
 
-        default:
-          errno = EINVAL;
-          break;
-      }
-      break;
+          default:
+            errno = EINVAL;
+            break;
+        }
+        break;
 
-    case RTEMS_NVDISK_IOCTL_ERASE_DISK:
-      errno = rtems_nvdisk_erase_disk (&rtems_nvdisks[minor]);
-      break;
+      case RTEMS_NVDISK_IOCTL_ERASE_DISK:
+        errno = rtems_nvdisk_erase_disk (&rtems_nvdisks[minor]);
+        break;
 
-    case RTEMS_NVDISK_IOCTL_INFO_LEVEL:
-      rtems_nvdisks[minor].info_level = (uintptr_t) argp;
-      break;
+      case RTEMS_NVDISK_IOCTL_INFO_LEVEL:
+        rtems_nvdisks[minor].info_level = (uintptr_t) argp;
+        break;
 
-    default:
-      rtems_blkdev_ioctl (dd, req, argp);
-      break;
+      default:
+        rtems_blkdev_ioctl (dd, req, argp);
+        break;
+    }
+
+    sc = rtems_semaphore_release (rtems_nvdisks[minor].lock);
+    if (sc != RTEMS_SUCCESSFUL)
+      errno = EIO;
   }
-
-  rtems_mutex_unlock (&rtems_nvdisks[minor].lock);
 
   return errno == 0 ? 0 : -1;
 }
@@ -757,7 +764,7 @@ rtems_nvdisk_ioctl (rtems_disk_device *dd, uint32_t req, void* argp)
 rtems_device_driver
 rtems_nvdisk_initialize (rtems_device_major_number major,
                         rtems_device_minor_number minor,
-                        void*                     arg RTEMS_UNUSED)
+                        void*                     arg __attribute__((unused)))
 {
   const rtems_nvdisk_config* c = rtems_nvdisk_configuration;
   rtems_nvdisk*              nvd;
@@ -823,7 +830,14 @@ rtems_nvdisk_initialize (rtems_device_major_number major,
       return sc;
     }
 
-    rtems_mutex_init (&nvd->lock, "NV Disk");
+    sc = rtems_semaphore_create (rtems_build_name ('N', 'V', 'D', 'K'), 1,
+                                 RTEMS_PRIORITY | RTEMS_BINARY_SEMAPHORE |
+                                 RTEMS_INHERIT_PRIORITY, 0, &nvd->lock);
+    if (sc != RTEMS_SUCCESSFUL)
+    {
+      rtems_nvdisk_error ("disk lock create failed");
+      return sc;
+    }
   }
 
   rtems_nvdisk_count = rtems_nvdisk_configuration_size;

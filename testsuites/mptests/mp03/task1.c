@@ -13,7 +13,7 @@
 
 #include "system.h"
 
-static void Test_Task_Support(
+void Test_Task_Support(
   uint32_t    node
 )
 {

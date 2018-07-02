@@ -23,16 +23,18 @@
   #include "config.h"
 #endif
 
-#include <rtems/printer.h>
+#include <rtems/bspIo.h>
 
-static int rtems_printf_plugin(void *context, const char *format, va_list ap)
-{
-  (void) context;
-  return vprintf(format, ap);
-}
+#include <stdio.h>
 
-void rtems_print_printer_printf(rtems_printer *printer)
+int rtems_printf_plugin(void *context, const char *format, ...)
 {
-  printer->context = NULL;
-  printer->printer = rtems_printf_plugin;
+  int rv;
+  va_list ap;
+
+  va_start(ap, format);
+  rv = vprintf(format, ap);
+  va_end(ap);
+
+  return rv;
 }

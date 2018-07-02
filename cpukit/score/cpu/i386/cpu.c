@@ -17,13 +17,11 @@
 #include "config.h"
 #endif
 
-#include <inttypes.h>
-
 #include <rtems.h>
 #include <rtems/system.h>
+#include <rtems/score/types.h>
 #include <rtems/score/isr.h>
 #include <rtems/score/idtr.h>
-#include <rtems/score/tls.h>
 
 #include <rtems/bspIo.h>
 #include <rtems/score/percpu.h>
@@ -43,18 +41,8 @@ I386_ASSERT_OFFSET(ebx, EBX);
 I386_ASSERT_OFFSET(esi, ESI);
 I386_ASSERT_OFFSET(edi, EDI);
 
-RTEMS_STATIC_ASSERT(
-  offsetof(Context_Control, gs)
-    == I386_CONTEXT_CONTROL_GS_0_OFFSET,
-  Context_Control_gs_0
-);
-
 #ifdef RTEMS_SMP
   I386_ASSERT_OFFSET(is_executing, IS_EXECUTING);
-#endif
-
-#if CPU_HARDWARE_FP
-Context_Control_fp _CPU_Null_fp_context;
 #endif
 
 void _CPU_Initialize(void)
@@ -110,8 +98,7 @@ void _CPU_Initialize(void)
   uint32_t cr4;
     __asm__ __volatile__("mov %%cr4, %0":"=r"(cr4));
     if ( 0x600 != (cr4 & 0x600) ) {
-      printk("PANIC: RTEMS was compiled for SSE but BSP did not enable it"
-             "(CR4: 0%" PRIu32 ")\n", cr4);
+      printk("PANIC: RTEMS was compiled for SSE but BSP did not enable it (CR4: 0x%08x)\n", cr4);
       while ( 1 ) {
         __asm__ __volatile__("hlt");
 	  }
@@ -120,91 +107,21 @@ void _CPU_Initialize(void)
 #endif
 }
 
-/*
- * Stack alignment note:
- *
- * We want the stack to look to the '_entry_point' routine
- * like an ordinary stack frame as if '_entry_point' was
- * called from C-code.
- * Note that '_entry_point' is jumped-to by the 'ret'
- * instruction returning from _CPU_Context_switch() or
- * _CPU_Context_restore() thus popping the _entry_point
- * from the stack.
- * However, _entry_point expects a frame to look like this:
- *
- *      args        [_Thread_Handler expects no args, however]
- *      ------      (alignment boundary)
- * SP-> return_addr return here when _entry_point returns which (never happens)
- *
- *
- * Hence we must initialize the stack as follows
- *
- *         [arg1          ]:  n/a
- *         [arg0 (aligned)]:  n/a
- *         [ret. addr     ]:  NULL
- * SP->    [jump-target   ]:  _entry_point
- *
- * When Context_switch returns it pops the _entry_point from
- * the stack which then finds a standard layout.
- */
-
-void _CPU_Context_Initialize(
-  Context_Control *the_context,
-  void *_stack_base,
-  size_t _size,
-  uint32_t _isr,
-  void (*_entry_point)( void ),
-  bool is_fp,
-  void *tls_area
-)
-{
-  uint32_t _stack;
-  uint32_t tcb;
-
-  (void) is_fp; /* avoid warning for being unused */
-
-  if ( _isr ) {
-    the_context->eflags = CPU_EFLAGS_INTERRUPTS_OFF;
-  } else {
-    the_context->eflags = CPU_EFLAGS_INTERRUPTS_ON;
-  }
-
-  _stack  = ((uint32_t)(_stack_base)) + (_size);
-  _stack &= ~ (CPU_STACK_ALIGNMENT - 1);
-  _stack -= 2*sizeof(proc_ptr*); /* see above for why we need to do this */
-  *((proc_ptr *)(_stack)) = (_entry_point);
-  the_context->ebp     = (void *) 0;
-  the_context->esp     = (void *) _stack;
-
-  if ( tls_area != NULL ) {
-    tcb = (uint32_t) _TLS_TCB_after_TLS_block_initialize( tls_area );
-  } else {
-    tcb = 0;
-  }
-
-  the_context->gs.limit_15_0 = 0xffff;
-  the_context->gs.base_address_15_0 = (tcb >> 0) & 0xffff;
-  the_context->gs.type = 0x2;
-  the_context->gs.descriptor_type = 0x1;
-  the_context->gs.limit_19_16 = 0xf;
-  the_context->gs.present = 0x1;
-  the_context->gs.operation_size = 0x1;
-  the_context->gs.granularity = 0x1;
-  the_context->gs.base_address_23_16 = (tcb >> 16) & 0xff;
-  the_context->gs.base_address_31_24 = (tcb >> 24) & 0xff;
-}
-
 uint32_t   _CPU_ISR_Get_level( void )
 {
   uint32_t   level;
 
-#if !defined(I386_DISABLE_INLINE_ISR_DISABLE_ENABLE)
   i386_get_interrupt_level( level );
-#else
-  level = i386_get_interrupt_level();
-#endif
 
   return level;
+}
+
+void *_CPU_Thread_Idle_body( uintptr_t ignored )
+{
+  while(1){
+    __asm__ volatile ("hlt");
+  }
+  return NULL;
 }
 
 struct Frame_ {
@@ -216,19 +133,19 @@ void _CPU_Exception_frame_print (const CPU_Exception_frame *ctx)
 {
   unsigned int faultAddr = 0;
   printk("----------------------------------------------------------\n");
-  printk("Exception %" PRIu32 " caught at PC %" PRIx32 " by thread %" PRId32 "\n",
+  printk("Exception %d caught at PC %x by thread %d\n",
 	 ctx->idtIndex,
 	 ctx->eip,
 	 _Thread_Executing->Object.id);
   printk("----------------------------------------------------------\n");
   printk("Processor execution context at time of the fault was  :\n");
   printk("----------------------------------------------------------\n");
-  printk(" EAX = %" PRIx32 "	EBX = %" PRIx32 "	ECX = %" PRIx32 "	EDX = %" PRIx32 "\n",
+  printk(" EAX = %x	EBX = %x	ECX = %x	EDX = %x\n",
 	 ctx->eax, ctx->ebx, ctx->ecx, ctx->edx);
-  printk(" ESI = %" PRIx32 "	EDI = %" PRIx32 "	EBP = %" PRIx32 "	ESP = %" PRIx32 "\n",
+  printk(" ESI = %x	EDI = %x	EBP = %x	ESP = %x\n",
 	 ctx->esi, ctx->edi, ctx->ebp, ctx->esp0);
   printk("----------------------------------------------------------\n");
-  printk("Error code pushed by processor itself (if not 0) = %" PRIx32 "\n",
+  printk("Error code pushed by processor itself (if not 0) = %x\n",
 	 ctx->faultCode);
   printk("----------------------------------------------------------\n");
   if (ctx->idtIndex == I386_EXCEPTION_PAGE_FAULT){
@@ -251,7 +168,7 @@ void _CPU_Exception_frame_print (const CPU_Exception_frame *ctx)
 	printk("Call Stack Trace of EIP:\n");
 	if ( fp ) {
 		for ( i=1; fp->up; fp=fp->up, i++ ) {
-			printk("0x%08" PRIx32 " ",fp->pc);
+			printk("0x%08x ",fp->pc);
 			if ( ! (i&3) )
 				printk("\n");
 		}

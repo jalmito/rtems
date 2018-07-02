@@ -2,14 +2,18 @@
 # RTEMS_CHECK_CPUOPTS(define)
 AC_DEFUN([RTEMS_CHECK_CPUOPTS],
 [
-AC_REQUIRE([RTEMS_BUILD_TOP])
 sav_CPPFLAGS="$CPPFLAGS"
-CPPFLAGS="$CPPFLAGS -I${RTEMS_BUILD_ROOT}/include"
+AS_IF([test "${enable_cpukit_root+set}" = set],[
+  CPPFLAGS="$CPPFLAGS -I$cpukit_rootdir/lib/include"
+])
+AS_IF([test "${enable_project_root+set}" = set],[
+  CPPFLAGS="$CPPFLAGS -I$project_rootdir/lib/include"
+])
 AC_CACHE_CHECK(
   [for $1],
   [rtems_cv_$1],
   [AC_COMPILE_IFELSE([AC_LANG_SOURCE([
-#include <rtems/score/cpuopts.h>
+#include <rtems/system.h>
 #ifndef $1
 choke me
 #endif

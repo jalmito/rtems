@@ -23,15 +23,13 @@
 
 void _Scheduler_EDF_Block(
   const Scheduler_Control *scheduler,
-  Thread_Control          *the_thread,
-  Scheduler_Node          *node
+  Thread_Control          *the_thread
 )
 {
   _Scheduler_Generic_block(
     scheduler,
     the_thread,
-    node,
-    _Scheduler_EDF_Extract_body,
+    _Scheduler_EDF_Extract,
     _Scheduler_EDF_Schedule_body
   );
 }

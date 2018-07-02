@@ -104,7 +104,7 @@ rtems_task Highest_task(
       end_time,
       1,
       0,
-      0
+      CALLING_OVERHEAD_TASK_RESTART
     );
 
     status = rtems_task_set_priority(
@@ -123,7 +123,7 @@ rtems_task Highest_task(
       end_time,
       1,
       0,
-      0
+      CALLING_OVERHEAD_TASK_RESTART
     );
 
     status = rtems_task_delete( RTEMS_SELF );
@@ -170,7 +170,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     0,
-    0
+    CALLING_OVERHEAD_SEMAPHORE_RELEASE
   );
 
   name = rtems_build_name( 'T', 'I', 'M', 'E' );
@@ -197,7 +197,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TASK_CREATE
   );
 
   benchmark_timer_initialize();
@@ -211,7 +211,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TASK_START
   );
 
   for ( index=1 ; index <= OPERATION_COUNT ; index++ ) {
@@ -247,7 +247,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TASK_RESTART
   );
 
   for ( index=1 ; index <= OPERATION_COUNT ; index++ )
@@ -263,7 +263,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TASK_DELETE
   );
 
   for ( index=1 ; index <= OPERATION_COUNT ; index++ ) {
@@ -291,7 +291,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TASK_RESTART
   );
 
   for ( index=1 ; index <= OPERATION_COUNT ; index++ ) {
@@ -313,7 +313,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TASK_RESTART
   );
 
   /* yield processor -- tasks block */
@@ -330,7 +330,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TASK_DELETE
   );
 
   TEST_END();

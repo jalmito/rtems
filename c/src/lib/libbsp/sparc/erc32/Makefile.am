@@ -1,72 +1,107 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
-include $(top_srcdir)/../../bsp.am
 
-dist_project_lib_DATA = ../../../../../../bsps/sparc/erc32/start/bsp_specs
+include_bspdir = $(includedir)/bsp
 
+dist_project_lib_DATA = bsp_specs
+
+include_HEADERS = include/bsp.h
+include_HEADERS += include/tm27.h
+
+nodist_include_HEADERS = include/bspopts.h
+nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
+DISTCLEANFILES = include/bspopts.h
 
 noinst_PROGRAMS =
 
+include_HEADERS += include/erc32.h
+include_HEADERS += ../../shared/include/coverhd.h
 
-start.$(OBJEXT): ../../../../../../bsps/sparc/shared/start/start.S
-	$(CPPASCOMPILE) -o $@ -c $<
+noinst_LIBRARIES = libbspstart.a
+libbspstart_a_SOURCES = ../../sparc/shared/start/start.S
 project_lib_DATA = start.$(OBJEXT)
 
-project_lib_DATA += linkcmds
-dist_project_lib_DATA += ../../../../../../bsps/sparc/shared/start/linkcmds.base
+dist_project_lib_DATA += startup/linkcmds ../shared/startup/linkcmds.base
 
-project_lib_LIBRARIES = librtemsbsp.a
-librtemsbsp_a_SOURCES =
+noinst_LIBRARIES += libbsp.a
+libbsp_a_SOURCES =
 
 # startup
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/start/bspgetworkarea.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-empty.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/erc32/start/bspstart.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/erc32/start/setvec.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/erc32/start/spurious.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/erc32/start/erc32mec.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/erc32/start/boardinit.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/erc32/start/bspidle.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/erc32/start/bspdelay.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/start/bsp_fatal_exit.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/start/bsp_fatal_halt.c
+libbsp_a_SOURCES += ../../shared/bspclean.c
+libbsp_a_SOURCES += ../../shared/bsplibc.c
+libbsp_a_SOURCES += startup/bsppredriver.c
+libbsp_a_SOURCES += ../../sparc/shared/startup/bspgetworkarea.c
+libbsp_a_SOURCES += ../../sparc/shared/bsppretaskinghook.c
+libbsp_a_SOURCES += ../../shared/bsppost.c
+libbsp_a_SOURCES += ../../shared/bspstart.c
+libbsp_a_SOURCES += ../../shared/bootcard.c
+libbsp_a_SOURCES += ../../shared/sbrk.c
+libbsp_a_SOURCES += startup/setvec.c
+libbsp_a_SOURCES += startup/spurious.c
+libbsp_a_SOURCES += startup/erc32mec.c
+libbsp_a_SOURCES += startup/boardinit.S
+libbsp_a_SOURCES += startup/bspidle.c
+libbsp_a_SOURCES += startup/bspdelay.c
+libbsp_a_SOURCES += ../../sparc/shared/startup/early_malloc.c
+libbsp_a_SOURCES += ../../sparc/shared/startup/bsp_fatal_exit.c
+libbsp_a_SOURCES += ../../sparc/shared/startup/bsp_fatal_halt.c
+# ISR Handler
+libbsp_a_SOURCES += ../../sparc/shared/cpu.c
+libbsp_a_SOURCES += ../../sparc/shared/irq_asm.S
 # gnatsupp
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/erc32/gnatsupp/gnatsupp.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/gnatcommon.c
+libbsp_a_SOURCES += gnatsupp/gnatsupp.c ../../sparc/shared/gnatcommon.c
+include_bsp_HEADERS = ../shared/include/gnatcommon.h
 # console
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console-control.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console-select.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/erc32/console/erc32_console.c
+libbsp_a_SOURCES += console/erc32_console.c ../../shared/console.c \
+    ../../shared/console_select.c  ../../shared/console_control.c \
+    ../../shared/console_read.c ../../shared/console_write.c
 # debugio
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/erc32/console/debugputs.c
+libbsp_a_SOURCES += console/debugputs.c
 # clock
-librtemsbsp_a_SOURCES +=../../../../../../bsps/sparc/erc32/clock/ckinit.c
+libbsp_a_SOURCES += clock/ckinit.c
+libbsp_a_SOURCES += ../../shared/clockdrv_shell.h
 # timer
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/erc32/btimer/btimer.c
+libbsp_a_SOURCES += timer/timer.c
 
 # IRQ
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/irq/irq-shared.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/irq/bsp_isr_handler.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/irq/irq-default-handler.c
+include_bsp_HEADERS += \
+    ../../shared/include/irq-generic.h \
+    ../../shared/include/irq-info.h \
+    include/bsp/irq.h
+libbsp_a_SOURCES += \
+    ../../sparc/shared/irq/irq-shared.c \
+    ../../sparc/shared/irq/bsp_isr_handler.c \
+    ../../shared/src/irq-default-handler.c \
+    ../../shared/src/irq-generic.c \
+    ../../shared/src/irq-info.c \
+    ../../shared/src/irq-legacy.c \
+    ../../shared/src/irq-server.c \
+    ../../shared/src/irq-shell.c
 
 if HAS_SMP
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspsmp-dummy.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/getcurrentprocessor-zero.c
+libbsp_a_SOURCES += ../../shared/bspsmp.c
+libbsp_a_SOURCES += ../../shared/bspsmpgetcurrentprocessor.c
 endif
 
 if HAS_NETWORKING
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/erc32/net/erc32sonic.c
+erc32sonic_CPPFLAGS = -D__INSIDE_RTEMS_BSD_TCPIP_STACK__
+noinst_PROGRAMS += erc32sonic.rel
+erc32sonic_rel_SOURCES = erc32sonic/erc32sonic.c
+erc32sonic_rel_CPPFLAGS = $(AM_CPPFLAGS) $(erc32sonic_CPPFLAGS)
+erc32sonic_rel_LDFLAGS = $(RTEMS_RELLDFLAGS)
 endif
 
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/cache/nocache.c
+libbsp_a_LIBADD  = \
+    ../../../libcpu/@RTEMS_CPU@/access.rel \
+    ../../../libcpu/@RTEMS_CPU@/cache.rel \
+    ../../../libcpu/@RTEMS_CPU@/reg_win.rel \
+    ../../../libcpu/@RTEMS_CPU@/syscall.rel
+if HAS_NETWORKING
+libbsp_a_LIBADD += erc32sonic.rel
+endif
 
+EXTRA_DIST = times
 
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
-include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
-include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/sparc/erc32/headers.am

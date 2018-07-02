@@ -18,7 +18,7 @@
   #include "config.h"
 #endif
 
-#include <rtems/imfs.h>
+#include "imfs.h"
 
 #include <rtems/deviceio.h>
 

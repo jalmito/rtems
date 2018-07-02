@@ -5,26 +5,29 @@ AUTOMAKE_OPTIONS = no-exeext
 noinst_PROGRAMS = bootloader
 
 ## IMPORTANT: head.S must be first, T. Straumann 12/17/2001
-bootloader_SOURCES =
-bootloader_SOURCES += ../../../../../../../bsps/powerpc/motorola_powerpc/bootloader/head.S
-bootloader_SOURCES += ../../../../../../../bsps/powerpc/motorola_powerpc/bootloader/exception.S
-bootloader_SOURCES += ../../../../../../../bsps/powerpc/motorola_powerpc/bootloader/em86real.S
-bootloader_SOURCES += ../../../../../../../bsps/powerpc/motorola_powerpc/bootloader/misc.c
-bootloader_SOURCES += ../../../../../../../bsps/powerpc/motorola_powerpc/bootloader/pci.c
-bootloader_SOURCES += ../../../../../../../bsps/powerpc/motorola_powerpc/bootloader/zlib.c
-bootloader_SOURCES += ../../../../../../../bsps/powerpc/motorola_powerpc/bootloader/mm.c
-bootloader_SOURCES += ../../../../../../../bsps/powerpc/motorola_powerpc/bootloader/em86.c
-bootloader_SOURCES += ../../../../../../../bsps/powerpc/motorola_powerpc/console/polled_io.c
-bootloader_SOURCES += ../../../../../../../bsps/powerpc/motorola_powerpc/bootloader/lib.c
+bootloader_SOURCES = ../../../powerpc/shared/bootloader/head.S \
+    ../../../powerpc/shared/bootloader/exception.S \
+    ../../../powerpc/shared/bootloader/em86real.S \
+    ../../../powerpc/shared/bootloader/misc.c \
+    ../../../powerpc/shared/bootloader/pci.c \
+    ../../../powerpc/shared/bootloader/zlib.c \
+    ../../../powerpc/shared/bootloader/mm.c \
+    ../../../powerpc/shared/bootloader/em86.c \
+    ../../../powerpc/shared/console/polled_io.c \
+    ../../../powerpc/shared/bootloader/lib.c \
+    ../../../powerpc/shared/bootloader/bootldr.h \
+    ../../../powerpc/shared/bootloader/zlib.h \
+    ../../../powerpc/shared/bootloader/pci.h \
+    ../../../powerpc/shared/console/keyboard.h
 
 # ----
 # Remove references to EABI when compiling bootloader
 BOOTLOADER_CPU_CFLAGS=$(subst -msdata=eabi,,$(subst -meabi,,$(CPU_CFLAGS)))
-AM_CPPFLAGS = -D__BOOT__ @RTEMS_CPPFLAGS@ @RTEMS_BSP_CPPFLAGS@
-AM_CFLAGS = -mrelocatable -msoft-float \
+AM_CPPFLAGS = -D__BOOT__
+AM_CFLAGS = $(GCCSPECS) -mrelocatable -msoft-float \
     -mstrict-align -fno-builtin -Wall -mmultiple -mstring -O2 \
     -fomit-frame-pointer -ffixed-r13 -mno-sdata $(BOOTLOADER_CPU_CFLAGS)
-AM_CCASFLAGS = $(AM_CPPFLAGS) \
+AM_CCASFLAGS = $(AM_CPPFLAGS) $(GCCSPECS) \
     -mrelocatable -DASM $(BOOTLOADER_CPU_CFLAGS)
 
 #
@@ -44,7 +47,7 @@ bootloader.$(OBJEXT): bootloader$(EXEEXT)
 	cp $< $@
 
 project_lib_DATA = bootloader.$(OBJEXT)
-project_lib_DATA += ../../../../../../../bsps/powerpc/motorola_powerpc/bootloader/ppcboot.lds
+project_lib_DATA += ../../shared/bootloader/ppcboot.lds
 
 all-local: $(TMPINSTALL_FILES)
 
@@ -59,7 +62,7 @@ $(PROJECT_LIB)/bootloader.$(OBJEXT): bootloader.$(OBJEXT) $(PROJECT_LIB)/$(dirst
 	$(INSTALL_DATA) $< $(PROJECT_LIB)/bootloader.$(OBJEXT)
 TMPINSTALL_FILES += $(PROJECT_LIB)/bootloader.$(OBJEXT)
 
-$(PROJECT_LIB)/ppcboot.lds: ../../../../../../../bsps/powerpc/motorola_powerpc/bootloader/ppcboot.lds $(PROJECT_LIB)/$(dirstamp)
+$(PROJECT_LIB)/ppcboot.lds: ../../shared/bootloader/ppcboot.lds $(PROJECT_LIB)/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_LIB)/ppcboot.lds
 TMPINSTALL_FILES += $(PROJECT_LIB)/ppcboot.lds
 

@@ -66,7 +66,7 @@ int link( const char *path1, const char *path2 )
  *  This is the Newlib dependent reentrant version of link().
  */
 int _link_r(
-  struct _reent *ptr RTEMS_UNUSED,
+  struct _reent *ptr __attribute__((unused)),
   const char    *path1,
   const char    *path2
 )

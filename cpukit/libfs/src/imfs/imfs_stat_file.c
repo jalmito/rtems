@@ -17,9 +17,7 @@
   #include "config.h"
 #endif
 
-#include <rtems/imfs.h>
-
-int imfs_memfile_bytes_per_block;
+#include "imfs.h"
 
 int IMFS_stat_file(
   const rtems_filesystem_location_info_t *loc,
@@ -29,7 +27,7 @@ int IMFS_stat_file(
   const IMFS_file_t *file = loc->node_access;
 
   buf->st_size = file->File.size;
-  buf->st_blksize = imfs_memfile_bytes_per_block;
+  buf->st_blksize = imfs_rq_memfile_bytes_per_block;
 
   return IMFS_stat( loc, buf );
 }

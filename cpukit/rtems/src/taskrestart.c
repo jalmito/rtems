@@ -26,32 +26,29 @@ rtems_status_code rtems_task_restart(
   uint32_t  argument
 )
 {
-  Thread_Control           *the_thread;
-  ISR_lock_Context          lock_context;
-  Thread_Entry_information  entry;
-  bool                      ok;
+  Thread_Control          *the_thread;
+  Objects_Locations        location;
 
-  the_thread = _Thread_Get( id, &lock_context );
+  the_thread = _Thread_Get( id, &location );
+  switch ( location ) {
 
-  if ( the_thread == NULL ) {
+    case OBJECTS_LOCAL:
+      if ( _Thread_Restart( the_thread, _Thread_Executing, NULL, argument ) ) {
+        _Objects_Put( &the_thread->Object );
+        return RTEMS_SUCCESSFUL;
+      }
+      _Objects_Put( &the_thread->Object );
+      return RTEMS_INCORRECT_STATE;
+
 #if defined(RTEMS_MULTIPROCESSING)
-    if ( _Thread_MP_Is_remote( id ) ) {
+    case OBJECTS_REMOTE:
+      _Thread_Dispatch();
       return RTEMS_ILLEGAL_ON_REMOTE_OBJECT;
-    }
 #endif
 
-    return RTEMS_INVALID_ID;
+    case OBJECTS_ERROR:
+      break;
   }
 
-  entry = the_thread->Start.Entry;
-  entry.Kinds.Numeric.argument = argument;
-
-  if ( the_thread == _Thread_Executing ) {
-    _Thread_Restart_self( the_thread, &entry, &lock_context );
-    RTEMS_UNREACHABLE();
-  }
-
-  ok = _Thread_Restart_other( the_thread, &entry, &lock_context );
-
-  return ok ? RTEMS_SUCCESSFUL : RTEMS_INCORRECT_STATE;
+  return RTEMS_INVALID_ID;
 }

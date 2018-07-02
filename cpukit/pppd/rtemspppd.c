@@ -13,7 +13,7 @@
 #include <rtems.h>
 #include <rtems/rtems_bsdnet.h>
 #include "pppd.h"
-#include <rtems/rtemspppd.h>
+#include "rtemspppd.h"
 
 
 /* define pppd function prototypes */

@@ -17,9 +17,9 @@
 #define INTERRUPT_CRITICAL_NAME rtems_build_name( 'I', 'C', 'R', 'I' )
 
 typedef struct {
-  uint_fast32_t minimum;
-  uint_fast32_t maximum;
-  uint_fast32_t maximum_current;
+  rtems_interval minimum;
+  rtems_interval maximum;
+  rtems_interval maximum_current;
   rtems_timer_service_routine_entry tsr;
   rtems_id timer;
   uint64_t t0;
@@ -28,7 +28,19 @@ typedef struct {
 
 static interrupt_critical_control interrupt_critical;
 
-static void wait_for_tick_change( void )
+static rtems_interval estimate_busy_loop_maximum( void )
+{
+  rtems_interval units = 0;
+  rtems_interval initial = rtems_clock_get_ticks_since_boot();
+
+  while ( initial == rtems_clock_get_ticks_since_boot() ) {
+    ++units;
+  }
+
+  return units;
+}
+
+static rtems_interval wait_for_tick_change( void )
 {
   rtems_interval initial = rtems_clock_get_ticks_since_boot();
   rtems_interval now;
@@ -36,11 +48,75 @@ static void wait_for_tick_change( void )
   do {
     now = rtems_clock_get_ticks_since_boot();
   } while ( now == initial );
+
+  return now;
+}
+
+/*
+ * It is important that we use actually use the same busy() function at the
+ * various places, since otherwise the obtained maximum value might be wrong.
+ * So the compiler must not inline this function.
+ */
+static __attribute__( ( noinline ) ) void busy( rtems_interval max )
+{
+  rtems_interval i = 0;
+
+  do {
+    __asm__ volatile ("");
+    ++i;
+  } while ( i < max );
+}
+
+static rtems_interval get_one_tick_busy_value( void )
+{
+  rtems_interval last;
+  rtems_interval now;
+  rtems_interval a;
+  rtems_interval b;
+  rtems_interval m;
+
+  /* Choose a lower bound */
+  a = 1;
+
+  /* Estimate an upper bound */
+
+  wait_for_tick_change();
+  b = 2 * estimate_busy_loop_maximum();
+
+  while ( true ) {
+    last = wait_for_tick_change();
+    busy( b );
+    now = rtems_clock_get_ticks_since_boot();
+
+    if ( now != last ) {
+      break;
+    }
+
+    b *= 2;
+    last = now;
+  }
+
+  /* Find a good value */
+  do {
+    m = ( a + b ) / 2;
+
+    last = wait_for_tick_change();
+    busy( m );
+    now = rtems_clock_get_ticks_since_boot();
+
+    if ( now != last ) {
+      b = m;
+    } else {
+      a = m;
+    }
+  } while ( b - a > 1 );
+
+  return m;
 }
 
 static bool interrupt_critical_busy_wait( void )
 {
-  uint_fast32_t max = interrupt_critical.maximum_current;
+  rtems_interval max = interrupt_critical.maximum_current;
   bool reset = max <= interrupt_critical.minimum;
 
   if ( reset ) {
@@ -49,7 +125,7 @@ static bool interrupt_critical_busy_wait( void )
     interrupt_critical.maximum_current = max - 1;
   }
 
-  rtems_test_busy( max );
+  busy( max );
 
   return reset;
 }
@@ -58,7 +134,7 @@ void interrupt_critical_section_test_support_initialize(
   rtems_timer_service_routine_entry tsr
 )
 {
-  uint_fast32_t m;
+  rtems_interval m;
 
   interrupt_critical.tsr = tsr;
 
@@ -70,7 +146,7 @@ void interrupt_critical_section_test_support_initialize(
     rtems_test_assert( sc == RTEMS_SUCCESSFUL );
   }
 
-  m = rtems_test_get_one_tick_busy_count();
+  m = get_one_tick_busy_value();
 
   interrupt_critical.minimum = 0;
   interrupt_critical.maximum = m;
@@ -97,12 +173,18 @@ bool interrupt_critical_section_test_support_delay(void)
   return interrupt_critical_busy_wait();
 }
 
+static bool is_idle( const Thread_Control *thread )
+{
+  return thread->Start.entry_point
+    == (Thread_Entry) rtems_configuration_get_idle_task();
+}
+
 static void thread_switch( Thread_Control *executing, Thread_Control *heir )
 {
   (void) executing;
   (void) heir;
 
-  if ( interrupt_critical.t1 == 0 && heir->is_idle ) {
+  if ( interrupt_critical.t1 == 0 && is_idle( heir ) ) {
     interrupt_critical.t1 = rtems_clock_get_uptime_nanoseconds();
   }
 }
@@ -121,7 +203,7 @@ bool interrupt_critical_section_test(
   rtems_status_code sc;
   rtems_id id;
   uint64_t delta;
-  uint_fast32_t busy_delta;
+  rtems_interval busy_delta;
   int retries = 3;
 
   interrupt_critical_section_test_support_initialize( tsr );
@@ -146,7 +228,7 @@ bool interrupt_critical_section_test(
   /* Update minimum */
 
   delta = interrupt_critical.t1 - interrupt_critical.t0;
-  busy_delta = (uint_fast32_t)
+  busy_delta = (rtems_interval)
     ( ( interrupt_critical.maximum * ( 2 * delta ) )
       / rtems_configuration_get_nanoseconds_per_tick() );
 

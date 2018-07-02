@@ -19,25 +19,17 @@
 #endif
 
 #include <rtems/score/todimpl.h>
-#include <rtems/score/apimutex.h>
 
-TOD_Control _TOD;
-
-static API_Mutex_Control _TOD_Mutex = API_MUTEX_INITIALIZER( "_TOD" );
-
-void _TOD_Lock( void )
+void _TOD_Handler_initialization(void)
 {
-  _API_Mutex_Lock( &_TOD_Mutex );
-}
+  struct timespec ts;
 
-void _TOD_Unlock( void )
-{
-  _API_Mutex_Unlock( &_TOD_Mutex );
-}
+  _Timecounter_Initialize();
 
-#if defined(RTEMS_DEBUG)
-bool _TOD_Is_owner( void )
-{
-  return _API_Mutex_Is_owner( &_TOD_Mutex );
+  ts.tv_sec = TOD_SECONDS_1970_THROUGH_1988;
+  ts.tv_nsec = 0;
+  _Timecounter_Set_clock( &ts );
+
+  /* TOD has not been set */
+  _TOD.is_set = false;
 }
-#endif

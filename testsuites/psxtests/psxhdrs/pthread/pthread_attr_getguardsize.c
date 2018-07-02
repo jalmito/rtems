@@ -14,6 +14,7 @@
 #include "config.h"
 #endif
 
+#if HAVE_DECL_PTHREAD_ATTR_GETGUARDSIZE
 #include <pthread.h>
 
 #ifndef _POSIX_THREADS
@@ -32,3 +33,4 @@ int test( void )
 
   return result;
 }
+#endif

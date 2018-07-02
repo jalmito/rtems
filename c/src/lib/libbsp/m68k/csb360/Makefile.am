@@ -1,42 +1,51 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
-include $(top_srcdir)/../../bsp.am
 
-dist_project_lib_DATA = ../../../../../../bsps/m68k/csb360/start/bsp_specs
+include_bspdir = $(includedir)/bsp
 
+dist_project_lib_DATA = bsp_specs
 
+include_HEADERS = include/bsp.h
+include_HEADERS += include/tm27.h
 
+nodist_include_HEADERS = include/bspopts.h
+nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
+nodist_include_bsp_HEADERS += ../../shared/include/console-polled.h
+DISTCLEANFILES = include/bspopts.h
 
-start.$(OBJEXT): ../../../../../../bsps/m68k/csb360/start/start.S
-	$(CPPASCOMPILE) -o $@ -c $<
+include_HEADERS += include/coverhd.h
+
+EXTRA_DIST = times
+
+noinst_LIBRARIES = libbspstart.a
+libbspstart_a_SOURCES = start/start.S
 project_lib_DATA = start.$(OBJEXT)
 
-project_lib_DATA += linkcmds
+dist_project_lib_DATA += startup/linkcmds
 
-project_lib_LIBRARIES = librtemsbsp.a
-librtemsbsp_a_SOURCES =
+noinst_LIBRARIES += libbsp.a
+libbsp_a_SOURCES =
 
 # startup
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspstart-empty.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/csb360/start/init5272.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/setvec.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-empty.c
+libbsp_a_SOURCES += ../../shared/bspclean.c ../../shared/bsplibc.c \
+    ../../shared/bsppredriverhook.c ../../shared/bsppretaskinghook.c \
+    ../../shared/bsppost.c ../../shared/bspgetworkarea.c \
+    ../../shared/bspstart.c startup/init5272.c ../../shared/bootcard.c \
+    ../../shared/sbrk.c ../../shared/setvec.c \
+    ../../shared/gnatinstallhandler.c
 # console
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/csb360/console/console-io.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/console-polled.c
+libbsp_a_SOURCES += console/console-io.c ../../shared/console-polled.c
 
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/cache/nocache.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/shared/memProbe.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/csb360/dev/ckinit.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/csb360/dev/timer.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/csb360/dev/timerisr.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/m68k/csb360/start/idle-mcf5272.c
+# Cache
+libbsp_a_SOURCES += ../../../libcpu/shared/src/cache_manager.c
+libbsp_a_SOURCES += ../../shared/include/cache_.h
+libbsp_a_CPPFLAGS = -I$(srcdir)/../../shared/include
 
+libbsp_a_LIBADD = \
+    ../../../libcpu/@RTEMS_CPU@/shared/misc.rel \
+    ../../../libcpu/@RTEMS_CPU@/mcf5272/clock.rel \
+    ../../../libcpu/@RTEMS_CPU@/mcf5272/timer.rel
+
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
-include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/m68k/csb360/headers.am

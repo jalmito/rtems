@@ -26,15 +26,7 @@ void _User_extensions_Remove_set (
   User_extensions_Control  *the_extension
 )
 {
-  ISR_lock_Context lock_context;
-
-  _User_extensions_Acquire( &lock_context );
-  _Chain_Iterator_registry_update(
-    &_User_extensions_List.Iterators,
-    &the_extension->Node
-  );
-  _Chain_Extract_unprotected( &the_extension->Node );
-  _User_extensions_Release( &lock_context );
+  _Chain_Extract( &the_extension->Node );
 
   /*
    * If a switch handler is present, remove it.

@@ -19,7 +19,8 @@
 #include "config.h"
 #endif
 
-#include <rtems/ioimpl.h>
+#include <rtems/system.h>
+#include <rtems/io.h>
 
 rtems_status_code rtems_io_read(
   rtems_device_major_number  major,

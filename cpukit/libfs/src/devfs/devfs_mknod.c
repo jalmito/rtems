@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <rtems/devfs.h>
+#include "devfs.h"
 
 int devFS_mknod(
   const rtems_filesystem_location_info_t *parentloc,

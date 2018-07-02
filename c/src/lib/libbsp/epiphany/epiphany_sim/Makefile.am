@@ -6,62 +6,90 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
-include $(top_srcdir)/../../bsp.am
 
-dist_project_lib_DATA = ../../../../../../bsps/epiphany/epiphany_sim/start/bsp_specs
+include_bspdir = $(includedir)/bsp
+include_libcpudir = $(includedir)/libcpu
+
+dist_project_lib_DATA = bsp_specs
 
 ###############################################################################
 #                  Header                                                     #
 ###############################################################################
 
+include_HEADERS = include/bsp.h
+include_HEADERS += include/tm27.h
+include_HEADERS += ../../shared/include/coverhd.h
+
+nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
+include_bsp_HEADERS = ../shared/include/linker-symbols.h
+
+include_bsp_HEADERS += ../../../libbsp/shared/include/mm.h
+include_bsp_HEADERS += ../../shared/include/utility.h
+include_bsp_HEADERS += ../../shared/include/irq-generic.h
+include_bsp_HEADERS += ../../shared/include/irq-info.h
+include_bsp_HEADERS += ../../shared/include/stackalloc.h
+include_bsp_HEADERS += ../../shared/include/console-polled.h
+include_bsp_HEADERS += include/irq.h
+
+nodist_include_HEADERS = include/bspopts.h
+
 ###############################################################################
 #                  Data                                                       #
 ###############################################################################
+noinst_LIBRARIES = libbspstart.a
 
-start.$(OBJEXT): ../../../../../../bsps/epiphany/epiphany_sim/start/start.S
-	$(CPPASCOMPILE) -o $@ -c $<
-project_lib_DATA = start.$(OBJEXT)
+libbspstart_a_SOURCES = start/start.S
 
-project_lib_DATA += linkcmds
+project_lib_DATA = start/start.$(OBJEXT)
+
+project_lib_DATA += startup/linkcmds
 
 ###############################################################################
 #                  LibBSP                                                     #
 ###############################################################################
 
-project_lib_LIBRARIES = librtemsbsp.a
+noinst_LIBRARIES += libbsp.a
 
 # Startup
-librtemsbsp_a_SOURCES = ../../../../../../bsps/shared/start/bspreset-empty.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspstart-empty.c
+libbsp_a_SOURCES = ../../shared/bspreset.c
+libbsp_a_SOURCES += ../../shared/bspstart.c
 
 # Shared
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/stackalloc.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
+libbsp_a_SOURCES += ../../shared/bootcard.c
+libbsp_a_SOURCES += ../../shared/bspclean.c
+libbsp_a_SOURCES += ../../shared/bsplibc.c
+libbsp_a_SOURCES += ../../shared/bsppost.c
+libbsp_a_SOURCES += ../../shared/bsppredriverhook.c
+libbsp_a_SOURCES += ../../shared/bsppretaskinghook.c
+libbsp_a_SOURCES += ../../shared/gnatinstallhandler.c
+libbsp_a_SOURCES += ../../shared/sbrk.c
+libbsp_a_SOURCES += ../../shared/src/stackalloc.c
+libbsp_a_SOURCES += ../../shared/bspgetworkarea.c
 
 # clock
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/clock/clock-simidle.c
+libbsp_a_SOURCES += ../../shared/clock_driver_simidle.c
 
 # Timer
-librtemsbsp_a_SOURCES += ../../../../../../bsps/epiphany/epiphany_sim/btimer/btimer.c
+libbsp_a_SOURCES += timer/timer.c
 
 # console
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/console-polled.c
+libbsp_a_SOURCES += ../../shared/console-polled.c
 
 # IRQ
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/irq/irq-default-handler.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/epiphany/epiphany_sim/irq/irq.c
+libbsp_a_SOURCES += ../../shared/src/irq-default-handler.c
+libbsp_a_SOURCES += ../../shared/src/irq-generic.c
+libbsp_a_SOURCES += ../../shared/src/irq-info.c
+libbsp_a_SOURCES += irq/irq.c
 
 # Cache
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/cache/nocache.c
+libbsp_a_SOURCES += ../../../libcpu/shared/src/cache_manager.c
+libbsp_a_SOURCES += ../../shared/include/cache_.h
+libbsp_a_CPPFLAGS = -I$(srcdir)/../../shared/include
 
 # debugio
-librtemsbsp_a_SOURCES += ../../../../../../bsps/epiphany/epiphany_sim/console/console-io.c
+libbsp_a_SOURCES += console/console-io.c
 
+DISTCLEANFILES = include/bspopts.h
 
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
-include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
-include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/epiphany/epiphany_sim/headers.am

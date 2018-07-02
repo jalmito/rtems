@@ -40,6 +40,14 @@ static rtems_timer_service_routine Do_nothing(
   /* Do nothing */
 }
 
+static Watchdog_Interval schedule_time( void )
+{
+  const Watchdog_Control *watchdog =
+    &_Timer_server->Interval_watchdogs.System_watchdog;
+
+  return watchdog->initial + watchdog->start_time;
+}
+
 rtems_task Task_1(
   rtems_task_argument argument
 )
@@ -111,6 +119,10 @@ rtems_task Task_1(
     "Timer 1 scheduled for %" PRIdWatchdog_Interval " ticks since boot\n",
     info.start_time + info.initial
   );
+  printf(
+    "Timer Server scheduled for %" PRIdWatchdog_Interval " ticks since boot\n",
+    schedule_time()
+  );
 
   puts( "TA1 - rtems_task_wake_after - 1 second" );
   status = rtems_task_wake_after( 1 * rtems_clock_get_ticks_per_second() );
@@ -127,6 +139,11 @@ rtems_task Task_1(
     "Timer 1 scheduled for %" PRIdWatchdog_Interval " ticks since boot\n",
     info.start_time + info.initial
   );
+  printf(
+    "Timer Server scheduled for %" PRIdWatchdog_Interval " ticks since boot\n",
+    schedule_time()
+  );
+  rtems_test_assert( (info.start_time + info.initial) == schedule_time() );
 
   puts( "TA1 - rtems_task_wake_after - 1 second" );
   status = rtems_task_wake_after( 1 * rtems_clock_get_ticks_per_second() );
@@ -143,6 +160,11 @@ rtems_task Task_1(
     "Timer 1 scheduled for %" PRIdWatchdog_Interval " ticks since boot\n",
      info.start_time + info.initial
   );
+  printf(
+    "Timer Server scheduled for %" PRIdWatchdog_Interval " ticks since boot\n",
+     schedule_time()
+  );
+  rtems_test_assert( (info.start_time + info.initial) == schedule_time() );
 
   puts( "TA1 - rtems_timer_cancel - timer 1" );
   status = rtems_timer_cancel( tmid );

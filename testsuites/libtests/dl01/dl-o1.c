@@ -6,13 +6,14 @@
  * http://www.rtems.org/license/LICENSE.
  */
 
+#include <stdio.h>
+#include <stdlib.h>
+
 /**
  * Hello World as a loadable module.
  */
 
-#include <rtems/test.h>
-
-#define printf(...) rtems_printf(&rtems_test_printer, __VA_ARGS__);
+#include <stdio.h>
 
 /*
  * Yes a decl in the source. This is a modules main and I could not find which

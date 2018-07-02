@@ -18,7 +18,6 @@
 #endif
 
 #include <inttypes.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include <rtems/rfs/rtems-rfs-block.h>
@@ -32,7 +31,7 @@
 
 #if __rtems__
 #include "rtems-rfs-rtems.h"
-#include <rtems/rtems-rfs-shell.h>
+#include "rtems-rfs-shell.h"
 #endif
 
 /**

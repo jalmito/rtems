@@ -21,7 +21,7 @@
   #include "config.h"
 #endif
 
-#include <rtems/imfs.h>
+#include "imfs.h"
 
 static const IMFS_mknod_control *get_control(
   const IMFS_mknod_controls *controls,

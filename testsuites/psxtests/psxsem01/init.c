@@ -15,7 +15,6 @@
 #include <semaphore.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <limits.h>
 #include <time.h>
 #include <tmacros.h>
 #include <pmacros.h>
@@ -27,304 +26,6 @@ const char rtems_test_name[] = "PSXSEM 1";
 void *POSIX_Init(void *argument);
 
 #define MAX_SEMS  10
-
-static void *sem_wait_task(void *arg)
-{
-  sem_t *sem;
-  int    rv;
-
-  sem = arg;
-
-  rv = sem_wait( sem );
-  rtems_test_assert( rv == 0 );
-
-  rv = sem_wait( sem );
-  rtems_test_assert( rv == 0 );
-
-  return NULL;
-}
-
-static void test_sem_wait_during_delete(void)
-{
-  sem_t     sem;
-  int       rv;
-  pthread_t th;
-  int       eno;
-  int       val;
-
-  rv = sem_init( &sem, 0, 1 );
-  rtems_test_assert( rv == 0 );
-
-  eno = pthread_create( &th, NULL, sem_wait_task, &sem );
-  rtems_test_assert( eno == 0 );
-
-  rv = sem_getvalue( &sem, &val );
-  rtems_test_assert( rv == 0 );
-  rtems_test_assert( val == 1 );
-
-  sched_yield();
-
-  rv = sem_getvalue( &sem, &val );
-  rtems_test_assert( rv == 0 );
-  rtems_test_assert( val == 0 );
-
-  errno = 0;
-  rv = sem_destroy( &sem );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EBUSY );
-
-  rv = sem_post( &sem );
-  rtems_test_assert( rv == 0 );
-
-  eno = pthread_join( th, NULL );
-  rtems_test_assert( eno == 0 );
-
-  rv = sem_destroy( &sem );
-  rtems_test_assert( rv == 0 );
-}
-
-static void test_named_sem_wait_during_delete(void)
-{
-  sem_t     *sem;
-  sem_t     *sem2;
-  int        rv;
-  pthread_t  th;
-  int        eno;
-  int        val;
-
-  sem = sem_open( "sem", O_CREAT | O_EXCL, 0777, 1 );
-  rtems_test_assert( sem != SEM_FAILED );
-
-  sem2 = sem_open( "sem", 0 );
-  rtems_test_assert( sem2 != SEM_FAILED );
-  rtems_test_assert( sem == sem2 );
-
-  eno = pthread_create( &th, NULL, sem_wait_task, sem );
-  rtems_test_assert( eno == 0 );
-
-  rv = sem_getvalue( sem, &val );
-  rtems_test_assert( rv == 0 );
-  rtems_test_assert( val == 1 );
-
-  sched_yield();
-
-  rv = sem_getvalue( sem, &val );
-  rtems_test_assert( rv == 0 );
-  rtems_test_assert( val == 0 );
-
-  rv = sem_close( sem2 );
-  rtems_test_assert( rv == 0 );
-
-  errno = 0;
-  rv = sem_close( sem );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EBUSY );
-
-  rv = sem_post( sem );
-  rtems_test_assert( rv == 0 );
-
-  eno = pthread_join( th, NULL );
-  rtems_test_assert( eno == 0 );
-
-  rv = sem_close( sem );
-  rtems_test_assert( rv == 0 );
-
-  rv = sem_unlink( "sem" );
-  rtems_test_assert( rv == 0 );
-}
-
-static void test_sem_post_overflow(void)
-{
-  sem_t sem;
-  int   rv;
-  int   val;
-
-  rv = sem_init( &sem, 0, SEM_VALUE_MAX );
-  rtems_test_assert( rv == 0 );
-
-  rv = sem_getvalue( &sem, &val );
-  rtems_test_assert( rv == 0 );
-  rtems_test_assert( val == (int) SEM_VALUE_MAX );
-
-  errno = 0;
-  rv = sem_post( &sem );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EOVERFLOW );
-
-  rv = sem_getvalue( &sem, &val );
-  rtems_test_assert( rv == 0 );
-  rtems_test_assert( val == (int) SEM_VALUE_MAX );
-
-  rv = sem_wait( &sem );
-  rtems_test_assert( rv == 0 );
-
-  rv = sem_post( &sem );
-  rtems_test_assert( rv == 0 );
-
-  rv = sem_destroy( &sem );
-  rtems_test_assert( rv == 0 );
-}
-
-static void test_sem_init_too_large_inital_value(void)
-{
-  sem_t  sem;
-  sem_t *sem2;
-  int    rv;
-
-  errno = 0;
-  rv = sem_init( &sem, 0, (unsigned int) SEM_VALUE_MAX + 1 );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-
-  errno = 0;
-  sem2 = sem_open(
-    "sem",
-    O_CREAT | O_EXCL,
-    0777,
-    (unsigned int) SEM_VALUE_MAX + 1
-  );
-  rtems_test_assert( sem2 == SEM_FAILED );
-  rtems_test_assert( errno == EINVAL );
-}
-
-static void test_sem_null(void)
-{
-  int rv;
-  int val;
-  struct timespec to;
-
-  rtems_test_assert( NULL == SEM_FAILED );
-
-  errno = 0;
-  rv = sem_init( NULL, 0, 0 );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-
-  errno = 0;
-  rv = sem_wait( NULL );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-
-  errno = 0;
-  rv = sem_post( NULL );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-
-  errno = 0;
-  rv = sem_wait( NULL );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-
-  errno = 0;
-  rv = sem_trywait( NULL );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-
-  to.tv_sec = 1;
-  to.tv_nsec = 1;
-  errno = 0;
-  rv = sem_timedwait( NULL, &to );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-
-  errno = 0;
-  rv = sem_getvalue( NULL, &val );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-
-  errno = 0;
-  rv = sem_destroy( NULL );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-
-  errno = 0;
-  rv = sem_close( NULL );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-}
-
-static void test_sem_not_initialized(void)
-{
-  sem_t sem;
-  int rv;
-  int val;
-  struct timespec to;
-
-  memset( &sem, 0xff, sizeof( sem ) );
-
-  errno = 0;
-  rv = sem_wait( &sem );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-
-  errno = 0;
-  rv = sem_post( &sem );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-
-  errno = 0;
-  rv = sem_wait( &sem );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-
-  errno = 0;
-  rv = sem_trywait( &sem );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-
-  to.tv_sec = 1;
-  to.tv_nsec = 1;
-  errno = 0;
-  rv = sem_timedwait( &sem, &to );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-
-  errno = 0;
-  rv = sem_getvalue( &sem, &val );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-
-  errno = 0;
-  rv = sem_destroy( &sem );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-
-  errno = 0;
-  rv = sem_close( &sem );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-}
-
-static void test_sem_invalid_copy(void)
-{
-  sem_t sem;
-  sem_t sem2;
-  int   rv;
-  int   val;
-
-  rv = sem_init( &sem, 0, 0 );
-  rtems_test_assert( rv == 0 );
-
-  val = 1;
-  rv = sem_getvalue( &sem, &val );
-  rtems_test_assert( rv == 0 );
-  rtems_test_assert( val == 0 );
-
-  memcpy( &sem2, &sem, sizeof( sem2 ) );
-
-  errno = 0;
-  rv = sem_getvalue( &sem2, &val );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-
-  rv = sem_destroy( &sem );
-  rtems_test_assert( rv == 0 );
-
-  errno = 0;
-  rv = sem_getvalue( &sem, &val );
-  rtems_test_assert( rv == -1 );
-  rtems_test_assert( errno == EINVAL );
-}
 
 void *POSIX_Init(
   void *argument
@@ -342,14 +43,6 @@ void *POSIX_Init(
 
   TEST_BEGIN();
 
-  puts( "Init: sem_init - SUCCESSFUL" );
-  status = sem_init(&sem2, 1, 1);
-  fatal_posix_service_status( status, 0, "sem_init with pshared != 0");
-
-  puts( "Init: sem_destroy - SUCCESSFUL" );
-  status = sem_destroy(&sem2);
-  fatal_posix_service_status( status, 0, "sem_destroy");
-
   puts( "Init: sem_init - UNSUCCESSFUL (EINVAL)" );
   status = sem_init(NULL, 0, 1);
   fatal_posix_service_status( status, -1, "sem_init error return status");
@@ -361,14 +54,15 @@ void *POSIX_Init(
     sprintf(failure_msg, "sem_init %d", i );
     fatal_posix_service_status( status, 0, failure_msg);
   }
-
-  puts( "Init: sem_init - SUCCESSFUL" );
+  puts( "Init: sem_init - UNSUCCESSFUL (ENOSPC)" );
   status = sem_init(&sem2, 0, 1);
-  fatal_posix_service_status( status, 0, "sem_init");
+  fatal_posix_service_status( status, -1, "sem_init error return status");
+  fatal_posix_service_status( errno, ENOSPC, "sem_init errorno ENOSPC" );
 
-  puts( "Init: sem_destroy - SUCCESSFUL" );
-  status = sem_destroy(&sem2);
-  fatal_posix_service_status( status, 0, "sem_destroy");
+  puts( "Init: sem_init - UNSUCCESSFUL (ENOSYS -- pshared not supported)" );
+  status = sem_init(&sem2, 1, 1);
+  fatal_posix_service_status( status, -1, "sem_init error return status");
+  fatal_posix_service_status( errno, ENOSYS, "sem_init errno set to ENOSYS");
 
   puts( "Init: sem_getvalue - SUCCESSFUL ");
   for (i = 0; i < MAX_SEMS; i++) {
@@ -378,7 +72,7 @@ void *POSIX_Init(
     fatal_posix_service_status( value, i, "sem_getvalue correct value" );
   }
   puts( "Init: sem_getvalue - UNSUCCESSFUL ");
-  status = sem_getvalue(SEM_FAILED, &value);
+  status = sem_getvalue(&sem2, &value);
   fatal_posix_service_status( status, -1, "sem_getvalue error return status");
   fatal_posix_service_status( errno, EINVAL, "sem_getvalue errno EINVAL");
 
@@ -387,7 +81,7 @@ void *POSIX_Init(
   fatal_posix_service_status( status, 0, "sem_destroy semaphore 0");
 
   puts( "Init: sem_destroy - UNSUCCESSFUL (EINVAL)" );
-  status = sem_destroy(SEM_FAILED);
+  status = sem_destroy(&sem2);
   fatal_posix_service_status( status, -1, "sem_destroy error return status");
   fatal_posix_service_status( errno, EINVAL, "sem_destroy errno EINVAL");
 
@@ -397,7 +91,7 @@ void *POSIX_Init(
   /* sem[1].count = 0 */
 
   puts( "Init: sem_wait - UNSUCCESSFUL (EINVAL)" );
-  status = sem_wait(SEM_FAILED);
+  status = sem_wait(&sem2);
   fatal_posix_service_status( status, -1, "sem_wait error return status");
   fatal_posix_service_status( errno, EINVAL, "sem_wait errno EINVAL");
 
@@ -423,7 +117,7 @@ void *POSIX_Init(
   /* sem[1].count = 0 */
 
   puts( "Init: sem_trywait - UNSUCCESSFUL (EINVAL)" );
-  status = sem_trywait(SEM_FAILED);
+  status = sem_trywait(&sem2);
   fatal_posix_service_status( status, -1, "sem_trywait error return status");
   fatal_posix_service_status( errno, EINVAL, "sem_trywait errno EINVAL");
 
@@ -465,7 +159,7 @@ void *POSIX_Init(
 #endif
 
   puts( "Init: sem_post - UNSUCCESSFUL (EINVAL)" );
-  status = sem_post(SEM_FAILED);
+  status = sem_post(&sem2);
   fatal_posix_service_status( status, -1, "sem_post error return status");
   fatal_posix_service_status( errno, EINVAL, "sem_post errno EINVAL");
 
@@ -585,10 +279,10 @@ void *POSIX_Init(
   fatal_posix_service_status( status, -1, "sem_unlink error return status");
   fatal_posix_service_status( errno, EINVAL, "sem_unlink errno value");
 
-  puts( "Init: sem_unlink (\"\") - ENOENT" );
+  puts( "Init: sem_unlink (\"\") - EINVAL" );
   status = sem_unlink( "" );
   fatal_posix_service_status( status, -1, "sem_unlink error return status");
-  fatal_posix_service_status( errno, ENOENT, "sem_unlink errno value");
+  fatal_posix_service_status( errno, EINVAL, "sem_unlink errno value");
 
   /*
    * XXX - Cant' create location OBJECTS_ERROR or OBJECTS_REMOTE.
@@ -601,13 +295,6 @@ void *POSIX_Init(
   fatal_posix_service_status( errno, ENOENT, "sem_unlink errno ENOENT");
   rtems_test_assert( (status == -1) && (errno == ENOENT) );
 
-  test_named_sem_wait_during_delete();
-  test_sem_wait_during_delete();
-  test_sem_post_overflow();
-  test_sem_init_too_large_inital_value();
-  test_sem_null();
-  test_sem_not_initialized();
-  test_sem_invalid_copy();
 
   /* Try adding in unlinking before closing... (can we still open?) */
 
@@ -618,15 +305,15 @@ void *POSIX_Init(
 }
 
 /* configuration information */
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_POSIX_INIT_THREAD_TABLE
 
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
-#define CONFIGURE_MAXIMUM_POSIX_THREADS     2
-#define CONFIGURE_MAXIMUM_POSIX_SEMAPHORES  2
+#define CONFIGURE_MAXIMUM_POSIX_THREADS     1
+#define CONFIGURE_MAXIMUM_POSIX_SEMAPHORES  MAX_SEMS
 
 #define CONFIGURE_POSIX_INIT_THREAD_TABLE
 #define CONFIGURE_POSIX_INIT_THREAD_STACK_SIZE \

@@ -18,8 +18,15 @@
 #include "config.h"
 #endif
 
+#include <errno.h>
+#include <pthread.h>
+
+#include <rtems/system.h>
+#include <rtems/score/coremuteximpl.h>
+#include <rtems/score/watchdog.h>
 #include <rtems/posix/muteximpl.h>
 #include <rtems/posix/priorityimpl.h>
+#include <rtems/posix/time.h>
 
 /*
  *  13.6.2 Change the Priority Ceiling of a Mutex, P1003.1c/Draft 10, p. 131
@@ -30,28 +37,28 @@ int pthread_mutex_getprioceiling(
   int               *prioceiling
 )
 {
-  POSIX_Mutex_Control  *the_mutex;
-  unsigned long         flags;
-  Thread_queue_Context  queue_context;
+  register POSIX_Mutex_Control *the_mutex;
+  Objects_Locations             location;
 
-  if ( prioceiling == NULL ) {
+  if ( !prioceiling )
     return EINVAL;
+
+  the_mutex = _POSIX_Mutex_Get( mutex, &location );
+  switch ( location ) {
+
+    case OBJECTS_LOCAL:
+      *prioceiling = _POSIX_Priority_From_core(
+        the_mutex->Mutex.Attributes.priority_ceiling
+      );
+      _Objects_Put( &the_mutex->Object );
+      return 0;
+
+#if defined(RTEMS_MULTIPROCESSING)
+    case OBJECTS_REMOTE:
+#endif
+    case OBJECTS_ERROR:
+      break;
   }
 
-  the_mutex = _POSIX_Mutex_Get( mutex );
-  POSIX_MUTEX_VALIDATE_OBJECT( the_mutex, flags );
-
-  _POSIX_Mutex_Acquire( the_mutex, &queue_context );
-
-  if ( _POSIX_Mutex_Get_protocol( flags ) == POSIX_MUTEX_PRIORITY_CEILING ) {
-    *prioceiling = _POSIX_Priority_From_core(
-      _POSIX_Mutex_Get_scheduler( the_mutex ),
-      _POSIX_Mutex_Get_priority( the_mutex )
-    );
-  } else {
-    *prioceiling = 0;
-  }
-
-  _POSIX_Mutex_Release( the_mutex, &queue_context );
-  return 0;
+  return EINVAL;
 }

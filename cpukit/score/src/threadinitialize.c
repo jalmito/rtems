@@ -19,16 +19,18 @@
 #endif
 
 #include <rtems/score/threadimpl.h>
+#include <rtems/score/resourceimpl.h>
 #include <rtems/score/schedulerimpl.h>
 #include <rtems/score/stackimpl.h>
 #include <rtems/score/tls.h>
 #include <rtems/score/userextimpl.h>
 #include <rtems/score/watchdogimpl.h>
 #include <rtems/score/wkspace.h>
+#include <rtems/score/cpusetimpl.h>
 #include <rtems/config.h>
 
 bool _Thread_Initialize(
-  Thread_Information                   *information,
+  Objects_Information                  *information,
   Thread_Control                       *the_thread,
   const Scheduler_Control              *scheduler,
   void                                 *stack_area,
@@ -50,31 +52,14 @@ bool _Thread_Initialize(
   #endif
   bool                     extension_status;
   size_t                   i;
-  Scheduler_Node          *scheduler_node;
-#if defined(RTEMS_SMP)
-  Scheduler_Node          *scheduler_node_for_index;
-  const Scheduler_Control *scheduler_for_index;
-#endif
-  size_t                   scheduler_index;
+  bool                     scheduler_node_initialized = false;
   Per_CPU_Control         *cpu = _Per_CPU_Get_by_index( 0 );
 
 #if defined( RTEMS_SMP )
-  if ( rtems_configuration_is_smp_enabled() ) {
-    if ( !is_preemptible ) {
-      return false;
-    }
-
-    if ( isr_level != 0 ) {
-      return false;
-    }
+  if ( rtems_configuration_is_smp_enabled() && !is_preemptible ) {
+    return false;
   }
 #endif
-
-  memset(
-    &the_thread->Join_queue,
-    0,
-    information->Objects.size - offsetof( Thread_Control, Join_queue )
-  );
 
   for ( i = 0 ; i < _Thread_Control_add_on_count ; ++i ) {
     const Thread_Control_add_on *add_on = &_Thread_Control_add_ons[ i ];
@@ -82,6 +67,15 @@ bool _Thread_Initialize(
     *(void **) ( (char *) the_thread + add_on->destination_offset ) =
       (char *) the_thread + add_on->source_offset;
   }
+
+  /*
+   *  Initialize the Ada self pointer
+   */
+  #if __RTEMS_ADA__
+    the_thread->rtems_ada_self = NULL;
+  #endif
+
+  the_thread->Start.tls_area = NULL;
 
   /*
    *  Allocate and Initialize the stack for this thread.
@@ -113,8 +107,6 @@ bool _Thread_Initialize(
      actual_stack_size
   );
 
-  scheduler_index = 0;
-
   /* Thread-local storage (TLS) area allocation */
   if ( tls_size > 0 ) {
     uintptr_t tls_align = _TLS_Heap_align_up( (uintptr_t) _TLS_Alignment );
@@ -136,24 +128,32 @@ bool _Thread_Initialize(
       fp_area = _Workspace_Allocate( CONTEXT_FP_SIZE );
       if ( !fp_area )
         goto failed;
+      fp_area = _Context_Fp_start( fp_area, 0 );
     }
     the_thread->fp_context       = fp_area;
     the_thread->Start.fp_context = fp_area;
   #endif
 
   /*
-   *  Get thread queue heads
+   *  Initialize the thread timer
    */
-  the_thread->Wait.spare_heads = _Freechain_Get(
-    &information->Free_thread_queue_heads,
-    _Workspace_Allocate,
-    _Objects_Extend_size( &information->Objects ),
-    THREAD_QUEUE_HEADS_SIZE( _Scheduler_Count )
-  );
-  if ( the_thread->Wait.spare_heads == NULL ) {
-    goto failed;
-  }
-  _Thread_queue_Heads_initialize( the_thread->Wait.spare_heads );
+  _Watchdog_Preinitialize( &the_thread->Timer );
+
+  #ifdef __RTEMS_STRICT_ORDER_MUTEX__
+    /* Initialize the head of chain of held mutexes */
+    _Chain_Initialize_empty(&the_thread->lock_mutex);
+  #endif
+
+  /*
+   * Clear the extensions area so extension users can determine
+   * if they are linked to the thread. An extension user may
+   * create the extension long after tasks have been created
+   * so they cannot rely on the thread create user extension
+   * call.  The object index starts with one, so the first extension context is
+   * unused.
+   */
+  for ( i = 1 ; i <= rtems_configuration_get_maximum_extensions() ; ++i )
+    the_thread->extensions[ i ] = NULL;
 
   /*
    *  General initialization
@@ -164,8 +164,6 @@ bool _Thread_Initialize(
   the_thread->Start.is_preemptible   = is_preemptible;
   the_thread->Start.budget_algorithm = budget_algorithm;
   the_thread->Start.budget_callout   = budget_callout;
-
-  _Thread_Timer_initialize( &the_thread->Timer, cpu );
 
   switch ( budget_algorithm ) {
     case THREAD_CPU_BUDGET_ALGORITHM_NONE:
@@ -184,99 +182,64 @@ bool _Thread_Initialize(
   }
 
 #if defined(RTEMS_SMP)
-  scheduler_node = NULL;
-  scheduler_node_for_index = the_thread->Scheduler.nodes;
-  scheduler_for_index = &_Scheduler_Table[ 0 ];
-
-  while ( scheduler_index < _Scheduler_Count ) {
-    Priority_Control priority_for_index;
-
-    if ( scheduler_for_index == scheduler ) {
-      priority_for_index = priority;
-      scheduler_node = scheduler_node_for_index;
-    } else {
-      /*
-       * Use the idle thread priority for the non-home scheduler instances by
-       * default.
-       */
-      priority_for_index = _Scheduler_Map_priority(
-        scheduler_for_index,
-        scheduler_for_index->maximum_priority
-      );
-    }
-
-    _Scheduler_Node_initialize(
-      scheduler_for_index,
-      scheduler_node_for_index,
-      the_thread,
-      priority_for_index
-    );
-    scheduler_node_for_index = (Scheduler_Node *)
-      ( (uintptr_t) scheduler_node_for_index + _Scheduler_Node_size );
-    ++scheduler_for_index;
-    ++scheduler_index;
-  }
-
-  _Assert( scheduler_node != NULL );
-  _Chain_Initialize_one(
-    &the_thread->Scheduler.Wait_nodes,
-    &scheduler_node->Thread.Wait_node
-  );
-  _Chain_Initialize_one(
-    &the_thread->Scheduler.Scheduler_nodes,
-    &scheduler_node->Thread.Scheduler_node.Chain
-  );
-#else
-  scheduler_node = _Thread_Scheduler_get_home_node( the_thread );
-  _Scheduler_Node_initialize(
-    scheduler,
-    scheduler_node,
-    the_thread,
-    priority
-  );
-  scheduler_index = 1;
+  the_thread->Scheduler.state = THREAD_SCHEDULER_BLOCKED;
+  the_thread->Scheduler.own_control = scheduler;
+  the_thread->Scheduler.control = scheduler;
+  the_thread->Scheduler.own_node = the_thread->Scheduler.node;
+  _Resource_Node_initialize( &the_thread->Resource_node );
+  _CPU_Context_Set_is_executing( &the_thread->Registers, false );
+  the_thread->Lock.current = &the_thread->Lock.Default;
+  _ISR_lock_Initialize( &the_thread->Lock.Default, "Thread Lock Default");
+  _Atomic_Init_uint(&the_thread->Lock.generation, 0);
 #endif
 
-  _Priority_Node_initialize( &the_thread->Real_priority, priority );
-  _Priority_Initialize_one(
-    &scheduler_node->Wait.Priority,
-    &the_thread->Real_priority
-  );
-
-#if defined(RTEMS_SMP)
-  RTEMS_STATIC_ASSERT( THREAD_SCHEDULER_BLOCKED == 0, Scheduler_state );
-  the_thread->Scheduler.home = scheduler;
-  _ISR_lock_Initialize( &the_thread->Scheduler.Lock, "Thread Scheduler" );
-  _Processor_mask_Assign(
-    &the_thread->Scheduler.Affinity,
-    _SMP_Get_online_processors()
-   );
-  _ISR_lock_Initialize( &the_thread->Wait.Lock.Default, "Thread Wait Default" );
-  _Thread_queue_Gate_open( &the_thread->Wait.Lock.Tranquilizer );
-  _RBTree_Initialize_node( &the_thread->Wait.Link.Registry_node );
-  _SMP_lock_Stats_initialize( &the_thread->Potpourri_stats, "Thread Potpourri" );
-  _SMP_lock_Stats_initialize( &the_thread->Join_queue.Lock_stats, "Thread State" );
-#endif
+  _Thread_Debug_set_real_processor( the_thread, cpu );
 
   /* Initialize the CPU for the non-SMP schedulers */
   _Thread_Set_CPU( the_thread, cpu );
 
   the_thread->current_state           = STATES_DORMANT;
+  the_thread->Wait.queue              = NULL;
   the_thread->Wait.operations         = &_Thread_queue_Operations_default;
+  the_thread->resource_count          = 0;
+  the_thread->current_priority        = priority;
+  the_thread->real_priority           = priority;
+  the_thread->priority_generation     = 0;
   the_thread->Start.initial_priority  = priority;
 
-  RTEMS_STATIC_ASSERT( THREAD_WAIT_FLAGS_INITIAL == 0, Wait_flags );
+  _Thread_Wait_flags_set( the_thread, THREAD_WAIT_FLAGS_INITIAL );
 
-  /* POSIX Keys */
-  _RBTree_Initialize_empty( &the_thread->Keys.Key_value_pairs );
-  _ISR_lock_Initialize( &the_thread->Keys.Lock, "POSIX Key Value Pairs" );
+  _Scheduler_Node_initialize( scheduler, the_thread );
+  scheduler_node_initialized = true;
+
+  _Scheduler_Update_priority( the_thread, priority );
+
+  /*
+   *  Initialize the CPU usage statistics
+   */
+  _Timestamp_Set_to_zero( &the_thread->cpu_time_used );
+
+  /*
+   * initialize thread's key vaule node chain
+   */
+  _Chain_Initialize_empty( &the_thread->Key_Chain );
 
   _Thread_Action_control_initialize( &the_thread->Post_switch_actions );
+
+  _Thread_Action_initialize(
+    &the_thread->Life.Action,
+    _Thread_Life_action_handler
+  );
+  the_thread->Life.state = THREAD_LIFE_NORMAL;
+  the_thread->Life.terminator = NULL;
+
+  the_thread->Capture.flags = 0;
+  the_thread->Capture.control = NULL;
 
   /*
    *  Open the object
    */
-  _Objects_Open( &information->Objects, &the_thread->Object, name );
+  _Objects_Open( information, &the_thread->Object, name );
 
   /*
    *  We assume the Allocator Mutex is locked and dispatching is
@@ -291,26 +254,11 @@ bool _Thread_Initialize(
 
 failed:
 
-#if defined(RTEMS_SMP)
-  while ( scheduler_index > 0 ) {
-    scheduler_node_for_index = (Scheduler_Node *)
-      ( (uintptr_t) scheduler_node_for_index - _Scheduler_Node_size );
-    --scheduler_for_index;
-    --scheduler_index;
-    _Scheduler_Node_destroy( scheduler_for_index, scheduler_node_for_index );
+  if ( scheduler_node_initialized ) {
+    _Scheduler_Node_destroy( scheduler, the_thread );
   }
-#else
-  if ( scheduler_index > 0 ) {
-    _Scheduler_Node_destroy( scheduler, scheduler_node );
-  }
-#endif
 
   _Workspace_Free( the_thread->Start.tls_area );
-
-  _Freechain_Put(
-    &information->Free_thread_queue_heads,
-    the_thread->Wait.spare_heads
-  );
 
   #if ( CPU_HARDWARE_FP == TRUE ) || ( CPU_SOFTWARE_FP == TRUE )
     _Workspace_Free( fp_area );

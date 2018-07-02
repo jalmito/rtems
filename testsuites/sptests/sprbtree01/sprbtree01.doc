@@ -16,7 +16,6 @@ directives:
   rtems_rbtree_insert
   rtems_rbtree_get
   rtems_rbtree_peek
-  _RBTree_Insert_inline
 
 concepts:
 

@@ -22,25 +22,13 @@
 #include <rtems/score/schedulerimpl.h>
 #include <rtems/score/thread.h>
 
-void _Scheduler_EDF_Unblock(
+Scheduler_Void_or_thread _Scheduler_EDF_Unblock(
   const Scheduler_Control *scheduler,
-  Thread_Control          *the_thread,
-  Scheduler_Node          *node
+  Thread_Control          *the_thread
 )
 {
-  Scheduler_EDF_Context *context;
-  Scheduler_EDF_Node    *the_node;
-  Priority_Control       priority;
-  Priority_Control       insert_priority;
-
-  context = _Scheduler_EDF_Get_context( scheduler );
-  the_node = _Scheduler_EDF_Node_downcast( node );
-  priority = _Scheduler_Node_get_priority( &the_node->Base );
-  priority = SCHEDULER_PRIORITY_PURIFY( priority );
-  insert_priority = SCHEDULER_PRIORITY_APPEND( priority );
-
-  the_node->priority = priority;
-  _Scheduler_EDF_Enqueue( context, the_node, insert_priority );
+  _Scheduler_EDF_Enqueue( scheduler, the_thread );
+  /* TODO: flash critical section? */
 
   /*
    *  If the thread that was unblocked is more important than the heir,
@@ -54,10 +42,15 @@ void _Scheduler_EDF_Unblock(
    *    Even if the thread isn't preemptible, if the new heir is
    *    a pseudo-ISR system task, we need to do a context switch.
    */
-  if ( priority < _Thread_Get_priority( _Thread_Heir ) ) {
+  if ( _Scheduler_Is_priority_lower_than(
+         scheduler,
+         _Thread_Heir->current_priority,
+         the_thread->current_priority )) {
     _Scheduler_Update_heir(
       the_thread,
-      priority == ( SCHEDULER_EDF_PRIO_MSB | PRIORITY_PSEUDO_ISR )
+      the_thread->current_priority == PRIORITY_PSEUDO_ISR
     );
   }
+
+  SCHEDULER_RETURN_VOID_OR_NULL;
 }

@@ -24,8 +24,17 @@
 #include <signal.h>
 #include <errno.h>
 
+#include <rtems/system.h>
+#include <rtems/posix/pthreadimpl.h>
 #include <rtems/posix/psignalimpl.h>
 #include <rtems/seterr.h>
+#include <rtems/score/isr.h>
+
+/*
+ * PARAMETERS_PASSING_S is defined in ptimer.c
+ */
+
+extern void PARAMETERS_PASSING_S (int num_signal, const struct sigaction inf);
 
 int sigaction(
   int                     sig,
@@ -33,7 +42,7 @@ int sigaction(
   struct sigaction       *__restrict oact
 )
 {
-  Thread_queue_Context queue_context;
+  ISR_Level     level;
 
   if ( !sig )
     rtems_set_errno_and_return_minus_one( EINVAL );
@@ -51,8 +60,7 @@ int sigaction(
   if ( sig == SIGKILL )
     rtems_set_errno_and_return_minus_one( EINVAL );
 
-  _Thread_queue_Context_initialize( &queue_context );
-  _POSIX_signals_Acquire( &queue_context );
+  _Thread_Disable_dispatch();
 
   if ( oact )
     *oact = _POSIX_signals_Vectors[ sig ];
@@ -69,15 +77,17 @@ int sigaction(
      *  we can just copy the provided sigaction structure into the vectors.
      */
 
-    if ( act->sa_handler == SIG_DFL ) {
-      _POSIX_signals_Vectors[ sig ] = _POSIX_signals_Default_vectors[ sig ];
-    } else {
-       _POSIX_signals_Clear_process_signals( sig );
-       _POSIX_signals_Vectors[ sig ] = *act;
-    }
+    _ISR_Disable( level );
+      if ( act->sa_handler == SIG_DFL ) {
+        _POSIX_signals_Vectors[ sig ] = _POSIX_signals_Default_vectors[ sig ];
+      } else {
+         _POSIX_signals_Clear_process_signals( sig );
+         _POSIX_signals_Vectors[ sig ] = *act;
+      }
+    _ISR_Enable( level );
   }
 
-  _POSIX_signals_Release( &queue_context );
+  _Thread_Enable_dispatch();
 
   return 0;
 }

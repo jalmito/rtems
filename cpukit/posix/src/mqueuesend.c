@@ -42,6 +42,7 @@
 #include <rtems/score/watchdog.h>
 #include <rtems/seterr.h>
 #include <rtems/posix/mqueueimpl.h>
+#include <rtems/posix/time.h>
 
 /*
  *  15.2.4 Send a Message to a Message Queue, P1003.1b-1993, p. 277
@@ -61,7 +62,7 @@ int mq_send(
     msg_ptr,
     msg_len,
     msg_prio,
-    NULL,
-    _Thread_queue_Enqueue_do_nothing_extra
+    true,
+    WATCHDOG_NO_TIMEOUT
   );
 }

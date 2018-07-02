@@ -1,6 +1,7 @@
 #ifndef __LINUX_KERNEL_H__
 #define __LINUX_KERNEL_H__
 
+#include <rtems.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -80,3 +81,7 @@ static inline int no_printk(const char *fmt, ...)
 #define truncate_setsize(x, y) do { (x)->i_size = (y); } while (0)
 
 #endif /* __LINUX_KERNEL_H__ */
+
+
+
+

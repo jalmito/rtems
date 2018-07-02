@@ -74,8 +74,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "des.h"
-
 #define REENTRANT
 /* Re-entrantify me -- all this junk needs to be in
  * struct crypt_data to make this really reentrant... */
@@ -265,7 +263,7 @@ ascii_to_bin(char ch)
   return(0);
 }
 
-static struct Des_Context *
+struct Des_Context *
 des_ctx_init(void)
 {
 struct Des_Context *des_ctx;
@@ -835,6 +833,14 @@ bailout:
   free(des_ctx);
   return rval;
 }
+
+char *
+__des_crypt(const char *key, const char *setting)
+{
+  static char	output[21];
+  return __des_crypt_r(key, setting, output, sizeof(output));
+}
+
 
 #ifdef DEBUG
 

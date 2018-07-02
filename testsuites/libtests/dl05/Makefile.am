@@ -14,8 +14,6 @@ AM_CPPFLAGS += -I$(top_srcdir)/../support/include
 LINK_OBJS = $(dl05_OBJECTS)
 LINK_LIBS = $(dl05_LDLIBS)
 
-init.$(OBJEXT): dl-tar.h
-
 dl-o5.o: dl-o5.cpp
 
 dl.tar: dl-o5.o
@@ -31,10 +29,15 @@ dl-tar.h: dl.tar
 	$(BIN2C) -H $< $@
 CLEANFILES += dl-tar.h
 
-dl05.pre: $(dl05_OBJECTS) $(dl05_DEPENDENCIES)
-	@rm -f dl05.pre
+dl05.pre$(EXEEXT): $(dl05_OBJECTS) $(dl05_DEPENDENCIES)
+	@rm -f dl05.pre$(EXEEXT)
 	$(LINK.cc) $(CPU_CFLAGS) $(AM_CFLAGS) $(AM_LDFLAGS) \
-		    -o $@ $(LINK_OBJS) $(LINK_LIBS)
+		    -o $(basename $@)$(EXEEXT) $(LINK_OBJS) $(LINK_LIBS)
+	rm -f dl05.pre.ralf
+
+dl05.pre: dl05.pre$(EXEEXT)
+	mv $< $@
+CLEANFILES += dl05.pre
 
 dl-sym.o: dl05.pre
 	rtems-syms -e -c "$(CFLAGS)" -o $@ $<

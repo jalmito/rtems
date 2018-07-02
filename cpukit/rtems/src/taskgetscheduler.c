@@ -24,31 +24,37 @@ rtems_status_code rtems_task_get_scheduler(
   rtems_id *scheduler_id
 )
 {
-  Thread_Control          *the_thread;
-  ISR_lock_Context         lock_context;
-  const Scheduler_Control *scheduler;
+  rtems_status_code sc;
 
-  if ( scheduler_id == NULL ) {
-    return RTEMS_INVALID_ADDRESS;
-  }
+  if ( scheduler_id != NULL ) {
+    Thread_Control          *the_thread;
+    Objects_Locations        location;
+    const Scheduler_Control *scheduler;
 
-  the_thread = _Thread_Get( task_id, &lock_context );
+    the_thread = _Thread_Get( task_id, &location );
 
-  if ( the_thread == NULL ) {
+    switch ( location ) {
+      case OBJECTS_LOCAL:
+        scheduler = _Scheduler_Get( the_thread );
+        *scheduler_id = _Scheduler_Build_id(
+          _Scheduler_Get_index( scheduler )
+        );
+        _Objects_Put( &the_thread->Object );
+        sc = RTEMS_SUCCESSFUL;
+        break;
 #if defined(RTEMS_MULTIPROCESSING)
-    if ( _Thread_MP_Is_remote( task_id ) ) {
-      return RTEMS_ILLEGAL_ON_REMOTE_OBJECT;
-    }
+      case OBJECTS_REMOTE:
+        _Thread_Dispatch();
+        sc = RTEMS_ILLEGAL_ON_REMOTE_OBJECT;
+        break;
 #endif
-
-    return RTEMS_INVALID_ID;
+      default:
+        sc = RTEMS_INVALID_ID;
+        break;
+    }
+  } else {
+    sc = RTEMS_INVALID_ADDRESS;
   }
 
-  _Thread_State_acquire_critical( the_thread, &lock_context );
-
-  scheduler = _Thread_Scheduler_get_home( the_thread );
-  *scheduler_id = _Scheduler_Build_id( _Scheduler_Get_index( scheduler ) );
-
-  _Thread_State_release( the_thread, &lock_context );
-  return RTEMS_SUCCESSFUL;
+  return sc;
 }

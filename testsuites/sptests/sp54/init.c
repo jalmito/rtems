@@ -22,7 +22,12 @@
 
 const char rtems_test_name[] = "SP 54";
 
-static void *Init( uintptr_t ignored )
+/* forward declarations to avoid warnings */
+rtems_task Init(rtems_task_argument argument);
+
+rtems_task Init(
+  rtems_task_argument ignored
+)
 {
   rtems_status_code    status;
   rtems_task_priority  pri;
@@ -56,14 +61,14 @@ static void *Init( uintptr_t ignored )
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
 
 /*
  *  In this application, the initialization task performs the system
  *  initialization and then transforms itself into the idle task.
  */
-#define CONFIGURE_IDLE_TASK_BODY Init
+#define CONFIGURE_IDLE_TASK_BODY (Thread_Entry_numeric) Init
 #define CONFIGURE_IDLE_TASK_INITIALIZES_APPLICATION
 
 /*

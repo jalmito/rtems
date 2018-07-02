@@ -23,12 +23,11 @@
 #include <stdlib.h>
 
 void *_calloc_r(
-  struct _reent *ignored,
+  struct _reent *ignored __attribute__((unused)),
   size_t         elements,
   size_t         size
 )
 {
-  (void) ignored;
   return calloc( elements, size );
 }
 #endif

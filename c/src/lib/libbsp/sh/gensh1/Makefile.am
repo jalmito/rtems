@@ -1,46 +1,59 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
-include $(top_srcdir)/../../bsp.am
 
-dist_project_lib_DATA = ../../../../../../bsps/sh/gensh1/start/bsp_specs
+include_bspdir = $(includedir)/bsp
 
+dist_project_lib_DATA = bsp_specs
 
+include_HEADERS = include/bsp.h
+include_HEADERS += ../../shared/include/tm27.h
 
-start.$(OBJEXT): ../../../../../../bsps/sh/gensh1/start/start.S
-	$(CPPASCOMPILE) -o $@ -c $<
+nodist_include_HEADERS = include/bspopts.h
+nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
+DISTCLEANFILES = include/bspopts.h
+
+include_HEADERS += include/coverhd.h
+
+noinst_LIBRARIES = libbspstart.a
+libbspstart_a_SOURCES = start/start.S
 project_lib_DATA = start.$(OBJEXT)
 
-project_lib_DATA += linkcmds
+dist_project_lib_DATA += startup/linkcmds
 
-project_lib_LIBRARIES = librtemsbsp.a
-librtemsbsp_a_SOURCES =
+noinst_LIBRARIES += libbsp.a
+libbsp_a_SOURCES =
+
+SHGEN = $(PROJECT_TOPdir)/tools/cpu/sh/shgen
+
+scitab.c: $(SHGEN)
+	$(SHGEN) -H @CPU_CLOCK_RATE_HZ@ sci > $@
+BUILT_SOURCES = scitab.c
+CLEANFILES = scitab.c
 
 # startup
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sh/shared/start/bspstart.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-loop.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sh/shared/start/bsphwinit.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
-librtemsbsp_a_SOURCES +=../../../../../../bsps/sh/gensh1/clock/ckinit.c
-librtemsbsp_a_SOURCES +=../../../../../../bsps/sh/gensh1/clock/delay.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sh/gensh1/start/cpu_asm.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sh/gensh1/start/ispsh7032.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sh/gensh1/btimer/btimer.c
+libbsp_a_SOURCES += ../../shared/bsplibc.c ../../shared/bsppost.c \
+    ../../shared/bsppredriverhook.c ../shared/startup/bspstart.c \
+    ../../shared/bspclean.c ../../shared/bspreset_loop.c \
+    ../../shared/bspgetworkarea.c ../../shared/bsppretaskinghook.c \
+    ../../shared/sbrk.c ../../shared/bootcard.c ../shared/bsphwinit.c \
+    ../../shared/gnatinstallhandler.c
 # scitab
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sh/gensh1/console/scitab.c
+libbsp_a_SOURCES += scitab.c
 # console
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sh/shared/console/console.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sh/gensh1/console/sci.c
+libbsp_a_SOURCES += ../../sh/shared/console.c
 # debugio
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/printk-dummy.c
+libbsp_a_SOURCES += ../../shared/dummy_printk_support.c
 
-# Cache
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/cache/nocache.c
+libbsp_a_LIBADD = \
+    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/clock.rel \
+    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/timer.rel \
+    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/sci.rel \
+    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/delay.rel \
+    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/score.rel \
+    ../../../libcpu/@RTEMS_CPU@/cache.rel
 
+EXTRA_DIST = times
 
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
-include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/sh/gensh1/headers.am

@@ -22,6 +22,10 @@
 #include "malloc_p.h"
 #include <stdlib.h>
 
+#include <rtems/score/sysstate.h>
+
+#include "malloc_p.h"
+
 void free(
   void *ptr
 )
@@ -32,13 +36,18 @@ void free(
   /*
    *  Do not attempt to free memory if in a critical section or ISR.
    */
-  if ( _Malloc_System_state() != MALLOC_SYSTEM_STATE_NORMAL ) {
-      _Malloc_Deferred_free(ptr);
+  if ( !malloc_is_system_state_OK() ) {
+      malloc_deferred_free(ptr);
       return;
   }
 
   if ( !_Protected_heap_Free( RTEMS_Malloc_Heap, ptr ) ) {
-    rtems_fatal( RTEMS_FATAL_SOURCE_INVALID_HEAP_FREE, (rtems_fatal_code) ptr );
+    printk( "Program heap: free of bad pointer %p -- range %p - %p \n",
+      ptr,
+      RTEMS_Malloc_Heap->area_begin,
+      RTEMS_Malloc_Heap->area_end
+    );
   }
+
 }
 #endif

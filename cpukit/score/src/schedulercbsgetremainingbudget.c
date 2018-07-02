@@ -26,31 +26,28 @@ int _Scheduler_CBS_Get_remaining_budget (
   time_t                  *remaining_budget
 )
 {
-  Scheduler_CBS_Server *server;
-  ISR_lock_Context      lock_context;
-  Thread_Control       *the_thread;
+  Objects_Locations location;
+  Thread_Control *the_thread;
 
-  if ( server_id >= _Scheduler_CBS_Maximum_servers ) {
+  if ( server_id >= _Scheduler_CBS_Maximum_servers )
     return SCHEDULER_CBS_ERROR_INVALID_PARAMETER;
-  }
-
-  server = &_Scheduler_CBS_Server_list[ server_id ];
-
-  if ( !server->initialized ) {
+  if ( !_Scheduler_CBS_Server_list[server_id].initialized )
     return SCHEDULER_CBS_ERROR_NOSERVER;
-  }
-
-  if ( server->task_id == -1 ) {
-    *remaining_budget = server->parameters.budget;
+  if ( _Scheduler_CBS_Server_list[server_id].task_id == -1 ) {
+    *remaining_budget = _Scheduler_CBS_Server_list[server_id].parameters.budget;
     return SCHEDULER_CBS_OK;
   }
 
-  the_thread = _Thread_Get( server->task_id, &lock_context );
-
-  if ( the_thread != NULL ) {
+  the_thread = _Thread_Get(
+                 _Scheduler_CBS_Server_list[server_id].task_id,
+                 &location
+               );
+  /* The routine _Thread_Get may disable dispatch and not enable again. */
+  if ( the_thread ) {
     *remaining_budget = the_thread->cpu_time_budget;
-    _ISR_lock_ISR_enable( &lock_context );
-  } else {
+    _Objects_Put( &the_thread->Object );
+  }
+  else {
     *remaining_budget = 0;
   }
 

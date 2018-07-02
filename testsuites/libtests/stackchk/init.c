@@ -90,17 +90,17 @@ rtems_task Init(
 
 void Fatal_extension(
   rtems_fatal_source source,
-  bool               always_set_to_false,
+  bool               is_internal,
   rtems_fatal_code   error
 )
 {
   if ( source != RTEMS_FATAL_SOURCE_STACK_CHECKER ) {
     printk( "unexpected fatal source\n" );
-  } else if ( always_set_to_false ) {
+  } else if ( is_internal ) {
     printk( "unexpected fatal is internal\n" );
   } else if ( error != rtems_build_name( 'T', 'A', '1', ' ' ) ) {
     printk( "unexpected fatal error\n" );
   } else {
-    TEST_END();
+    rtems_test_endk();
   }
 }

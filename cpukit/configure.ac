@@ -4,14 +4,13 @@ AC_PREREQ([2.69])
 AC_INIT([rtems-cpukit],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
 AC_CONFIG_SRCDIR([score])
 RTEMS_TOP([..],[])
-RTEMS_SOURCE_TOP
-RTEMS_BUILD_TOP
 
 RTEMS_CANONICAL_TARGET_CPU
 
 AM_INIT_AUTOMAKE([no-define nostdinc subdir-objects foreign 1.12.2])
 AM_MAINTAINER_MODE
 
+RTEMS_ENABLE_MULTILIB
 RTEMS_ENABLE_MULTIPROCESSING
 RTEMS_ENABLE_POSIX
 RTEMS_ENABLE_RTEMS_DEBUG
@@ -23,8 +22,6 @@ RTEMS_ENABLE_DRVMGR
 RTEMS_ENV_RTEMSCPU
 RTEMS_CHECK_RTEMS_DEBUG
 
-AC_DEFUN([RTEMS_TOOL_CHAIN_ERROR],AC_MSG_ERROR([please update your tool chain via the RSB <https://docs.rtems.org/branches/master/rsb/quick-start.html>]))
-
 # Is this a supported CPU?
 AC_MSG_CHECKING([if cpu $RTEMS_CPU is supported])
 if test -d "$srcdir/score/cpu/$RTEMS_CPU"; then
@@ -34,9 +31,9 @@ else
 fi
 
 RTEMS_PROG_CC_FOR_TARGET
-AM_PROG_CC_C_O
-RTEMS_CANONICALIZE_TOOLS
 RTEMS_PROG_CCAS
+RTEMS_CANONICALIZE_TOOLS
+AM_PROG_CC_C_O
 AC_PROG_RANLIB
 
 RTEMS_CHECK_NEWLIB
@@ -58,7 +55,9 @@ AC_CHECK_FUNCS([creat \
   sleep \
   telldir \
   usleep],,
-  [RTEMS_TOOL_CHAIN_ERROR])
+  [rtems_missing_func="$ac_func";break])
+AS_IF([test -n "$rtems_missing_func"],
+  AC_MSG_ERROR([Missing function $rtems_missing_func in libc])])
 AC_CHECK_FUNCS([__assert])
 AC_CHECK_FUNCS([execl execlp execle execv execvp execve])
 AC_CHECK_FUNCS([regcomp regexec regerror regfree])
@@ -69,11 +68,13 @@ AC_CHECK_DECLS([funlockfile],[AC_CHECK_FUNCS([funlockfile])],,[#include <stdio.h
 AC_CHECK_DECLS([ftrylockfile],[AC_CHECK_FUNCS([ftrylockfile])],,[#include <stdio.h>])
 
 # Newlib proprietary
-AC_CHECK_MEMBER([struct _Thread_queue_Queue._name],[],[RTEMS_TOOL_CHAIN_ERROR],[#include <sys/lock.h>])
+AC_CHECK_HEADERS([envlock.h])
+AC_CHECK_DECLS([__env_lock],,,[#include <envlock.h>])
+AC_CHECK_DECLS([__env_unlock],,,[#include <envlock.h>])
 
 # Mandated by POSIX, older newlibs bogusly provided CLOCK_PROCESS_CPUTIME+CLOCK_THREAD_CPUTIME
-AC_CHECK_DECL([CLOCK_PROCESS_CPUTIME_ID],[],[RTEMS_TOOL_CHAIN_ERROR],[#include <time.h>])
-AC_CHECK_DECL([CLOCK_THREAD_CPUTIME_ID],[],[RTEMS_TOOL_CHAIN_ERROR],[#include <time.h>])
+AC_CHECK_DECL([CLOCK_PROCESS_CPUTIME_ID],[],[AC_MSG_ERROR([missing define CLOCK_PROCESS_CPUTIME_ID])],[#include <time.h>])
+AC_CHECK_DECL([CLOCK_THREAD_CPUTIME_ID],[],[AC_MSG_ERROR([missing define CLOCK_THREAD_CPUTIME_ID])],[#include <time.h>])
 
 # Mandated by POSIX, decls not present in some versions of newlib,
 # some versions stubbed in newlib's rtems crt0
@@ -114,6 +115,13 @@ RTEMS_CHECK_FUNC([pthread_getaffinity_np],[
 RTEMS_CHECK_FUNC([pthread_getattr_np],[
   #define _GNU_SOURCE
   #include <pthread.h>])
+AC_CHECK_HEADERS([sys/cpuset.h])
+
+# This was added to newlib in August 2014 to improve conformance.
+# Disable use of internal definition if it is present.
+RTEMS_CHECK_FUNC([sigaltstack],[
+  #define _GNU_SOURCE
+  #include <signal.h>])
 
 # Mandated by POSIX, not declared in some versions of newlib.
 AC_CHECK_DECLS([getrusage],,,[#include sys/resource.h])
@@ -124,20 +132,25 @@ AC_CHECK_FUNCS([ttyname getcwd])
 
 # Check if the installed toolchain provides these headers
 # and error out if not.
-AC_CHECK_HEADERS([errno.h sched.h semaphore.h sys/cdefs.h sys/queue.h tar.h threads.h],,
-  [RTEMS_TOOL_CHAIN_ERROR])
+AC_CHECK_HEADERS([tar.h errno.h sched.h sys/cdefs.h sys/queue.h],,
+  [rtems_missing_header="$ac_header";break])
+AS_IF([test -n "$rtems_missing_header"],
+  AC_MSG_ERROR([Missing required header $rtems_missing_header])])
+
+AC_CHECK_HEADERS([semaphore.h])
+AM_CONDITIONAL([HAVE_SEMAPHORE_H],[test x"$ac_cv_header_semaphore_h" = x"yes"])
 
 ## error out if libc doesn't provide stdint.h
 AS_IF([test x"${ac_cv_header_stdint_h}" != xyes],
-[RTEMS_TOOL_CHAIN_ERROR])
+[AC_MSG_ERROR([Required header stdint.h not found])])
 
 ## error out if libc doesn't provide inttypes.h
 AS_IF([test x"${ac_cv_header_inttypes_h}" != xyes],
-[RTEMS_TOOL_CHAIN_ERROR])
+[AC_MSG_ERROR([Required header inttypes.h not found])])
 
 AC_HEADER_STDBOOL
 AS_IF([test x"${ac_cv_header_stdbool_h}" != xyes],
-[RTEMS_TOOL_CHAIN_ERROR])
+[AC_MSG_ERROR([No sufficient stdbool.h found])])
 
 AC_CHECK_TYPES([ uint8_t,  int8_t])
 AC_CHECK_TYPES([uint16_t, int16_t])
@@ -156,24 +169,19 @@ AC_CHECK_HEADER([pthread.h],[
   AC_CHECK_TYPES([pthread_rwlock_t])
   AC_CHECK_TYPES([pthread_barrier_t])
   AC_CHECK_TYPES([pthread_spinlock_t])
-  AC_CHECK_TYPES([struct _pthread_cleanup_context],[],[RTEMS_TOOL_CHAIN_ERROR],[#include <pthread.h>])
-  AC_CHECK_TYPES([struct _Priority_Node],[],[RTEMS_TOOL_CHAIN_ERROR],[#include <pthread.h>])
+  AC_CHECK_TYPES([struct _pthread_cleanup_context],[],[],[#include <pthread.h>])
 ])
 
 AC_CHECK_HEADER([signal.h],[
   AC_CHECK_TYPES([sighandler_t])
 ])
 
-if test x"$RTEMS_USE_NEWLIB" = xyes ; then
-  AC_CHECK_DECLS([__getreent],[],[RTEMS_TOOL_CHAIN_ERROR],[#include <sys/reent.h>])
-fi
-
 RTEMS_CHECK_MULTIPROCESSING
 RTEMS_CHECK_POSIX_API
 RTEMS_CHECK_NETWORKING
 RTEMS_CHECK_SMP
 if test "${RTEMS_HAS_SMP}" = "yes"; then
-  AC_CHECK_HEADERS([stdatomic.h],[],[RTEMS_TOOL_CHAIN_ERROR])
+  AC_CHECK_HEADERS([stdatomic.h],[],[AC_MSG_ERROR([<stdatomic.h> is required for SMP support])])
 fi
 
 rtems_major=`echo _RTEMS_VERSION | sed "s/\..*//"`
@@ -233,50 +241,40 @@ RTEMS_CPUOPT([RTEMS_VERSION],
   [RTEMS version string])
 
 ## Header file differences that need to be known in .h after install
+RTEMS_CPUOPT([__RTEMS_HAVE_SYS_CPUSET_H__],
+  [test x"${ac_cv_header_sys_cpuset_h}" = x"yes"],
+  [1],
+  [indicate if <sys/cpuset.h> is present in toolset])
+
+## Header file differences that need to be known in .h after install
+RTEMS_CPUOPT([__RTEMS_HAVE_DECL_SIGALTSTACK__],
+  [test x"${ac_cv_have_decl_sigaltstack}" = x"yes"],
+  [1],
+  [indicate if <signal.h> in toolset has sigaltstack()])
+
+## This improves both the size and coverage analysis.
+RTEMS_CPUOPT([__RTEMS_DO_NOT_INLINE_THREAD_ENABLE_DISPATCH__],
+  [test x"${RTEMS_DO_NOT_INLINE_THREAD_ENABLE_DISPATCH}" = x"1"],
+  [1],
+  [disable inlining _Thread_Enable_dispatch])
+
+## This improves both the size and coverage analysis.
+RTEMS_CPUOPT([__RTEMS_DO_NOT_INLINE_CORE_MUTEX_SEIZE__],
+  [test x"${RTEMS_DO_NOT_INLINE_CORE_MUTEX_SEIZE}" = x"1"],
+  [1],
+  [disable inlining _Thread_Enable_dispatch])
+
+## This gives the same behavior as 4.8 and older
+RTEMS_CPUOPT([__RTEMS_STRICT_ORDER_MUTEX__],
+  [test x"${ENABLE_STRICT_ORDER_MUTEX}" = x"1"],
+  [1],
+  [disable strict order mutex])
 
 ## Deactivate ada bindings
 RTEMS_CPUOPT([__RTEMS_ADA__],
   [test x"${enable_ada}" = x"yes"],
   [1],
   [Define to 1 if ada/gnat bindings are built-in])
-
-# These are used to provide <rtems/inttypes.h
-AC_CHECK_SIZEOF([mode_t])
-AC_CHECK_SIZEOF([off_t])
-AC_CHECK_SIZEOF([time_t])
-AC_CHECK_SIZEOF([size_t])
-AC_CHECK_SIZEOF([blksize_t])
-AC_CHECK_SIZEOF([blkcnt_t])
-
-## Provide sizeof(mode_t) information via cpuopts.h
-RTEMS_CPUOPT([__RTEMS_SIZEOF_MODE_T__],
-  [true],
-  [${ac_cv_sizeof_mode_t}],
-  [sizeof(mode_t)])
-
-## Provide sizeof(off_t) information via cpuopts.h
-RTEMS_CPUOPT([__RTEMS_SIZEOF_OFF_T__],
-  [true],
-  [${ac_cv_sizeof_off_t}],
-  [sizeof(off_t)])
-
-## Provide sizeof(time_t) information via cpuopts.h
-RTEMS_CPUOPT([__RTEMS_SIZEOF_TIME_T__],
-  [true],
-  [${ac_cv_sizeof_time_t}],
-  [sizeof(time_t)])
-
-## Provide sizeof(blksize_t) information via cpuopts.h
-RTEMS_CPUOPT([__RTEMS_SIZEOF_BLKSIZE_T__],
-  [true],
-  [${ac_cv_sizeof_blksize_t}],
-  [sizeof(blksize_t)])
-
-## Provide sizeof(blkcnt_t) information via cpuopts.h
-RTEMS_CPUOPT([__RTEMS_SIZEOF_BLKCNT_T__],
-  [true],
-  [${ac_cv_sizeof_blkcnt_t}],
-  [sizeof(blkcnt_t)])
 
 ## Then we propagate a private copy of the value into cpuopts.h
 ## so it is always available to the RTEMS header files.
@@ -318,6 +316,16 @@ RTEMS_CHECK_GCC_WEAK
 AC_CHECK_DECLS([_POSIX_LOGIN_NAME_MAX],,,[#include <limits.h>])
 AC_CHECK_DECLS([CHAR_BIT],,,[#include <limits.h>])
 
+# FIXME: We should get rid of this.
+# So far, only used in libfs/src/nfsclient/src/dirutils.c
+AC_CHECK_SIZEOF([mode_t])
+AC_CHECK_SIZEOF([off_t])
+
+# FIXME: We should get rid of this. It's a cludge.
+AC_CHECK_SIZEOF([time_t])
+
+AC_CHECK_SIZEOF([size_t])
+
 # FIXME: Mandatory in SUSv4, optional in SUSv3.
 #   Not implemented in GCC/newlib, so far.
 AC_CHECK_DECLS([WORD_BIT],,,[#include <limits.h>])
@@ -339,10 +347,8 @@ AC_CHECK_DECLS([utime],,,[#include <sys/types.h>
 ## Check if libc provides decl of utimes
 AC_CHECK_DECLS([utimes],,,[#include <sys/time.h>])
 
-# Ensure that Newlib does not provide things now in <machine/_timecounter.h>
-AC_CHECK_DECLS([_Timecounter_Time_second],[RTEMS_TOOL_CHAIN_ERROR],,[#include <sys/time.h>])
-
 # ... far too many conditionals ...
+AM_CONDITIONAL(LIBRPC,[test x"$rtems_cv_HAS_NETWORKING" = x"yes"])
 AM_CONDITIONAL(NEWLIB,test x"$RTEMS_USE_NEWLIB" = x"yes")
 
 AM_CONDITIONAL(HAS_MP,test x"$enable_multiprocessing" = x"yes" )
@@ -374,10 +380,14 @@ AM_CONDITIONAL([RPCTOOLS],[test "$RPCGEN" = rpcgen \
 # reloc backends
 AC_MSG_CHECKING([whether CPU supports libdl])
 case $RTEMS_CPU in
-  arm | i386 | m68k | mips | moxie | powerpc | sparc)
+  arm | i386 | m32r | m68k | mips | \
+  moxie | powerpc | sparc)
    HAVE_LIBDL=yes ;;
   # bfin has an issue to resolve with libdl. See ticket #2252
   bfin)
+   HAVE_LIBDL=no ;;
+  # h8300 has an issue to resolve with libdl. See ticket #2284
+  h8300)
    HAVE_LIBDL=no ;;
   # lm32 has an issue to resolve with libdl. See ticket #2283
   lm32)
@@ -390,17 +400,6 @@ case $RTEMS_CPU in
 esac
 AM_CONDITIONAL(LIBDL,[test x"$HAVE_LIBDL" = x"yes"])
 AC_MSG_RESULT([$HAVE_LIBDL])
-
-# Filter debugger to only build for architectures that have a target backend
-AC_MSG_CHECKING([whether CPU supports libdebugger])
-case $RTEMS_CPU in
-  arm | i386)
-   HAVE_LIBDEBUGGER=yes ;;
-  *)
-   HAVE_LIBDEBUGGER=no ;;
-esac
-AM_CONDITIONAL(LIBDEBUGGER,[test x"$HAVE_LIBDEBUGGER" = x"yes"])
-AC_MSG_RESULT([$HAVE_LIBDEBUGGER])
 
 AC_MSG_CHECKING([whether CPU supports SHA])
 case $RTEMS_CPU in
@@ -442,24 +441,25 @@ AC_CONFIG_FILES([
 Doxyfile
 Makefile
 dev/Makefile
-dtc/libfdt/Makefile
 rtems/Makefile
 sapi/Makefile
 score/Makefile
 score/cpu/Makefile
 score/cpu/arm/Makefile
 score/cpu/bfin/Makefile
+score/cpu/avr/Makefile
 score/cpu/epiphany/Makefile
+score/cpu/h8300/Makefile
 score/cpu/i386/Makefile
 score/cpu/lm32/Makefile
 score/cpu/m68k/Makefile
 score/cpu/m32c/Makefile
+score/cpu/m32r/Makefile
 score/cpu/mips/Makefile
 score/cpu/moxie/Makefile
 score/cpu/nios2/Makefile
 score/cpu/or1k/Makefile
 score/cpu/powerpc/Makefile
-score/cpu/riscv/Makefile
 score/cpu/sh/Makefile
 score/cpu/sparc/Makefile
 score/cpu/sparc64/Makefile
@@ -480,13 +480,16 @@ libmisc/Makefile
 libi2c/Makefile
 libmd/Makefile
 libdl/Makefile
-libstdthreads/Makefile
-libdebugger/Makefile
 zlib/Makefile
 ftpd/Makefile
 telnetd/Makefile
 pppd/Makefile
 mghttpd/Makefile
 wrapup/Makefile])
+
+AC_CONFIG_COMMANDS([preinstall-stamp],
+[test -z "$with_multisubdir" && ${MAKE} preinstall-stamp],
+[MAKE=${MAKE}
+with_multisubdir="$with_multisubdir"])
 
 AC_OUTPUT

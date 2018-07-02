@@ -15,7 +15,7 @@
   #include "config.h"
 #endif
 
-#include <rtems/devfs.h>
+#include "devfs.h"
 
 #include <rtems/deviceio.h>
 

@@ -17,7 +17,7 @@
   #include "config.h"
 #endif
 
-#include <rtems/imfs.h>
+#include "imfs.h"
 
 #include <stdlib.h>
 #include <string.h>

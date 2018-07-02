@@ -21,7 +21,8 @@
 
 #include <rtems/score/prioritybitmapimpl.h>
 
-const unsigned char _Bitfield_Leading_zeros[256] = {
+#if ( CPU_USE_GENERIC_BITFIELD_DATA == TRUE )
+const unsigned char __log2table[256] = {
     7, 7, 6, 6, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4,
     3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
@@ -39,3 +40,4 @@ const unsigned char _Bitfield_Leading_zeros[256] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
+#endif

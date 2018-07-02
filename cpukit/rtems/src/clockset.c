@@ -19,6 +19,7 @@
 #endif
 
 #include <rtems/rtems/clock.h>
+#include <rtems/score/threaddispatch.h>
 #include <rtems/score/todimpl.h>
 #include <rtems/config.h>
 
@@ -30,17 +31,16 @@ rtems_status_code rtems_clock_set(
     return RTEMS_INVALID_ADDRESS;
 
   if ( _TOD_Validate( tod ) ) {
-    struct timespec  tod_as_timespec;
-    ISR_lock_Context lock_context;
-
-    tod_as_timespec.tv_sec = _TOD_To_seconds( tod );
-    tod_as_timespec.tv_nsec = tod->ticks
+    Timestamp_Control tod_as_timestamp;
+    uint32_t seconds = _TOD_To_seconds( tod );
+    uint32_t nanoseconds = tod->ticks
       * rtems_configuration_get_nanoseconds_per_tick();
 
-    _TOD_Lock();
-    _TOD_Acquire( &lock_context );
-    _TOD_Set( &tod_as_timespec, &lock_context );
-    _TOD_Unlock();
+    _Timestamp_Set( &tod_as_timestamp, seconds, nanoseconds );
+
+    _Thread_Disable_dispatch();
+      _TOD_Set_with_timestamp( &tod_as_timestamp );
+    _Thread_Enable_dispatch();
 
     return RTEMS_SUCCESSFUL;
   }

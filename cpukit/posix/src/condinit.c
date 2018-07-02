@@ -18,31 +18,14 @@
 #include "config.h"
 #endif
 
+#include <pthread.h>
+#include <errno.h>
+
+#include <rtems/system.h>
+#include <rtems/score/watchdog.h>
 #include <rtems/posix/condimpl.h>
-#include <rtems/posix/posixapi.h>
-
-RTEMS_STATIC_ASSERT(
-  offsetof( POSIX_Condition_variables_Control, flags )
-    == offsetof( pthread_cond_t, _flags ),
-  POSIX_CONDITION_VARIABLES_CONTROL_FLAGS
-);
-
-RTEMS_STATIC_ASSERT(
-  offsetof( POSIX_Condition_variables_Control, mutex )
-    == offsetof( pthread_cond_t, _mutex ),
-  POSIX_CONDITION_VARIABLES_CONTROL_COUNT
-);
-
-RTEMS_STATIC_ASSERT(
-  offsetof( POSIX_Condition_variables_Control, Queue )
-    == offsetof( pthread_cond_t, _Queue ),
-  POSIX_CONDITION_VARIABLES_CONTROL_QUEUE
-);
-
-RTEMS_STATIC_ASSERT(
-  sizeof( POSIX_Condition_variables_Control ) == sizeof( pthread_cond_t ),
-  POSIX_CONDITION_VARIABLES_CONTROL_SIZE
-);
+#include <rtems/posix/time.h>
+#include <rtems/posix/muteximpl.h>
 
 /**
  *  11.4.2 Initializing and Destroying a Condition Variable,
@@ -53,26 +36,46 @@ int pthread_cond_init(
   const pthread_condattr_t *attr
 )
 {
-  POSIX_Condition_variables_Control *the_cond;
+  POSIX_Condition_variables_Control   *the_cond;
+  const pthread_condattr_t            *the_attr;
 
-  the_cond = _POSIX_Condition_variables_Get( cond );
+  if ( attr ) the_attr = attr;
+  else        the_attr = &_POSIX_Condition_variables_Default_attributes;
 
-  if ( the_cond == NULL ) {
+  /*
+   *  Be careful about attributes when global!!!
+   */
+  if ( the_attr->process_shared == PTHREAD_PROCESS_SHARED )
     return EINVAL;
-  }
 
-  if ( attr == NULL ) {
-    attr = &_POSIX_Condition_variables_Default_attributes;
-  }
-
-  if ( !attr->is_initialized ) {
+  if ( !the_attr->is_initialized )
     return EINVAL;
+
+  the_cond = _POSIX_Condition_variables_Allocate();
+
+  if ( !the_cond ) {
+    _Objects_Allocator_unlock();
+    return ENOMEM;
   }
 
-  if ( !_POSIX_Is_valid_pshared( attr->process_shared ) ) {
-    return EINVAL;
-  }
+  the_cond->process_shared  = the_attr->process_shared;
 
-  _POSIX_Condition_variables_Initialize( the_cond, attr );
+  the_cond->Mutex = POSIX_CONDITION_VARIABLES_NO_MUTEX;
+
+  _Thread_queue_Initialize(
+    &the_cond->Wait_queue,
+    THREAD_QUEUE_DISCIPLINE_FIFO
+  );
+
+  _Objects_Open_u32(
+    &_POSIX_Condition_variables_Information,
+    &the_cond->Object,
+    0
+  );
+
+  *cond = the_cond->Object.id;
+
+  _Objects_Allocator_unlock();
+
   return 0;
 }

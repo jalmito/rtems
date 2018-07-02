@@ -31,9 +31,9 @@
 #include <rtems/posix/threadsup.h>
 #include <rtems/posix/psignalimpl.h>
 #include <rtems/posix/pthreadimpl.h>
+#include <rtems/posix/time.h>
 #include <rtems/config.h>
 #include <rtems/seterr.h>
-#include <rtems/sysinit.h>
 
 /*
  *  Ensure we have the same number of vectors and default vector entries
@@ -48,7 +48,7 @@ RTEMS_STATIC_ASSERT(
 sigset_t  _POSIX_signals_Pending;
 
 void _POSIX_signals_Abnormal_termination_handler(
-  int signo RTEMS_UNUSED )
+  int signo __attribute__((unused)) )
 {
   exit( 1 );
 }
@@ -92,13 +92,82 @@ const struct sigaction _POSIX_signals_Default_vectors[ SIG_ARRAY_MAX ] = {
 
 struct sigaction _POSIX_signals_Vectors[ SIG_ARRAY_MAX ];
 
-Thread_queue_Control _POSIX_signals_Wait_queue =
-  THREAD_QUEUE_INITIALIZER( "POSIX Signals" );
+Thread_queue_Control _POSIX_signals_Wait_queue;
 
 Chain_Control _POSIX_signals_Inactive_siginfo;
 Chain_Control _POSIX_signals_Siginfo[ SIG_ARRAY_MAX ];
 
-static void _POSIX_signals_Manager_Initialization(void)
+/*
+ *  XXX - move these
+ */
+
+#define _States_Is_interruptible_signal( _states ) \
+  ( ((_states) & \
+    (STATES_WAITING_FOR_SIGNAL|STATES_INTERRUPTIBLE_BY_SIGNAL)) == \
+      (STATES_WAITING_FOR_SIGNAL|STATES_INTERRUPTIBLE_BY_SIGNAL))
+
+void _POSIX_signals_Action_handler(
+  Thread_Control  *executing,
+  Thread_Action   *action,
+  Per_CPU_Control *cpu,
+  ISR_Level        level
+)
+{
+  POSIX_API_Control  *api;
+  int                 signo;
+  ISR_lock_Context    lock_context;
+  int                 hold_errno;
+
+  (void) action;
+  _Thread_Action_release_and_ISR_enable( cpu, level );
+
+  api = executing->API_Extensions[ THREAD_API_POSIX ];
+
+  /*
+   *  We need to ensure that if the signal handler executes a call
+   *  which overwrites the unblocking status, we restore it.
+   */
+  hold_errno = executing->Wait.return_code;
+
+  /*
+   * api may be NULL in case of a thread close in progress
+   */
+  if ( !api )
+    return;
+
+  /*
+   *  If we invoke any user code, there is the possibility that
+   *  a new signal has been posted that we should process so we
+   *  restart the loop if a signal handler was invoked.
+   *
+   *  The first thing done is to check there are any signals to be
+   *  processed at all.  No point in doing this loop otherwise.
+   */
+  while (1) {
+    _POSIX_signals_Acquire( &lock_context );
+      if ( !(~api->signals_blocked &
+            (api->signals_pending | _POSIX_signals_Pending)) ) {
+       _POSIX_signals_Release( &lock_context );
+       break;
+     }
+    _POSIX_signals_Release( &lock_context );
+
+    for ( signo = SIGRTMIN ; signo <= SIGRTMAX ; signo++ ) {
+      _POSIX_signals_Check_signal( api, signo, false );
+      _POSIX_signals_Check_signal( api, signo, true );
+    }
+    /* Unfortunately - nothing like __SIGFIRSTNOTRT in newlib signal .h */
+
+    for ( signo = SIGHUP ; signo <= __SIGLASTNOTRT ; signo++ ) {
+      _POSIX_signals_Check_signal( api, signo, false );
+      _POSIX_signals_Check_signal( api, signo, true );
+    }
+  }
+
+  executing->Wait.return_code = hold_errno;
+}
+
+void _POSIX_signals_Manager_Initialization(void)
 {
   uint32_t   signo;
   uint32_t   maximum_queued_signals;
@@ -115,6 +184,14 @@ static void _POSIX_signals_Manager_Initialization(void)
    *  Initialize the set of pending signals for the entire process
    */
   sigemptyset( &_POSIX_signals_Pending );
+
+  /*
+   *  Initialize the queue we use to block for signals
+   */
+  _Thread_queue_Initialize(
+    &_POSIX_signals_Wait_queue,
+    THREAD_QUEUE_DISCIPLINE_FIFO
+  );
 
   /* XXX status codes */
 
@@ -137,9 +214,3 @@ static void _POSIX_signals_Manager_Initialization(void)
     _Chain_Initialize_empty( &_POSIX_signals_Inactive_siginfo );
   }
 }
-
-RTEMS_SYSINIT_ITEM(
-  _POSIX_signals_Manager_Initialization,
-  RTEMS_SYSINIT_POSIX_SIGNALS,
-  RTEMS_SYSINIT_ORDER_MIDDLE
-);

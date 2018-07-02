@@ -121,7 +121,7 @@ uintptr_t _Heap_Extend(
   Heap_Control *heap,
   void *extend_area_begin_ptr,
   uintptr_t extend_area_size,
-  uintptr_t unused RTEMS_UNUSED
+  uintptr_t unused __attribute__((unused))
 )
 {
   Heap_Statistics *const stats = &heap->stats;

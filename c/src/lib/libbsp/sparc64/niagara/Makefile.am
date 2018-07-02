@@ -3,49 +3,77 @@ ACLOCAL_AMFLAGS = -I ../../../../aclocal
 include $(top_srcdir)/../../../../automake/compile.am
 include $(top_srcdir)/../../bsp.am
 
-dist_project_lib_DATA = ../../../../../../bsps/sparc64/niagara/start/bsp_specs
+include_bspdir = $(includedir)/bsp
 
+dist_project_lib_DATA = bsp_specs
+
+include_HEADERS = include/bsp.h 
+include_HEADERS += include/tm27.h
+include_HEADERS += ../shared/include/asm.h
+
+include_bootdir = $(includedir)/boot
+include_boot_HEADERS = ../shared/helenos/boot/include/align.h \
+  ../shared/helenos/boot/include/balloc.h \
+  ../shared/helenos/boot/include/gentypes.h \
+  ../shared/helenos/boot/include/main.h \
+  ../shared/helenos/boot/include/ofwarch.h \
+  ../shared/helenos/boot/include/ofw.h \
+  ../shared/helenos/boot/include/ofw_tree.h \
+  ../shared/helenos/boot/include/register.h \
+  ../shared/helenos/boot/include/stack.h \
+  ../shared/helenos/boot/include/types.h
+
+nodist_include_HEADERS = include/bspopts.h    
+nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h 
+DISTCLEANFILES = include/bspopts.h
 noinst_PROGRAMS =
 
+nodist_include_HEADERS += ../../shared/include/coverhd.h
 
 
-start.$(OBJEXT): ../../../../../../bsps/sparc64/shared/start/start.S
+EXTRA_DIST = ../shared/start/start.S
+start.$(OBJEXT): ../shared/start/start.S
 	$(CPPASCOMPILE) -o $@ -c $<
 project_lib_DATA = start.$(OBJEXT)
 
-dist_project_lib_DATA += ../../../../../../bsps/sparc64/shared/start/linkcmds
+dist_project_lib_DATA += ../shared/startup/linkcmds
 
-project_lib_LIBRARIES = librtemsbsp.a
-librtemsbsp_a_SOURCES =
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc64/niagara/start/bspclean.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc64/niagara/start/m5op_sparc.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspstart-empty.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-empty.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc64/shared/start/setvec.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc64/shared/helenos/boot/genarch/balloc.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc64/shared/helenos/boot/genarch/ofw.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc64/shared/helenos/boot/genarch/ofw_tree.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc64/shared/helenos/boot/generic/string.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc64/shared/helenos/boot/sparc64/loader/ofwarch.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc64/shared/helenos/boot/sparc64/loader/main.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc64/shared/helenos/boot/sparc64/loader/ofwasm.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc64/niagara/start/bspinit.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc64/shared/start/halt.S
+startup_SOURCES = startup/bspclean.c startup/m5op_sparc.S \
+    ../../shared/bsplibc.c \
+    ../../shared/bsppredriverhook.c ../../shared/bsppretaskinghook.c \
+    ../../shared/bsppost.c \
+    ../../shared/bootcard.c ../../shared/sbrk.c \
+    ../../shared/bspgetworkarea.c \
+    ../../shared/bspstart.c \
+    ../shared/startup/setvec.c \
+    ../../shared/gnatinstallhandler.c  \
+    ../shared/helenos/boot/genarch/balloc.c \
+    ../shared/helenos/boot/genarch/ofw.c \
+    ../shared/helenos/boot/genarch/ofw_tree.c \
+    ../shared/helenos/boot/generic/string.c \
+    ../shared/helenos/boot/sparc64/loader/ofwarch.c \
+    ../shared/helenos/boot/sparc64/loader/main.c \
+    ../shared/helenos/boot/sparc64/loader/ofwasm.S \
+    start/bspinit.S \
+    ../shared/asm/asm.S
 
-librtemsbsp_a_SOURCES +=../../../../../../bsps/sparc64/shared/clock/ckinit.c
+#clock_SOURCES = ../../shared/clock_driver_simidle.c
+clock_SOURCES = ../shared/clock/ckinit.c
 
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc64/shared/console/conscfg.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console-control.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/legacy-console-select.c
+console_SOURCES = ../../shared/console.c  ../shared/console/conscfg.c \
+    ../../shared/console_select.c ../../shared/console_control.c \
+    ../../shared/console_read.c ../../shared/console_write.c
 
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/btimer/btimer-stub.c
+timer_SOURCES = ../../shared/timerstub.c
 
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/cache/nocache.c
+noinst_LIBRARIES = libbsp.a
+libbsp_a_SOURCES = $(startup_SOURCES) $(clock_SOURCES) $(console_SOURCES) \
+    $(timer_SOURCES)
 
+libbsp_a_LIBADD = \
+      ../../../libcpu/@RTEMS_CPU@/shared/shared-score.rel \
+      ../../../libcpu/@RTEMS_CPU@/shared/cache.rel \
+      ../../../libcpu/@RTEMS_CPU@/shared/sparc64-syscall.rel 
+
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
-include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/sparc64/niagara/headers.am

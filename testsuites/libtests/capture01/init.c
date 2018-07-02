@@ -26,7 +26,6 @@
 #include <rtems/monitor.h>
 #include <rtems/shell.h>
 #include <assert.h>
-#include <tmacros.h>
 
 #define ASSERT_SC(sc) assert((sc) == RTEMS_SUCCESSFUL)
 
@@ -47,9 +46,7 @@ rtems_task Init(
   rtems_mode          old_mode;
   rtems_name          to_name = rtems_build_name('I', 'D', 'L', 'E');;
 
-  rtems_print_printer_fprintf_putc(&rtems_test_printer);
-
-  TEST_BEGIN();
+  rtems_test_begin();
 
   rtems_task_set_priority(RTEMS_SELF, 20, &old_priority);
   rtems_task_mode(RTEMS_PREEMPT,  RTEMS_PREEMPT_MASK, &old_mode);
@@ -78,18 +75,18 @@ rtems_task Init(
 
   rtems_capture_print_watch_list();
 
-  sc = rtems_capture_set_control (true);
+  sc = rtems_capture_control (true);
   ASSERT_SC(sc);
 
   capture_test_1();
 
-  sc = rtems_capture_set_control (false);
+  sc = rtems_capture_control (false);
   ASSERT_SC(sc);
 
   rtems_capture_print_trace_records ( 22, false );
   rtems_capture_print_trace_records ( 22, false );
 
-  TEST_END();
+  rtems_test_end();
   exit( 0 );
 
 #endif

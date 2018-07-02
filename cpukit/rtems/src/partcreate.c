@@ -94,13 +94,14 @@ rtems_status_code rtems_partition_create(
   }
 #endif
 
-  _Partition_Initialize(
-    the_partition,
-    starting_address,
-    length,
-    buffer_size,
-    attribute_set
-  );
+  the_partition->starting_address      = starting_address;
+  the_partition->length                = length;
+  the_partition->buffer_size           = buffer_size;
+  the_partition->attribute_set         = attribute_set;
+  the_partition->number_of_used_blocks = 0;
+
+  _Chain_Initialize( &the_partition->Memory, starting_address,
+                        length / buffer_size, buffer_size );
 
   _Objects_Open(
     &_Partition_Information,

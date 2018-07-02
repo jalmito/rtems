@@ -18,8 +18,6 @@
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
 
-#include <rtems/rtems_bsdnet.h>
-
 /*
  * Display IP statistics
  * Don't lock the rest of the network tasks out while printing.

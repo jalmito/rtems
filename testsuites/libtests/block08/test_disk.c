@@ -46,19 +46,19 @@ test_disk_ioctl(rtems_disk_device *dd, uint32_t req, void *argp)
 
             r = argp;
 
-            printf("DISK_DRV: %s ",
+            printk("DISK_DRV: %s ",
                    r->req == RTEMS_BLKDEV_REQ_READ ? "R" :
                    r->req == RTEMS_BLKDEV_REQ_WRITE ? "W" : "?");
             for (i = 0, sg = r->bufs; i < r->bufnum; i++, sg++)
             {
-                printf("[%" PRIu32 "] ", sg->block);
+                printk("[%d] ", sg->block);
             }
-            printf("\n");
+            printk("\n");
             break;
         }
 
         default:
-            printf("%s() Unexpected request comes %" PRIu32 "\n",
+            printk("%s() Unexpected request comes %u\n",
                    __FUNCTION__, req);
             return -1;
     }
@@ -135,7 +135,7 @@ test_disk_initialize(
     rc = bdbuf_test_create_drv_rx_queue(&drvq_id);
     if (rc != RTEMS_SUCCESSFUL)
     {
-        printf("%s() Failed to create Msg Queue for RX: %u\n",
+        printk("%s() Failed to create Msg Queue for RX: %u\n",
                __FUNCTION__, rc);
         return rc;
     }
@@ -148,6 +148,7 @@ test_disk_initialize(
         return rc;
     }
 
-    printf("TEST DISK - OK\n");
+    printk("TEST DISK - OK\n");
     return RTEMS_SUCCESSFUL;
 }
+

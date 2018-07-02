@@ -72,8 +72,8 @@ void tms570_pll_init( void )
                         TMS570_SYS1_PLLCTL1_MASK_SLIP( 1 ) |
                         TMS570_SYS1_PLLCTL1_PLLDIV( 0x1f ) | /* max value */
                         TMS570_SYS1_PLLCTL1_ROF * 0 |
-                        TMS570_SYS1_PLLCTL1_REFCLKDIV( 6 - 1 ) |
-                        TMS570_SYS1_PLLCTL1_PLLMUL( ( 120 - 1 ) << 8 );
+                        TMS570_SYS1_PLLCTL1_REFCLKDIV( 8 - 1 ) |
+                        TMS570_SYS1_PLLCTL1_PLLMUL( ( 150 - 1 ) << 8 );
 
   /* Setup pll control register 2 */
   TMS570_SYS1.PLLCTL2 = TMS570_SYS1_PLLCTL2_FMENA * 0 |
@@ -85,10 +85,10 @@ void tms570_pll_init( void )
   /** @b Initialize @b Pll2: */
 
   /* Setup pll2 control register */
-  TMS570_SYS2.PLLCTL3 = TMS570_SYS2_PLLCTL3_ODPLL2( 2 - 1 ) |
+  TMS570_SYS2.PLLCTL3 = TMS570_SYS2_PLLCTL3_ODPLL2( 1 - 1 ) |
                         TMS570_SYS2_PLLCTL3_PLLDIV2( 0x1F ) | /* max value */
-                        TMS570_SYS2_PLLCTL3_REFCLKDIV2( 6 - 1 ) |
-                        TMS570_SYS2_PLLCTL3_PLLMUL2( ( 120 - 1 ) << 8 );
+                        TMS570_SYS2_PLLCTL3_REFCLKDIV2( 8 - 1 ) |
+                        TMS570_SYS2_PLLCTL3_PLLMUL2( ( 150 - 1 ) << 8 );
 
   /** - Enable PLL(s) to start up or Lock */
   TMS570_SYS1.CSDIS = 0x00000000 | /* CLKSR0 on */
@@ -203,11 +203,28 @@ void tms570_periph_init( void )
 
   /** - Release peripherals from reset and enable clocks to all peripherals */
   /** - Power-up all peripherals */
+#ifdef TMS570_LC43X /* Code added to support the LC43X Family*/
+  TMS570_PCR1.PSPWRDWNCLR0 = 0xFFFFFFFFU;
+  TMS570_PCR1.PSPWRDWNCLR1 = 0xFFFFFFFFU;
+  TMS570_PCR1.PSPWRDWNCLR2 = 0xFFFFFFFFU;
+  TMS570_PCR1.PSPWRDWNCLR3 = 0xFFFFFFFFU;
+
+  TMS570_PCR2.PSPWRDWNCLR0 = 0xFFFFFFFFU;
+  TMS570_PCR2.PSPWRDWNCLR1 = 0xFFFFFFFFU;
+  TMS570_PCR2.PSPWRDWNCLR2 = 0xFFFFFFFFU;
+  TMS570_PCR2.PSPWRDWNCLR3 = 0xFFFFFFFFU;
+
+  TMS570_PCR3.PSPWRDWNCLR0 = 0xFFFFFFFFU;
+  TMS570_PCR3.PSPWRDWNCLR1 = 0xFFFFFFFFU;
+  TMS570_PCR3.PSPWRDWNCLR2 = 0xFFFFFFFFU;
+  TMS570_PCR3.PSPWRDWNCLR3 = 0xFFFFFFFFU;
+#else
   TMS570_PCR.PSPWRDWNCLR0 = 0xFFFFFFFFU;
   TMS570_PCR.PSPWRDWNCLR1 = 0xFFFFFFFFU;
   TMS570_PCR.PSPWRDWNCLR2 = 0xFFFFFFFFU;
   TMS570_PCR.PSPWRDWNCLR3 = 0xFFFFFFFFU;
 
+#endif
   /** - Enable Peripherals */
   TMS570_SYS1.CLKCNTL |= TMS570_SYS1_CLKCNTL_PENA;
 }

@@ -21,7 +21,7 @@
 #ifndef _RTEMS_MKROOTFS_H
 #define _RTEMS_MKROOTFS_H
 
-#include <sys/types.h> /* in_addr_t */
+#include <arpa/inet.h> /* in_addr_t */
 
 #include <rtems.h>
 

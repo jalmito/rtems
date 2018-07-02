@@ -129,7 +129,7 @@ rtems_task High_task(
     end_time,
     operation_count,
     overhead,
-    0
+    CALLING_OVERHEAD_MESSAGE_QUEUE_URGENT
   );
 
   TEST_END();

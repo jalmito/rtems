@@ -25,16 +25,18 @@
 #include <rtems/score/assert.h>
 #include <rtems/score/schedulerimpl.h>
 
-States_Control _Thread_Set_state_locked(
+States_Control _Thread_Set_state(
   Thread_Control *the_thread,
   States_Control  state
 )
 {
-  States_Control previous_state;
-  States_Control next_state;
+  ISR_lock_Context lock_context;
+  States_Control   previous_state;
+  States_Control   next_state;
 
   _Assert( state != 0 );
-  _Assert( _Thread_State_is_owner( the_thread ) );
+
+  _Scheduler_Acquire( the_thread, &lock_context );
 
   previous_state = the_thread->current_state;
   next_state = _States_Set( state, previous_state);
@@ -44,20 +46,7 @@ States_Control _Thread_Set_state_locked(
     _Scheduler_Block( the_thread );
   }
 
-  return previous_state;
-}
-
-States_Control _Thread_Set_state(
-  Thread_Control *the_thread,
-  States_Control  state
-)
-{
-  ISR_lock_Context lock_context;
-  States_Control   previous_state;
-
-  _Thread_State_acquire( the_thread, &lock_context );
-  previous_state = _Thread_Set_state_locked( the_thread, state );
-  _Thread_State_release( the_thread, &lock_context );
+  _Scheduler_Release( the_thread, &lock_context );
 
   return previous_state;
 }

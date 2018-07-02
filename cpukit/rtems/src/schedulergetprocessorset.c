@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2017 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2014 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
  *  Dornierstr. 4
@@ -16,7 +16,10 @@
   #include "config.h"
 #endif
 
+#if defined(__RTEMS_HAVE_SYS_CPUSET_H__)
+
 #include <rtems/rtems/tasks.h>
+#include <rtems/score/cpusetimpl.h>
 #include <rtems/score/schedulerimpl.h>
 
 rtems_status_code rtems_scheduler_get_processor_set(
@@ -25,24 +28,23 @@ rtems_status_code rtems_scheduler_get_processor_set(
   cpu_set_t *cpuset
 )
 {
-  const Scheduler_Control    *scheduler;
-  const Processor_mask       *processor_set;
-  Processor_mask_Copy_status  status;
+  const Scheduler_Control *scheduler;
 
   if ( cpuset == NULL ) {
     return RTEMS_INVALID_ADDRESS;
   }
 
-  scheduler = _Scheduler_Get_by_id( scheduler_id );
-  if ( scheduler == NULL ) {
+  if ( !_Scheduler_Get_by_id( scheduler_id, &scheduler ) ) {
     return RTEMS_INVALID_ID;
   }
 
-  processor_set = _Scheduler_Get_processors( scheduler );
-  status = _Processor_mask_To_cpu_set_t( processor_set, cpusetsize, cpuset );
-  if ( status != PROCESSOR_MASK_COPY_LOSSLESS ) {
+  if ( !_CPU_set_Is_large_enough( cpusetsize ) ) {
     return RTEMS_INVALID_NUMBER;
   }
 
+  _Scheduler_Get_processor_set( scheduler, cpusetsize, cpuset );
+
   return RTEMS_SUCCESSFUL;
 }
+
+#endif /* defined(__RTEMS_HAVE_SYS_CPUSET_H__) */

@@ -51,7 +51,7 @@ static void provoke_aligment_or_data_access_exception( void )
 
 static void Init( rtems_task_argument arg )
 {
-  TEST_BEGIN();
+  rtems_test_begink();
 
   provoke_aligment_or_data_access_exception();
 
@@ -60,16 +60,16 @@ static void Init( rtems_task_argument arg )
 
 static void fatal_extension(
   rtems_fatal_source source,
-  bool always_set_to_false,
+  bool is_internal,
   rtems_fatal_code code
 )
 {
   rtems_test_assert( source == RTEMS_FATAL_SOURCE_EXCEPTION );
-  rtems_test_assert( !always_set_to_false );
+  rtems_test_assert( !is_internal );
 
   rtems_exception_frame_print( (const rtems_exception_frame *) code );
 
-  TEST_END();
+  rtems_test_endk();
 }
 
 #define CONFIGURE_INITIAL_EXTENSIONS \

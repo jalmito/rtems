@@ -25,6 +25,8 @@
  * OR MODIFICATIONS.
  */
 
+#define RCSID	"$Id$"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -32,6 +34,8 @@
 #include "fsm.h"
 #include "ccp.h"
 #include <net/ppp_comp.h>
+
+static const char rcsid[] = RCSID;
 
 /*
  * Command-line options.

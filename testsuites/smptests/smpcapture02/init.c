@@ -15,8 +15,6 @@
  *
  */
 
-/* #define VERBOSE 1 */
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -38,7 +36,7 @@ typedef struct  {
   rtems_id id;
   rtems_id task_sem;
   rtems_id prev_sem;
-} per_cpu_task_data;
+} task_data_t;
 
 typedef struct {
   bool found;
@@ -49,45 +47,46 @@ typedef struct {
 } clock_interrupt_handler;
 
 static rtems_id finished_sem;
-static per_cpu_task_data task_data[ TASKS_PER_CPU * TASKS_PER_CPU ];
+static task_data_t task_data[ TASKS_PER_CPU * TASKS_PER_CPU ];
 static rtems_interrupt_handler org_clock_handler;
 
-typedef enum {
+enum cap_rec_types {
   enter_add_number,
   exit_add_number,
   clock_tick
-} cap_rec_type;
+};
 
 /*
  * These records define the data stored in the capture trace.
- * The records must be packed so alignment issues are not a factor.
+ * The records must be 64-bit aligned to make sure that the time
+ * attribute in rtems_capture_record_t is correctly aligned.
  */
 typedef struct {
+  enum cap_rec_types id;
   uint32_t a;
   uint32_t b;
-} RTEMS_PACKED enter_add_number_record;
+} __attribute__ ((aligned (8))) enter_add_number_record_t;
 
 typedef struct {
+  enum cap_rec_types id;
   uint32_t res;
-} RTEMS_PACKED exit_add_number_record;
+} __attribute__ ((aligned (8))) exit_add_number_record_t;
 
 typedef struct {
+  enum cap_rec_types id;
   void *arg;
-} RTEMS_PACKED clock_tick_record;
+} __attribute__ ((aligned (8))) clock_tick_record_t;
 
-/*
- * Create a printable set of char's from a name.
- */
-#define PNAME(n) \
-  (char) (n >> 24) & 0xff, (char) (n >> 16) & 0xff, \
-  (char) (n >> 8) & 0xff, (char) (n >> 0) & 0xff
+typedef struct {
+  enum cap_rec_types id;
+} empty_record_t ;
 
 /*
  * The function that we want to trace
  */
 static uint32_t add_number(uint32_t a, uint32_t b)
 {
-  return a + b;
+  return a+b;
 }
 
 /*
@@ -96,43 +95,31 @@ static uint32_t add_number(uint32_t a, uint32_t b)
  */
 static uint32_t add_number_wrapper(uint32_t a, uint32_t b)
 {
-  rtems_capture_record_lock_context lock;
-  enter_add_number_record enter_rec;
-  exit_add_number_record exit_rec;
-  cap_rec_type id;
+  enter_add_number_record_t enter_rec;
+  exit_add_number_record_t exit_rec;
   uint32_t res;
   void* rec;
 
-  id = enter_add_number;
+  enter_rec.id = enter_add_number;
   enter_rec.a = a;
   enter_rec.b = b;
 
-  rec = rtems_capture_record_open(_Thread_Get_executing(),
-                                  RTEMS_CAPTURE_TIMESTAMP,
-                                  sizeof(id) + sizeof(enter_rec),
-                                  &lock);
-  rtems_test_assert(rec != NULL);
-  rec = rtems_capture_record_append(rec, &id, sizeof(id));
-  rtems_test_assert(rec != NULL);
-  rec = rtems_capture_record_append(rec, &enter_rec, sizeof(enter_rec));
-  rtems_test_assert(rec != NULL);
-  rtems_capture_record_close(&lock);
+  rtems_capture_begin_add_record(_Thread_Get_executing(),
+      RTEMS_CAPTURE_TIMESTAMP, sizeof(rtems_capture_record_t)+
+      sizeof(enter_add_number_record_t), &rec);
+  rec = rtems_capture_append_to_record(rec, &enter_rec, sizeof(enter_rec));
+  rtems_capture_end_add_record(rec);
 
   res = add_number(a, b);
 
-  id = exit_add_number;
+  exit_rec.id = exit_add_number;
   exit_rec.res = res;
 
-  rec = rtems_capture_record_open(_Thread_Get_executing(),
-                                  RTEMS_CAPTURE_TIMESTAMP,
-                                  sizeof(id) + sizeof(exit_rec),
-                                  &lock);
-  rtems_test_assert(rec != NULL);
-  rec = rtems_capture_record_append(rec, &id, sizeof(id));
-  rtems_test_assert(rec != NULL);
-  rec = rtems_capture_record_append(rec, &exit_rec, sizeof(exit_rec));
-  rtems_test_assert(rec != NULL);
-  rtems_capture_record_close(&lock);
+  rtems_capture_begin_add_record(_Thread_Get_executing(),
+      RTEMS_CAPTURE_TIMESTAMP, sizeof(rtems_capture_record_t)+
+      sizeof(exit_add_number_record_t), &rec);
+  rec = rtems_capture_append_to_record(rec, &exit_rec, sizeof(exit_rec));
+  rtems_capture_end_add_record(rec);
 
   return res;
 }
@@ -168,9 +155,10 @@ static void task(rtems_task_argument arg)
   rtems_task_suspend(rtems_task_self());
 }
 
-static void test(uint32_t cpu_count)
+static void test(void)
 {
   rtems_status_code sc;
+  uint32_t cpu_count;
   uint32_t t;
   uint32_t c;
   rtems_task_argument idx;
@@ -182,6 +170,9 @@ static void test(uint32_t cpu_count)
       RTEMS_NO_INHERIT_PRIORITY |
       RTEMS_NO_PRIORITY_CEILING |
       RTEMS_FIFO, 0, &finished_sem);
+
+  /* Get the number of processors that we are using. */
+  cpu_count = rtems_get_processor_count();
 
   /*
    * Create a set of tasks per CPU. Chain them together using
@@ -241,19 +232,15 @@ static void test(uint32_t cpu_count)
 /* Writes an entry in the capture trace for every clock tick */
 static void clock_tick_wrapper(void *arg)
 {
-  rtems_capture_record_lock_context lock;
-  cap_rec_type id  = clock_tick;
-  Thread_Control* tcb = _Thread_Get_executing();
   void* rec;
+  clock_tick_record_t clock_tick_record = {.id = clock_tick};
+  Thread_Control* tcb = _Thread_Get_executing();
 
-  rec = rtems_capture_record_open(tcb,
-                                  RTEMS_CAPTURE_TIMESTAMP,
-                                  sizeof(id),
-                                  &lock);
-  rtems_test_assert(rec != NULL);
-  rec = rtems_capture_record_append(rec, &id, sizeof(id));
-  rtems_test_assert(rec != NULL);
-  rtems_capture_record_close(&lock);
+  rtems_capture_begin_add_record(tcb, RTEMS_CAPTURE_TIMESTAMP,
+      sizeof(rtems_capture_record_t) + sizeof(clock_tick_record_t), &rec);
+  rec = rtems_capture_append_to_record(rec, &clock_tick_record,
+      sizeof(clock_tick_record));
+  rtems_capture_end_add_record(rec);
 
   org_clock_handler(arg);
 }
@@ -279,29 +266,21 @@ static void Init(rtems_task_argument arg)
   rtems_status_code sc;
   uint32_t i;
   uint32_t cpu;
-  uint32_t cpu_count;
+  uint32_t read;
   uint32_t enter_count;
   uint32_t exit_count;
   uint32_t clock_tick_count;
   uint32_t res_should_be;
+  rtems_name name;
+  rtems_capture_record_t *recs;
+  rtems_capture_record_t *prev_rec;
+  empty_record_t *record;
+  enter_add_number_record_t *enter_add_number_rec;
+  exit_add_number_record_t *exit_add_number_rec;
   rtems_vector_number vec;
-  size_t read;
-  const void *recs;
-  cap_rec_type id;
-  rtems_capture_record rec;
-  rtems_capture_record prev_rec;
-  enter_add_number_record enter_rec;
-  exit_add_number_record exit_rec;
   clock_interrupt_handler cih = {.found = 0};
 
-#ifdef VERBOSE
-  rtems_name name;
-#endif
-
   TEST_BEGIN();
-
-  /* Get the number of processors that we are using. */
-  cpu_count = rtems_get_processor_count();
 
   sc = rtems_capture_open(50000, NULL);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
@@ -309,11 +288,11 @@ static void Init(rtems_task_argument arg)
   sc = rtems_capture_watch_global(true);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-  sc = rtems_capture_set_control(true);
+  sc = rtems_capture_control(true);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
   /* Run main test */
-  test(cpu_count);
+  test();
 
   /* Try to find the clock interrupt handler */
   for ( vec=BSP_INTERRUPT_VECTOR_MIN; vec<BSP_INTERRUPT_VECTOR_MAX; vec++ ) {
@@ -337,73 +316,72 @@ static void Init(rtems_task_argument arg)
   }
 
   /* Disable capturing */
-  sc = rtems_capture_set_control(false);
+  sc = rtems_capture_control(false);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
   clock_tick_count = 0;
 
   /* Read out the trace from all processors */
-  for ( cpu = 0; cpu < cpu_count; cpu++ ) {
+  for ( cpu = 0; cpu < rtems_get_processor_count(); cpu++ ) {
     sc = rtems_capture_read(cpu, &read, &recs);
     rtems_test_assert(sc == RTEMS_SUCCESSFUL);
-    rtems_test_assert(recs != NULL);
 
-    memset(&rec, 0, sizeof(rec));
-    prev_rec = rec;
+    prev_rec = recs;
     enter_count = 0;
     exit_count = 0;
     res_should_be = 0;
 
     for ( i = 0; i < read; i++ ) {
 
-      recs = rtems_capture_record_extract(recs, &rec, sizeof(rec));
-      rtems_test_assert(recs != NULL);
-
       /* Verify that time goes forward */
-      rtems_test_assert(rec.time >= prev_rec.time);
+      rtems_test_assert(recs->time>=prev_rec->time);
 
-      if ((rec.events & RTEMS_CAPTURE_TIMESTAMP) != 0) {
-        recs = rtems_capture_record_extract(recs, &id, sizeof(id));
-        rtems_test_assert(recs != NULL);
+      if ( recs->events & RTEMS_CAPTURE_TIMESTAMP ) {
+        record = (empty_record_t*)((char*) recs +
+            sizeof(rtems_capture_record_t));
 
-        switch (id) {
+        switch ( record->id ) {
         case enter_add_number:
-          rtems_test_assert(enter_count == exit_count);
+          rtems_test_assert(enter_count==exit_count);
           enter_count++;
-          recs = rtems_capture_record_extract(recs,
-                                              &enter_rec,
-                                              sizeof(enter_rec));
-          rtems_test_assert(recs != NULL);
-          res_should_be = add_number(enter_rec.a, enter_rec.b);
+          enter_add_number_rec = (enter_add_number_record_t*)record;
+          res_should_be = add_number(enter_add_number_rec->a,
+              enter_add_number_rec->b);
+          rtems_object_get_classic_name(recs->task_id, &name);
+
 #ifdef VERBOSE
           /* Print record */
-          rtems_object_get_classic_name(rec.task_id, &name);
-          printf("Time: %"PRIu64"us Task: %c%c%c%c => Add %"PRIu32" and %"PRIu32" is %"PRIu32"\n",
-                 rec.time / 1000, PNAME(name), enter_rec.a, enter_rec.b, res_should_be);
+          printf("Time: %"PRIu64"us Task: %4s => Add %"PRIu32" and"
+              " %"PRIu32"\n",
+              recs->time/1000,
+              (char*)&name,
+              enter_add_number_rec->a,
+              enter_add_number_rec->b);
 #endif
           break;
         case exit_add_number:
-          rtems_test_assert(enter_count == exit_count+1);
+          rtems_test_assert(enter_count==exit_count+1);
           exit_count++;
-          recs = rtems_capture_record_extract(recs,
-                                              &exit_rec,
-                                              sizeof(exit_rec));
-          rtems_test_assert(recs != NULL);
+          exit_add_number_rec = (exit_add_number_record_t*)record;
+          /* Verify that the result matches the expected result */
+          rtems_test_assert(res_should_be == exit_add_number_rec->res);
+
 #ifdef VERBOSE
           /* Print record */
-          rtems_object_get_classic_name(rec.task_id, &name);
-          printf("Time: %"PRIu64"us Task: %c%c%c%c => Result is %"PRIu32"\n",
-                 rec.time / 1000, PNAME(name), exit_rec.res);
+          rtems_object_get_classic_name(recs->task_id, &name);
+          printf("Time: %"PRIu64"us Task: %4s => Result is %"PRIu32"\n",
+              recs->time/1000,
+              (char*)&name,
+              exit_add_number_rec->res);
 #endif
-          /* Verify that the result matches the expected result */
-          rtems_test_assert(res_should_be == exit_rec.res);
           break;
         case clock_tick:
           clock_tick_count++;
 #ifdef VERBOSE
-          rtems_object_get_classic_name(rec.task_id, &name);
-          printf("Time: %"PRIu64"us Task: %c%c%c%c => Clock tick\n",
-                 rec.time/1000, PNAME(name));
+          rtems_object_get_classic_name(recs->task_id, &name);
+          printf("Time: %"PRIu64"us Task: %4s => Clock tick\n",
+              recs->time/1000,
+              (char*)&name);
 #endif
           break;
         default:
@@ -411,7 +389,8 @@ static void Init(rtems_task_argument arg)
         }
       }
 
-      prev_rec = rec;
+      prev_rec = recs;
+      recs = (rtems_capture_record_t*) ((char*) recs + recs->size);
     }
 
     rtems_test_assert(enter_count == exit_count);
@@ -420,16 +399,20 @@ static void Init(rtems_task_argument arg)
     rtems_capture_release(cpu, read);
   }
 
+  if( cih.found )
+    rtems_test_assert(clock_tick_count == CLOCK_TICKS);
+
   TEST_END();
   rtems_test_exit(0);
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 
+#define CONFIGURE_SMP_APPLICATION
 #define CONFIGURE_SCHEDULER_PRIORITY_AFFINITY_SMP
 
-#define CONFIGURE_MAXIMUM_PROCESSORS MAX_CPUS
+#define CONFIGURE_SMP_MAXIMUM_PROCESSORS MAX_CPUS
 #define CONFIGURE_MAXIMUM_PROCESSORS MAX_CPUS
 #define CONFIGURE_MAXIMUM_SEMAPHORES MAX_CPUS * TASKS_PER_CPU + 1
 #define CONFIGURE_MAXIMUM_TASKS MAX_CPUS * TASKS_PER_CPU + 1

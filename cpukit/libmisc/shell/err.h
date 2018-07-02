@@ -59,7 +59,6 @@
 #define vwarnx rtems_shell_vwarnx
 
 #include <setjmp.h>
-#include <rtems.h>
 
 extern  jmp_buf rtems_shell_bsd_exit_recover;
 

@@ -33,5 +33,8 @@ int pthread_once(
   if ( !once_control || !init_routine )
     return EINVAL;
 
-  return _Once( &once_control->_flags, init_routine );
+  if ( once_control->is_initialized != 1 )
+    return EINVAL;
+
+  return _Once( &once_control->init_executed, init_routine );
 }

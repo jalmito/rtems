@@ -7,7 +7,7 @@
  *  http://www.rtems.org/license/LICENSE.
  */
 
-/* generate fatal errors in termios.c
+/* generate fatal errors in termios.c 
  *    rtems_semaphore_create( rtems_build_name ('T', 'R', 'r', c),...);
  */
 
@@ -16,6 +16,7 @@
 #define FATAL_ERROR_TEST_NAME            "16"
 #define FATAL_ERROR_DESCRIPTION          "termios sem create #1"
 #define FATAL_ERROR_EXPECTED_SOURCE      INTERNAL_ERROR_RTEMS_API
+#define FATAL_ERROR_EXPECTED_IS_INTERNAL FALSE
 #define FATAL_ERROR_EXPECTED_ERROR       RTEMS_TOO_MANY
 
 #define CONFIGURE_APPLICATION_PREREQUISITE_DRIVERS \
@@ -24,6 +25,6 @@
 void force_error()
 {
   /* This fatal error depends on the Termios device configuration */
-  TEST_END();
+  rtems_test_endk();
   rtems_test_exit(0);
 }

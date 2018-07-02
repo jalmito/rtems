@@ -20,35 +20,26 @@
 
 #include <rtems/score/scheduleredfimpl.h>
 
-void _Scheduler_EDF_Update_priority(
+Scheduler_Void_or_thread _Scheduler_EDF_Change_priority(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread,
-  Scheduler_Node          *node
+  Priority_Control         new_priority,
+  bool                     prepend_it
 )
 {
-  Scheduler_EDF_Context *context;
-  Scheduler_EDF_Node    *the_node;
-  Priority_Control       priority;
-  Priority_Control       insert_priority;
+  Scheduler_EDF_Context *context =
+    _Scheduler_EDF_Get_context( scheduler );
+  Scheduler_EDF_Node *node = _Scheduler_EDF_Thread_get_node( the_thread );
 
-  if ( !_Thread_Is_ready( the_thread ) ) {
-    /* Nothing to do */
-    return;
-  }
+  _RBTree_Extract( &context->Ready, &node->Node );
+  _RBTree_Insert(
+    &context->Ready,
+    &node->Node,
+    _Scheduler_EDF_Compare,
+    false
+  );
 
-  the_node = _Scheduler_EDF_Node_downcast( node );
-  insert_priority = _Scheduler_Node_get_priority( &the_node->Base );
-  priority = SCHEDULER_PRIORITY_PURIFY( insert_priority );
-
-  if ( priority == the_node->priority ) {
-    /* Nothing to do */
-    return;
-  }
-
-  the_node->priority = priority;
-  context = _Scheduler_EDF_Get_context( scheduler );
-
-  _Scheduler_EDF_Extract( context, the_node );
-  _Scheduler_EDF_Enqueue( context, the_node, insert_priority );
   _Scheduler_EDF_Schedule_body( scheduler, the_thread, false );
+
+  SCHEDULER_RETURN_VOID_OR_NULL;
 }

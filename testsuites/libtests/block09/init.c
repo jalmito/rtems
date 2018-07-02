@@ -24,11 +24,8 @@
 #include "config.h"
 #endif
 
-#include "tmacros.h"
-
 #include <assert.h>
 #include <errno.h>
-#include <stdlib.h>
 
 #include <rtems.h>
 #include <rtems/bdbuf.h>
@@ -178,7 +175,7 @@ static rtems_task Init(rtems_task_argument argument)
   dev_t dev = 0;
   rtems_disk_device *dd = NULL;
 
-  TEST_BEGIN();
+  rtems_test_begink();
 
   sc = rtems_disk_io_initialize();
   ASSERT_SC(sc);
@@ -226,7 +223,7 @@ static rtems_task Init(rtems_task_argument argument)
   sc = rtems_disk_release(dd);
   ASSERT_SC(sc);
 
-  TEST_END();
+  rtems_test_endk();
 
   exit(0);
 }
@@ -234,7 +231,7 @@ static rtems_task Init(rtems_task_argument argument)
 #define CONFIGURE_INIT
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_LIBBLOCK
 
 #define CONFIGURE_MAXIMUM_TASKS 1

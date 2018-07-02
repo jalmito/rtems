@@ -23,7 +23,6 @@
   #include "config.h"
 #endif
 
-#include <string.h>
 #include <unistd.h>
 
 #include <rtems/libio_.h>

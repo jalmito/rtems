@@ -20,8 +20,13 @@
 
 #include <errno.h>
 #include <pthread.h>
-#include <stddef.h>
-#include <stdbool.h>
+
+#include <rtems/system.h>
+#include <rtems/score/coremuteximpl.h>
+#include <rtems/score/watchdog.h>
+#include <rtems/posix/muteximpl.h>
+#include <rtems/posix/priorityimpl.h>
+#include <rtems/posix/time.h>
 
 /**
  * 11.3.1 Mutex Initialization Attributes, P1003.1c/Draft 10, p. 81
@@ -30,7 +35,7 @@ int pthread_mutexattr_destroy(
   pthread_mutexattr_t *attr
 )
 {
-  if ( attr == NULL || !attr->is_initialized )
+  if ( !attr || !attr->is_initialized )
     return EINVAL;
 
   attr->is_initialized = false;

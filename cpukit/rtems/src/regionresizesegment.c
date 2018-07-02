@@ -18,7 +18,13 @@
 #include "config.h"
 #endif
 
+#include <rtems/system.h>
+#include <rtems/rtems/status.h>
+#include <rtems/rtems/support.h>
+#include <rtems/rtems/options.h>
 #include <rtems/rtems/regionimpl.h>
+#include <rtems/score/thread.h>
+#include <rtems/score/apimutex.h>
 
 rtems_status_code rtems_region_resize_segment(
   rtems_id    id,
@@ -27,46 +33,60 @@ rtems_status_code rtems_region_resize_segment(
   uintptr_t  *old_size
 )
 {
-  uintptr_t           avail_size;
-  uintptr_t           osize;
-  rtems_status_code   status;
-  Heap_Resize_status  resize_status;
-  Region_Control     *the_region;
+  uintptr_t                avail_size;
+  Objects_Locations        location;
+  uintptr_t                osize;
+  rtems_status_code        return_status;
+  Heap_Resize_status       status;
+  Region_Control          *the_region;
 
-  if ( old_size == NULL ) {
+  if ( !old_size )
     return RTEMS_INVALID_ADDRESS;
-  }
 
-  the_region = _Region_Get_and_lock( id );
+  _RTEMS_Lock_allocator();
 
-  if ( the_region == NULL ) {
-    return RTEMS_INVALID_ID;
-  }
+    the_region = _Region_Get( id, &location );
+    switch ( location ) {
 
-  resize_status = _Heap_Resize_block(
-    &the_region->Memory,
-    segment,
-    (uint32_t) size,
-    &osize,
-    &avail_size
-  );
-  *old_size = (uint32_t) osize;
+      case OBJECTS_LOCAL:
 
-  switch ( resize_status ) {
-    case HEAP_RESIZE_SUCCESSFUL:
-      /* Unlocks allocator */
-      _Region_Process_queue( the_region );
-      return RTEMS_SUCCESSFUL;
+        _Region_Debug_Walk( the_region, 7 );
 
-    case HEAP_RESIZE_UNSATISFIED:
-      status = RTEMS_UNSATISFIED;
-      break;
+        status = _Heap_Resize_block(
+          &the_region->Memory,
+          segment,
+          (uint32_t) size,
+          &osize,
+          &avail_size
+        );
+        *old_size = (uint32_t) osize;
 
-    default:
-      status = RTEMS_INVALID_ADDRESS;
-      break;
-  }
+        _Region_Debug_Walk( the_region, 8 );
 
-  _Region_Unlock( the_region );
-  return status;
+        if ( status == HEAP_RESIZE_SUCCESSFUL )
+          /* unlocks allocator */
+          _Region_Process_queue( the_region );
+        else
+          _RTEMS_Unlock_allocator();
+
+
+        if (status == HEAP_RESIZE_SUCCESSFUL)
+          return RTEMS_SUCCESSFUL;
+        if (status == HEAP_RESIZE_UNSATISFIED)
+          return RTEMS_UNSATISFIED;
+        return RTEMS_INVALID_ADDRESS;
+        break;
+
+#if defined(RTEMS_MULTIPROCESSING)
+      case OBJECTS_REMOTE:        /* this error cannot be returned */
+#endif
+
+      case OBJECTS_ERROR:
+      default:
+        return_status = RTEMS_INVALID_ID;
+        break;
+    }
+
+  _RTEMS_Unlock_allocator();
+  return return_status;
 }

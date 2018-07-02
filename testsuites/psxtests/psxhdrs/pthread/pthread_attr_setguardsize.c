@@ -14,6 +14,7 @@
 #include "config.h"
 #endif
 
+#if HAVE_DECL_PTHREAD_ATTR_SETGUARDSIZE
 #include <pthread.h>
 #include <limits.h>  /* only for PTHREAD_STACK_MIN */
 
@@ -35,3 +36,4 @@ int test( void )
 
   return result;
 }
+#endif

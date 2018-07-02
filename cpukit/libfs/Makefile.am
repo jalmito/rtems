@@ -1,8 +1,9 @@
 include $(top_srcdir)/automake/multilib.am
 include $(top_srcdir)/automake/compile.am
 
-_SUBDIRS = src/nfsclient
+SUBDIRS = src/nfsclient
 
+EXTRA_DIST = README
 
 noinst_LIBRARIES = libdefaultfs.a
 libdefaultfs_a_SOURCES = \
@@ -32,7 +33,6 @@ libdefaultfs_a_SOURCES = \
     src/defaults/default_ftruncate_directory.c \
     src/defaults/default_handlers.c src/defaults/default_ops.c
 libdefaultfs_a_SOURCES += src/defaults/default_kqfilter.c
-libdefaultfs_a_SOURCES += src/defaults/default_mmap.c
 libdefaultfs_a_SOURCES += src/defaults/default_poll.c
 libdefaultfs_a_SOURCES += src/defaults/default_readv.c
 libdefaultfs_a_SOURCES += src/defaults/default_writev.c
@@ -59,7 +59,6 @@ libimfs_a_SOURCES += src/imfs/deviceio.c \
     src/imfs/imfs_stat.c src/imfs/imfs_stat_file.c src/imfs/imfs_symlink.c \
     src/imfs/imfs_unmount.c src/imfs/imfs_utime.c src/imfs/ioman.c \
     src/imfs/imfs_memfile.c src/imfs/imfs.h
-libimfs_a_SOURCES += src/imfs/imfs_node.c
 
 # POSIX FIFO/pipe
 libimfs_a_SOURCES += src/pipe/fifo.c src/pipe/pipe.c src/pipe/pipe.h
@@ -111,14 +110,10 @@ librfs_a_SOURCES = \
 
 # JFFS2
 project_lib_LIBRARIES = libjffs2.a
-
-$(PROJECT_LIB)/libjffs2.a: libjffs2.a
-	$(INSTALL_DATA) $< $(PROJECT_LIB)/libjffs2.a
-TMPINSTALL_FILES = $(PROJECT_LIB)/libjffs2.a
-
 libjffs2_a_SOURCES =
 libjffs2_a_SOURCES += src/jffs2/src/build.c
 libjffs2_a_SOURCES += src/jffs2/src/compat-crc32.c
+libjffs2_a_SOURCES += src/jffs2/src/compat-rbtree.c
 libjffs2_a_SOURCES += src/jffs2/src/compr.c
 libjffs2_a_SOURCES += src/jffs2/src/compr_rtime.c
 libjffs2_a_SOURCES += src/jffs2/src/compr_zlib.c
@@ -139,7 +134,10 @@ libjffs2_a_CFLAGS =
 libjffs2_a_CFLAGS += -Wno-pointer-sign
 libjffs2_a_CPPFLAGS =
 libjffs2_a_CPPFLAGS += $(AM_CPPFLAGS) -I$(srcdir)/src/jffs2/include
+libjffs2_a_CPPFLAGS += -D__ECOS
+libjffs2_a_CPPFLAGS += '-DKBUILD_MODNAME="JFFS2"'
 
 # ---
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/automake/subdirs.am
 include $(top_srcdir)/automake/local.am

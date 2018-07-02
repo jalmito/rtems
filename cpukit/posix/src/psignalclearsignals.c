@@ -30,6 +30,7 @@
 #include <rtems/posix/threadsup.h>
 #include <rtems/posix/psignalimpl.h>
 #include <rtems/posix/pthreadimpl.h>
+#include <rtems/posix/time.h>
 #include <stdio.h>
 
 /*
@@ -46,8 +47,8 @@ bool _POSIX_signals_Clear_signals(
 )
 {
   sigset_t                    mask;
-  sigset_t                    signals_unblocked;
-  Thread_queue_Context        queue_context;
+  sigset_t                    signals_blocked;
+  ISR_lock_Context            lock_context;
   bool                        do_callout;
   POSIX_signals_Siginfo_node *psiginfo;
 
@@ -60,20 +61,19 @@ bool _POSIX_signals_Clear_signals(
    */
 
   if ( check_blocked )
-    signals_unblocked = api->signals_unblocked;
+    signals_blocked = ~api->signals_blocked;
   else
-    signals_unblocked = SIGNAL_ALL_MASK;
+    signals_blocked = SIGNAL_ALL_MASK;
 
   /* XXX is this right for siginfo type signals? */
   /* XXX are we sure they can be cleared the same way? */
 
   if ( do_signals_acquire_release ) {
-    _Thread_queue_Context_initialize( &queue_context );
-    _POSIX_signals_Acquire( &queue_context );
+    _POSIX_signals_Acquire( &lock_context );
   }
 
     if ( is_global ) {
-       if ( mask & (_POSIX_signals_Pending & signals_unblocked) ) {
+       if ( mask & (_POSIX_signals_Pending & signals_blocked) ) {
          if ( _POSIX_signals_Vectors[ signo ].sa_flags == SA_SIGINFO ) {
            psiginfo = (POSIX_signals_Siginfo_node *)
              _Chain_Get_unprotected( &_POSIX_signals_Siginfo[ signo ] );
@@ -96,14 +96,14 @@ bool _POSIX_signals_Clear_signals(
          do_callout = true;
        }
     } else {
-      if ( mask & (api->signals_pending & signals_unblocked) ) {
+      if ( mask & (api->signals_pending & signals_blocked) ) {
         api->signals_pending &= ~mask;
         do_callout = true;
       }
     }
 
   if ( do_signals_acquire_release ) {
-    _POSIX_signals_Release( &queue_context );
+    _POSIX_signals_Release( &lock_context );
   }
 
   return do_callout;

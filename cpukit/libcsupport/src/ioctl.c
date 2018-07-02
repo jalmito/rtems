@@ -39,7 +39,9 @@ int ioctl(
   rtems_libio_t     *iop;
   void              *buffer;
 
-  LIBIO_GET_IOP( fd, iop );
+  rtems_libio_check_fd( fd );
+  iop = rtems_libio_iop( fd );
+  rtems_libio_check_is_open(iop);
 
   va_start(ap, command);
 
@@ -51,6 +53,5 @@ int ioctl(
   rc = (*iop->pathinfo.handlers->ioctl_h)( iop, command, buffer );
 
   va_end( ap );
-  rtems_libio_iop_drop( iop );
   return rc;
 }

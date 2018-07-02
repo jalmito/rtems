@@ -27,15 +27,12 @@ RTEMS_INTERRUPT_LOCK_DEFINE( static, report_lock, "test report" )
 
 void rtems_test_fatal_extension(
   rtems_fatal_source source,
-  bool always_set_to_false,
+  bool is_internal,
   rtems_fatal_code code
 )
 {
 #if defined(RTEMS_PROFILING)
   rtems_interrupt_lock_context lock_context;
-  rtems_printer printer;
-
-  rtems_print_printer_printk( &printer );
 
   /*
    * Ensures to report only once on SMP machines and ensures that the report is
@@ -53,7 +50,8 @@ void rtems_test_fatal_extension(
 
     rtems_profiling_report_xml(
       rtems_test_name,
-      &printer,
+      printk_plugin,
+      NULL,
       1,
       "  "
     );
@@ -68,6 +66,6 @@ void rtems_test_fatal_extension(
 #endif
 
   (void) source;
-  (void) always_set_to_false;
+  (void) is_internal;
   (void) code;
 }

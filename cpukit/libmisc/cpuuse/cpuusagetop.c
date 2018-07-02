@@ -32,7 +32,6 @@
 #include <inttypes.h>
 
 #include <rtems/cpuuse.h>
-#include <rtems/printer.h>
 #include <rtems/malloc.h>
 #include <rtems/score/objectimpl.h>
 #include <rtems/score/protectedheap.h>
@@ -41,7 +40,14 @@
 #include <rtems/score/watchdogimpl.h>
 #include <rtems/score/wkspace.h>
 
-#include "cpuuseimpl.h"
+/*
+ * Common variable to sync the load monitor task.
+ */
+typedef struct
+{
+  void*                  context;
+  rtems_printk_plugin_t  print;
+} rtems_cpu_usage_plugin;
 
 /*
  * Use a struct for all data to allow more than one top and to support the
@@ -55,8 +61,8 @@ typedef struct
   volatile uint32_t      sort_order;
   volatile uint32_t      poll_rate_usecs;
   volatile uint32_t      show;
-  const rtems_printer*   printer;
-  Timestamp_Control      zero;
+  rtems_cpu_usage_plugin plugin;
+  Thread_CPU_usage_t     zero;
   Timestamp_Control      uptime;
   Timestamp_Control      last_uptime;
   Timestamp_Control      period;
@@ -65,9 +71,9 @@ typedef struct
   int                    task_size;         /* The size of the arrays */
   Thread_Control**       tasks;             /* List of tasks in this sample. */
   Thread_Control**       last_tasks;        /* List of tasks in the last sample. */
-  Timestamp_Control*     usage;             /* Usage of task's in this sample. */
-  Timestamp_Control*     last_usage;        /* Usage of task's in the last sample. */
-  Timestamp_Control*     current_usage;     /* Current usage for this sample. */
+  Thread_CPU_usage_t*    usage;             /* Usage of task's in this sample. */
+  Thread_CPU_usage_t*    last_usage;        /* Usage of task's in the last sample. */
+  Thread_CPU_usage_t*    current_usage;     /* Current usage for this sample. */
   Timestamp_Control      total;             /* Total run run, should equal the uptime. */
   Timestamp_Control      idle;              /* Time spent in idle. */
   Timestamp_Control      current;           /* Current time run in this period. */
@@ -85,6 +91,43 @@ typedef struct
 #define RTEMS_TOP_SORT_CURRENT       (4)
 #define RTEMS_TOP_SORT_MAX           (4)
 
+/*
+ * Private version of the iterator with an arg. This will be moved
+ * to the public version in 5.0.
+ */
+
+typedef void (*rtems_per_thread_routine_2)( Thread_Control *, void* );
+
+void rtems_iterate_over_all_threads_2(rtems_per_thread_routine_2 routine,
+                                      void*                      arg);
+
+void rtems_iterate_over_all_threads_2(rtems_per_thread_routine_2 routine,
+                                      void*                      arg)
+{
+  uint32_t             i;
+  uint32_t             api_index;
+  Thread_Control      *the_thread;
+  Objects_Information *information;
+
+  if ( !routine )
+    return;
+
+  for ( api_index = 1 ; api_index <= OBJECTS_APIS_LAST ; api_index++ ) {
+    #if !defined(RTEMS_POSIX_API) || defined(RTEMS_DEBUG)
+      if ( !_Objects_Information_table[ api_index ] )
+        continue;
+    #endif
+    information = _Objects_Information_table[ api_index ][ 1 ];
+    if ( information ) {
+      for ( i=1 ; i <= information->maximum ; i++ ) {
+        the_thread = (Thread_Control *)information->local_table[ i ];
+        if ( the_thread )
+          (*routine)(the_thread, arg);
+      }
+    }
+  }
+}
+
 static inline bool equal_to_uint32_t( uint32_t * lhs, uint32_t * rhs )
 {
    if ( *lhs == *rhs )
@@ -101,19 +144,27 @@ static inline bool less_than_uint32_t( uint32_t * lhs, uint32_t * rhs )
     return false;
 }
 
-#define CPU_usage_Equal_to( _lhs, _rhs )  _Timestamp_Equal_to( _lhs, _rhs )
-#define CPU_usage_Set_to_zero( _time )    _Timestamp_Set_to_zero( _time )
-#define CPU_usage_Less_than( _lhs, _rhs ) _Timestamp_Less_than( _lhs, _rhs )
+#define CPU_usage_Equal_to( _lhs, _rhs ) \
+	_Timestamp_Equal_to( _lhs, _rhs )
+
+#define CPU_usage_Set_to_zero( _time ) \
+       _Timestamp_Set_to_zero( _time )
+
+#define CPU_usage_Less_than( _lhs, _rhs ) \
+      _Timestamp_Less_than( _lhs, _rhs )
 
 static void
-print_memsize(rtems_cpu_usage_data* data, const uintptr_t size, const char* label)
+print_memsize(rtems_cpu_usage_data* data, const uint32_t size, const char* label)
 {
   if (size > (1024 * 1024))
-    rtems_printf(data->printer, "%4" PRIuPTR "M %s", size / (1024 * 1024), label);
+    (*data->plugin.print)(data->plugin.context, "%4" PRIu32 "M %s",
+                          size / (1024 * 1024), label);
   else if (size > 1024)
-    rtems_printf(data->printer, "%4" PRIuPTR "K %s", size / 1024, label);
+    (*data->plugin.print)(data->plugin.context, "%4" PRIu32 "K %s",
+                          size / 1024, label);
   else
-    rtems_printf(data->printer, "%4" PRIuPTR " %s", size, label);
+    (*data->plugin.print)(data->plugin.context, "%4" PRIu32 " %s",
+                          size, label);
 }
 
 static int
@@ -133,19 +184,19 @@ print_time(rtems_cpu_usage_data*    data,
       uint32_t hours = mins / 60;
       if (hours > 24)
       {
-        len += rtems_printf(data->printer, "%" PRIu32 "d", hours / 24);
+        len += (*data->plugin.print)(data->plugin.context, "%" PRIu32 "d", hours / 24);
         hours %= 24;
       }
-      len += rtems_printf(data->printer, "%" PRIu32 "hr", hours);
+      len += (*data->plugin.print)(data->plugin.context, "%" PRIu32 "hr", hours);
       mins %= 60;
     }
-    len += rtems_printf(data->printer, "%" PRIu32 "m", mins);
+    len += (*data->plugin.print)(data->plugin.context, "%" PRIu32 "m", mins);
     secs %= 60;
   }
-  len += rtems_printf(data->printer, "%" PRIu32 ".%06" PRIu32, secs, usecs);
+  len += (*data->plugin.print)(data->plugin.context, "%" PRIu32 ".%06" PRIu32, secs, usecs);
 
   if (len < length)
-    rtems_printf(data->printer, "%*c", length - len, ' ');
+    (*data->plugin.print)(data->plugin.context, "%*c", length - len, ' ');
 
   return len;
 }
@@ -153,29 +204,25 @@ print_time(rtems_cpu_usage_data*    data,
 /*
  * Count the number of tasks.
  */
-static bool
+static void
 task_counter(Thread_Control *thrad, void* arg)
 {
   rtems_cpu_usage_data* data = (rtems_cpu_usage_data*) arg;
   ++data->task_count;
-
-  return false;
 }
 
 /*
  * Create the sorted table with the current and total usage.
  */
-static bool
+static void
 task_usage(Thread_Control* thread, void* arg)
 {
   rtems_cpu_usage_data* data = (rtems_cpu_usage_data*) arg;
-  Timestamp_Control     usage;
-  Timestamp_Control     current = data->zero;
+  Thread_CPU_usage_t    usage = thread->cpu_time_used;
+  Thread_CPU_usage_t    current = data->zero;
   int                   j;
 
   data->stack_size += thread->Start.Initial_stack.size;
-
-  _Thread_Get_CPU_time_used(thread, &usage);
 
   for (j = 0; j < data->last_task_count; j++)
   {
@@ -226,15 +273,11 @@ task_usage(Thread_Control* thread, void* arg)
               CPU_usage_Less_than(&usage, &data->usage[j]))
             continue;
         case RTEMS_TOP_SORT_REAL_PRI:
-          if (thread->Real_priority.priority > data->tasks[j]->Real_priority.priority)
+          if (thread->real_priority > data->tasks[j]->real_priority)
             continue;
         case RTEMS_TOP_SORT_CURRENT_PRI:
-          if (
-            _Thread_Get_priority( thread )
-              > _Thread_Get_priority( data->tasks[j] )
-          ) {
+          if (thread->current_priority > data->tasks[j]->current_priority)
             continue;
-          }
         case RTEMS_TOP_SORT_ID:
           if (thread->Object.id < data->tasks[j]->Object.id)
             continue;
@@ -252,8 +295,6 @@ task_usage(Thread_Control* thread, void* arg)
     data->current_usage[j] = current;
     break;
   }
-
-  return false;
 }
 
 /*
@@ -289,10 +330,10 @@ rtems_cpuusage_top_thread (rtems_task_argument arg)
     Timestamp_Control load;
 
     data->task_count = 0;
-    _Thread_Iterate(task_counter, data);
+    rtems_iterate_over_all_threads_2(task_counter, data);
 
     tasks_size = sizeof(Thread_Control*) * (data->task_count + 1);
-    usage_size = sizeof(Timestamp_Control) * (data->task_count + 1);
+    usage_size = sizeof(Thread_CPU_usage_t) * (data->task_count + 1);
 
     if (data->task_count > data->task_size)
     {
@@ -301,7 +342,7 @@ rtems_cpuusage_top_thread (rtems_task_argument arg)
       data->current_usage = realloc(data->current_usage, usage_size);
       if ((data->tasks == NULL) || (data->usage == NULL) || (data->current_usage == NULL))
       {
-        rtems_printf(data->printer, "top worker: error: no memory\n");
+        (*data->plugin.print)(data->plugin.context, "top worker: error: no memory\n");
         data->thread_run = false;
         break;
       }
@@ -320,7 +361,7 @@ rtems_cpuusage_top_thread (rtems_task_argument arg)
     _Timestamp_Subtract(&data->last_uptime, &data->uptime, &data->period);
     data->last_uptime = data->uptime;
 
-    _Thread_Iterate(task_usage, data);
+    rtems_iterate_over_all_threads_2(task_usage, data);
 
     if (data->task_count > data->task_size)
     {
@@ -328,7 +369,7 @@ rtems_cpuusage_top_thread (rtems_task_argument arg)
       data->last_usage = realloc(data->last_usage, usage_size);
       if ((data->last_tasks == NULL) || (data->last_usage == NULL))
       {
-        rtems_printf(data->printer, "top worker: error: no memory\n");
+        (*data->plugin.print)(data->plugin.context, "top worker: error: no memory\n");
         data->thread_run = false;
         break;
       }
@@ -353,43 +394,43 @@ rtems_cpuusage_top_thread (rtems_task_argument arg)
     _Protected_heap_Get_information(&_Workspace_Area, &wksp);
 
     if (data->single_page)
-      rtems_printf(data->printer,
-                   "\x1b[H\x1b[J"
-                   " ENTER:Exit  SPACE:Refresh"
-                   "  S:Scroll  A:All  <>:Order  +/-:Lines\n");
-    rtems_printf(data->printer, "\n");
+      (*data->plugin.print)(data->plugin.context,
+                            "\x1b[H\x1b[J"
+                            " ENTER:Exit  SPACE:Refresh"
+                            "  S:Scroll  A:All  <>:Order  +/-:Lines\n");
+    (*data->plugin.print)(data->plugin.context,"\n");
 
     /*
      * Uptime and period of this sample.
      */
-    rtems_printf(data->printer, "Uptime: ");
+    (*data->plugin.print)(data->plugin.context, "Uptime: ");
     print_time(data, &data->uptime, 20);
-    rtems_printf(data->printer, " Period: ");
+    (*data->plugin.print)(data->plugin.context, " Period: ");
     print_time(data, &data->period, 20);
 
     /*
      * Task count, load and idle levels.
      */
-    rtems_printf(data->printer, "\nTasks: %4i  ", data->task_count);
+    (*data->plugin.print)(data->plugin.context, "\nTasks: %4i  ", data->task_count);
 
     _Timestamp_Subtract(&data->idle, &data->total, &load);
     _Timestamp_Divide(&load, &data->uptime, &ival, &fval);
-    rtems_printf(data->printer,
-                 "Load Average: %4" PRIu32 ".%03" PRIu32 "%%", ival, fval);
+    (*data->plugin.print)(data->plugin.context,
+                          "Load Average: %4" PRIu32 ".%03" PRIu32 "%%", ival, fval);
     _Timestamp_Subtract(&data->current_idle, &data->current, &load);
     _Timestamp_Divide(&load, &data->period, &ival, &fval);
-    rtems_printf(data->printer,
-                 "  Load: %4" PRIu32 ".%03" PRIu32 "%%", ival, fval);
+    (*data->plugin.print)(data->plugin.context,
+                          "  Load: %4" PRIu32 ".%03" PRIu32 "%%", ival, fval);
     _Timestamp_Divide(&data->current_idle, &data->period, &ival, &fval);
-    rtems_printf(data->printer,
-                 "  Idle: %4" PRIu32 ".%03" PRIu32 "%%", ival, fval);
+    (*data->plugin.print)(data->plugin.context,
+                          "  Idle: %4" PRIu32 ".%03" PRIu32 "%%", ival, fval);
 
     /*
      * Memory usage.
      */
     if (rtems_configuration_get_unified_work_area())
     {
-      rtems_printf(data->printer, "\nMem: ");
+      (*data->plugin.print)(data->plugin.context, "\nMem: ");
       print_memsize(data, wksp.Free.total, "free");
       print_memsize(data, wksp.Used.total, "used");
     }
@@ -397,7 +438,7 @@ rtems_cpuusage_top_thread (rtems_task_argument arg)
     {
       region_information_block libc_heap;
       malloc_info(&libc_heap);
-      rtems_printf(data->printer, "\nMem: Wksp: ");
+      (*data->plugin.print)(data->plugin.context, "\nMem: Wksp: ");
       print_memsize(data, wksp.Free.total, "free");
       print_memsize(data, wksp.Used.total, "used  Heap: ");
       print_memsize(data, libc_heap.Free.total, "free");
@@ -406,7 +447,7 @@ rtems_cpuusage_top_thread (rtems_task_argument arg)
 
     print_memsize(data, data->stack_size, "stack\n");
 
-    rtems_printf(data->printer,
+    (*data->plugin.print)(data->plugin.context,
        "\n"
         " ID         | NAME                | RPRI | CPRI   | TIME                | TOTAL   | CURRENT\n"
         "-%s---------+---------------------+-%s-----%s-----+---------------------+-%s------+--%s----\n",
@@ -422,6 +463,7 @@ rtems_cpuusage_top_thread (rtems_task_argument arg)
     for (i = 0; i < data->task_count; i++)
     {
       Thread_Control*   thread = data->tasks[i];
+      Timestamp_Control last;
       Timestamp_Control usage;
       Timestamp_Control current_usage;
 
@@ -442,28 +484,47 @@ rtems_cpuusage_top_thread (rtems_task_argument arg)
        */
       rtems_object_get_name(thread->Object.id, sizeof(name), name);
       if (name[0] == '\0')
-        snprintf(name, sizeof(name) - 1, "(%p)", thread->Start.Entry.Kinds.Numeric.entry);
+        snprintf(name, sizeof(name) - 1, "(%p)", thread->Start.entry_point);
 
-      rtems_printf(data->printer,
-                   " 0x%08" PRIx32 " | %-19s |  %3" PRId64 " |  %3" PRId64 "   | ",
-                   thread->Object.id,
-                   name,
-                   thread->Real_priority.priority,
-                   _Thread_Get_priority(thread));
+      (*data->plugin.print)(data->plugin.context,
+                            " 0x%08" PRIx32 " | %-19s |  %3" PRId32 " |  %3" PRId32 "   | ",
+                            thread->Object.id,
+                            name,
+                            thread->real_priority,
+                            thread->current_priority);
 
       usage = data->usage[i];
       current_usage = data->current_usage[i];
+
+      /*
+       * If this is the currently executing thread, account for time since
+       * the last context switch.
+       */
+      if (_Thread_Get_time_of_last_context_switch(thread, &last))
+      {
+        Timestamp_Control used;
+        Timestamp_Control now;
+
+        /*
+         * Get the current uptime and assume we are not pre-empted to
+         * measure the time from the last switch this thread and now.
+         */
+        _TOD_Get_uptime(&now);
+        _Timestamp_Subtract(&last, &now, &used);
+        _Timestamp_Add_to(&usage, &used);
+        _Timestamp_Add_to(&current_usage, &used);
+      }
 
       /*
        * Print the information
        */
       print_time(data, &usage, 19);
       _Timestamp_Divide(&usage, &data->total, &ival, &fval);
-      rtems_printf(data->printer,
-                   " |%4" PRIu32 ".%03" PRIu32, ival, fval);
+      (*data->plugin.print)(data->plugin.context,
+                            " |%4" PRIu32 ".%03" PRIu32, ival, fval);
       _Timestamp_Divide(&current_usage, &data->period, &ival, &fval);
-      rtems_printf(data->printer,
-                   " |%4" PRIu32 ".%03" PRIu32 "\n", ival, fval);
+      (*data->plugin.print)(data->plugin.context,
+                            " |%4" PRIu32 ".%03" PRIu32 "\n", ival, fval);
     }
 
     if (data->single_page && (data->show != 0) && (task_count < data->show))
@@ -471,7 +532,7 @@ rtems_cpuusage_top_thread (rtems_task_argument arg)
       i = data->show - task_count;
       while (i > 0)
       {
-        rtems_printf(data->printer, "\x1b[K\n");
+        (*data->plugin.print)(data->plugin.context, "\x1b[K\n");
         i--;
       }
     }
@@ -482,8 +543,8 @@ rtems_cpuusage_top_thread (rtems_task_argument arg)
                              &out);
     if ((sc != RTEMS_SUCCESSFUL) && (sc != RTEMS_TIMEOUT))
     {
-      rtems_printf(data->printer,
-                   "error: event receive: %s\n", rtems_status_text(sc));
+      (*data->plugin.print)(data->plugin.context,
+                            "error: event receive: %s\n", rtems_status_text(sc));
       break;
     }
   }
@@ -499,7 +560,8 @@ rtems_cpuusage_top_thread (rtems_task_argument arg)
 }
 
 void rtems_cpu_usage_top_with_plugin(
-  const rtems_printer *printer
+  void                  *context,
+  rtems_printk_plugin_t  print
 )
 {
   rtems_status_code      sc;
@@ -509,6 +571,9 @@ void rtems_cpu_usage_top_with_plugin(
   rtems_cpu_usage_data   data;
   int                    show_lines = 25;
 
+  if ( !print )
+    return;
+
   memset(&data, 0, sizeof(data));
 
   data.thread_run = true;
@@ -516,14 +581,18 @@ void rtems_cpu_usage_top_with_plugin(
   data.sort_order = RTEMS_TOP_SORT_CURRENT;
   data.poll_rate_usecs = 3000;
   data.show = show_lines;
-  data.printer = printer;
+  data.plugin.context = context;
+  data.plugin.print = print;
 
   sc = rtems_task_set_priority (RTEMS_SELF, RTEMS_CURRENT_PRIORITY, &priority);
 
   if (sc != RTEMS_SUCCESSFUL)
   {
-    rtems_printf (printer,
-                  "error: cannot obtain the current priority: %s\n", rtems_status_text (sc));
+    (*print)(
+       context,
+       "error: cannot obtain the current priority: %s\n",
+       rtems_status_text (sc)
+    );
     return;
   }
 
@@ -536,16 +605,24 @@ void rtems_cpu_usage_top_with_plugin(
 
   if (sc != RTEMS_SUCCESSFUL)
   {
-    rtems_printf (printer,
-                  "error: cannot create helper thread: %s\n", rtems_status_text (sc));
+    (*print)(
+       context,
+       "error: cannot create helper thread: %s\n",
+       rtems_status_text (sc)
+    );
     return;
   }
 
-  sc = rtems_task_start (id, rtems_cpuusage_top_thread, (rtems_task_argument) &data);
+  sc = rtems_task_start (
+    id, rtems_cpuusage_top_thread, (rtems_task_argument) &data
+  );
   if (sc != RTEMS_SUCCESSFUL)
   {
-    rtems_printf (printer,
-                  "error: cannot start helper thread: %s\n", rtems_status_text (sc));
+    (*print)(
+       context,
+       "error: cannot start helper thread: %s\n",
+       rtems_status_text (sc)
+    );
     rtems_task_delete (id);
     return;
   }
@@ -565,7 +642,7 @@ void rtems_cpu_usage_top_with_plugin(
       while (loops && data.thread_active)
         rtems_task_wake_after (RTEMS_MICROSECONDS_TO_TICKS (100000));
 
-      rtems_printf (printer, "load monitoring stopped.\n");
+      (*print)(context, "load monitoring stopped.\n");
       return;
     }
     else if (c == '<')
@@ -617,9 +694,7 @@ void rtems_cpu_usage_top_with_plugin(
   }
 }
 
-void rtems_cpu_usage_top (void)
+void rtems_cpu_usage_top( void )
 {
-  rtems_printer printer;
-  rtems_print_printer_printk (&printer);
-  rtems_cpu_usage_top_with_plugin (&printer);
+  rtems_cpu_usage_top_with_plugin( NULL, printk_plugin );
 }

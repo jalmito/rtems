@@ -566,25 +566,16 @@ fat_init_volume_info(fat_fs_info_t *fs_info, const char *device)
     for (vol->spc_log2 = 0, i = vol->spc; (i & 1) == 0;
          i >>= 1, vol->spc_log2++);
 
-<<<<<<< HEAD
     /*
      * "bytes per cluster" value greater than 32K is invalid
      */
     if (vol->bps > (MS_BYTES_PER_CLUSTER_LIMIT >> vol->spc_log2))
-=======
-    /* Sectors per cluster must be a power of two */
-    if (vol->spc != UINT32_C(1) << vol->spc_log2)
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
     {
         close(vol->fd);
         rtems_set_errno_and_return_minus_one(EINVAL);
     }
 
-<<<<<<< HEAD
     vol->bpc = vol->bps << vol->spc_log2;
-=======
-    vol->bpc = ((uint32_t) vol->bps) << vol->spc_log2;
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 
     for (vol->bpc_log2 = 0, i = vol->bpc; (i & 1) == 0;
          i >>= 1, vol->bpc_log2++);

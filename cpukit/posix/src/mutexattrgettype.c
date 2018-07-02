@@ -20,7 +20,13 @@
 
 #include <errno.h>
 #include <pthread.h>
-#include <stddef.h>
+
+#include <rtems/system.h>
+#include <rtems/score/coremuteximpl.h>
+#include <rtems/score/watchdog.h>
+#include <rtems/posix/muteximpl.h>
+#include <rtems/posix/priorityimpl.h>
+#include <rtems/posix/time.h>
 
 #if defined(_UNIX98_THREAD_MUTEX_ATTRIBUTES)
 int pthread_mutexattr_gettype(
@@ -28,7 +34,13 @@ int pthread_mutexattr_gettype(
   int                       *type
 )
 {
-  if ( attr == NULL || !attr->is_initialized || type == NULL )
+  if ( !attr )
+    return EINVAL;
+
+  if ( !attr->is_initialized )
+    return EINVAL;
+
+  if ( !type )
     return EINVAL;
 
   *type = attr->type;

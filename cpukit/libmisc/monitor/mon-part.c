@@ -7,7 +7,7 @@
 #endif
 
 #include <rtems.h>
-#include <rtems/monitor.h>
+#include "monitor.h"
 #include <rtems/rtems/attrimpl.h>
 #include <stdio.h>
 #include <string.h>    /* memcpy() */
@@ -30,7 +30,7 @@ rtems_monitor_part_canonical(
 
 void
 rtems_monitor_part_dump_header(
-    bool verbose RTEMS_UNUSED
+    bool verbose __attribute__((unused))
 )
 {
     printf("\
@@ -47,7 +47,7 @@ rtems_monitor_part_dump_header(
 void
 rtems_monitor_part_dump(
     rtems_monitor_part_t *monitor_part,
-    bool  verbose RTEMS_UNUSED
+    bool  verbose __attribute__((unused))
 )
 {
     int length = 0;

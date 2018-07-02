@@ -14,7 +14,7 @@
 #define CONFIGURE_INIT
 #include "system.h"
 #include <stdio.h>
-#include <tmacros.h>
+#include <stdlib.h> /* exit */
 
 extern int paranoia(int, char **);
 
@@ -35,9 +35,8 @@ rtems_task Init(
   M68KFPSPInstallExceptionHandlers ();
 #endif
 
-  rtems_print_printer_fprintf_putc(&rtems_test_printer);
-  TEST_BEGIN();
+  rtems_test_begin();
   paranoia(1, args);
-  TEST_END();
-  rtems_test_exit( 0 );
+  rtems_test_end();
+  exit( 0 );
 }

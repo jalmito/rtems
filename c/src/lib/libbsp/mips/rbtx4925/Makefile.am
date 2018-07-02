@@ -1,55 +1,73 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
-include $(top_srcdir)/../../bsp.am
 
-dist_project_lib_DATA = ../../../../../../bsps/mips/rbtx4925/start/bsp_specs
+include_bspdir = $(includedir)/bsp
 
+dist_project_lib_DATA = bsp_specs
+
+include_HEADERS = include/bsp.h
+include_HEADERS += ../../shared/include/tm27.h
+include_bsp_HEADERS = ../shared/liblnk/regs.h
 #isr
+include_bsp_HEADERS += ../../shared/include/irq-generic.h
+include_bsp_HEADERS += ../../shared/include/irq-info.h
+include_bsp_HEADERS += include/irq.h
+
+nodist_include_HEADERS = include/bspopts.h
+nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
+DISTCLEANFILES = include/bspopts.h
 
 noinst_PROGRAMS =
 
+nodist_include_HEADERS += ../../shared/include/coverhd.h
 
-start.$(OBJEXT): ../../../../../../bsps/mips/rbtx4925/start/start.S
-	$(CPPASCOMPILE) -o $@ -c $<
+noinst_LIBRARIES = libbspstart.a
+libbspstart_a_SOURCES = start/start.S
 project_lib_DATA = start.$(OBJEXT)
 
-project_lib_DATA += linkcmds
+dist_project_lib_DATA += startup/linkcmds
 
-project_lib_LIBRARIES = librtemsbsp.a
-librtemsbsp_a_SOURCES =
+noinst_LIBRARIES += libbsp.a
+libbsp_a_SOURCES =
 
 # startup
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-empty.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/rbtx4925/start/bspstart.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/rbtx4925/start/inittlb.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/start/idttlb.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/start/idtmem.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/irq/exception.S
+libbsp_a_SOURCES += ../../shared/bspclean.c
+libbsp_a_SOURCES += ../../shared/bsppredriverhook.c
+libbsp_a_SOURCES += ../../shared/bsppretaskinghook.c
+libbsp_a_SOURCES += ../../shared/bspgetworkarea.c
+libbsp_a_SOURCES += ../../shared/bsplibc.c
+libbsp_a_SOURCES += ../../shared/bsppost.c
+libbsp_a_SOURCES += startup/bspstart.c
+libbsp_a_SOURCES += ../../shared/bootcard.c
+libbsp_a_SOURCES += ../../shared/sbrk.c
+libbsp_a_SOURCES += startup/inittlb.c
+libbsp_a_SOURCES += ../shared/startup/idttlb.S
+libbsp_a_SOURCES += ../shared/startup/idtmem.S
+libbsp_a_SOURCES += ../shared/irq/exception.S
 # clock
-librtemsbsp_a_SOURCES +=../../../../../../bsps/mips/rbtx4925/clock/clockdrv.c
+libbsp_a_SOURCES += clock/clockdrv.c
+libbsp_a_SOURCES += ../../shared/clockdrv_shell.h
 # console
-librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/rbtx4925/console/console-io.c
+libbsp_a_SOURCES += console/console-io.c
 # liblnk
-librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/liblnk/lnklib.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/liblnk/pmon.S
+libbsp_a_SOURCES += ../shared/liblnk/lnklib.S
+libbsp_a_SOURCES += ../shared/liblnk/pmon.S
+libbsp_a_SOURCES += ../shared/liblnk/regs.h
 #isr
-librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/irq/vectorexceptions.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/irq/irq.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/rbtx4925/irq/vectorisrs.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/irq/interruptmask_TX49.c
+libbsp_a_SOURCES += ../../shared/src/irq-generic.c
+libbsp_a_SOURCES += ../../shared/src/irq-legacy.c
+libbsp_a_SOURCES += ../../shared/src/irq-info.c
+libbsp_a_SOURCES += ../../shared/src/irq-shell.c
+libbsp_a_SOURCES += ../../shared/src/irq-server.c
+libbsp_a_SOURCES += ../shared/irq/vectorexceptions.c
+libbsp_a_SOURCES += ../shared/irq/irq.c
+libbsp_a_SOURCES += irq/vectorisrs.c
+libbsp_a_SOURCES += ../shared/irq/interruptmask_TX49.c
 
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/cache/nocache.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/irq/installisrentries.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/irq/isr_entries.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/timer/timer.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/timer/gettime.S
+libbsp_a_LIBADD  = ../../../libcpu/@RTEMS_CPU@/shared/cache.rel
+libbsp_a_LIBADD += ../../../libcpu/@RTEMS_CPU@/shared/interrupts.rel
+libbsp_a_LIBADD += ../../../libcpu/@RTEMS_CPU@/tx49/timer.rel
 
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
-include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
-include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/mips/rbtx4925/headers.am

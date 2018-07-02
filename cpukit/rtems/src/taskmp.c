@@ -20,42 +20,14 @@
 
 #include <rtems/rtems/tasksimpl.h>
 #include <rtems/rtems/optionsimpl.h>
-#include <rtems/rtems/statusimpl.h>
 #include <rtems/score/statesimpl.h>
 #include <rtems/score/threadimpl.h>
 #include <rtems/score/threadqimpl.h>
-
-/**
- *  The following data structure defines the packet used to perform
- *  remote task operations.
- */
-typedef struct {
-  rtems_packet_prefix               Prefix;
-  RTEMS_tasks_MP_Remote_operations  operation;
-  rtems_name                        name;
-  rtems_task_priority               the_priority;
-}   RTEMS_tasks_MP_Packet;
 
 RTEMS_STATIC_ASSERT(
   sizeof(RTEMS_tasks_MP_Packet) <= MP_PACKET_MINIMUM_PACKET_SIZE,
   RTEMS_tasks_MP_Packet
 );
-
-static RTEMS_tasks_MP_Packet *_RTEMS_tasks_MP_Get_packet( void )
-{
-  return (RTEMS_tasks_MP_Packet *) _MPCI_Get_packet();
-}
-
-static RTEMS_tasks_MP_Packet *_RTEMS_tasks_MP_Get_request_packet(
-  Objects_Id id
-)
-{
-  if ( !_Thread_MP_Is_remote( id ) ) {
-    return NULL;
-  }
-
-  return _RTEMS_tasks_MP_Get_packet();
-}
 
 /*
  *  _RTEMS_tasks_MP_Send_process_packet
@@ -92,84 +64,70 @@ void _RTEMS_tasks_MP_Send_process_packet (
     case RTEMS_TASKS_MP_RESUME_RESPONSE:
     case RTEMS_TASKS_MP_SET_PRIORITY_REQUEST:
     case RTEMS_TASKS_MP_SET_PRIORITY_RESPONSE:
+    case RTEMS_TASKS_MP_GET_NOTE_REQUEST:
+    case RTEMS_TASKS_MP_GET_NOTE_RESPONSE:
+    case RTEMS_TASKS_MP_SET_NOTE_REQUEST:
+    case RTEMS_TASKS_MP_SET_NOTE_RESPONSE:
       break;
   }
 }
 
-static rtems_status_code _RTEMS_tasks_MP_Send_request_packet(
-  RTEMS_tasks_MP_Packet            *the_packet,
-  Objects_Id                        id,
-  RTEMS_tasks_MP_Remote_operations  operation
-)
-{
-  Status_Control status;
+/*
+ *  _RTEMS_tasks_MP_Send_request_packet
+ *
+ */
 
-  the_packet->Prefix.the_class  = MP_PACKET_TASKS;
-  the_packet->Prefix.length     = sizeof( *the_packet );
-  the_packet->Prefix.to_convert = sizeof( *the_packet );
-  the_packet->Prefix.id         = id;
-  the_packet->operation         = operation;
-
-  status = _MPCI_Send_request_packet(
-    _Objects_Get_node( id ),
-    &the_packet->Prefix,
-    STATES_READY /* Not used */
-  );
-  return _Status_Get( status );
-}
-
-rtems_status_code _RTEMS_tasks_MP_Set_priority(
-  rtems_id             id,
-  rtems_task_priority  new_priority,
-  rtems_task_priority *old_priority
+rtems_status_code _RTEMS_tasks_MP_Send_request_packet (
+  RTEMS_tasks_MP_Remote_operations operation,
+  Objects_Id                       task_id,
+  rtems_task_priority              new_priority,
+  uint32_t                         notepad,
+  uint32_t                         note
 )
 {
   RTEMS_tasks_MP_Packet *the_packet;
 
-  the_packet = _RTEMS_tasks_MP_Get_request_packet( id );
-  if ( the_packet == NULL ) {
-    return RTEMS_INVALID_ID;
+  switch ( operation ) {
+
+    case RTEMS_TASKS_MP_SUSPEND_REQUEST:
+    case RTEMS_TASKS_MP_RESUME_REQUEST:
+    case RTEMS_TASKS_MP_SET_PRIORITY_REQUEST:
+    case RTEMS_TASKS_MP_GET_NOTE_REQUEST:
+    case RTEMS_TASKS_MP_SET_NOTE_REQUEST:
+
+      the_packet                    = _RTEMS_tasks_MP_Get_packet();
+      the_packet->Prefix.the_class  = MP_PACKET_TASKS;
+      the_packet->Prefix.length     = sizeof ( RTEMS_tasks_MP_Packet );
+      the_packet->Prefix.to_convert = sizeof ( RTEMS_tasks_MP_Packet );
+      the_packet->operation         = operation;
+      the_packet->Prefix.id         = task_id;
+      the_packet->the_priority      = new_priority;
+      the_packet->notepad           = notepad;
+      the_packet->note              = note;
+
+      return _MPCI_Send_request_packet(
+        _Objects_Get_node( task_id ),
+        &the_packet->Prefix,
+        STATES_READY,    /* Not used */
+        RTEMS_TIMEOUT
+      );
+      break;
+
+    case RTEMS_TASKS_MP_ANNOUNCE_CREATE:
+    case RTEMS_TASKS_MP_ANNOUNCE_DELETE:
+    case RTEMS_TASKS_MP_SUSPEND_RESPONSE:
+    case RTEMS_TASKS_MP_RESUME_RESPONSE:
+    case RTEMS_TASKS_MP_SET_PRIORITY_RESPONSE:
+    case RTEMS_TASKS_MP_GET_NOTE_RESPONSE:
+    case RTEMS_TASKS_MP_SET_NOTE_RESPONSE:
+      break;
+
   }
-
-  the_packet->the_priority = new_priority;
-  _Thread_Executing->Wait.return_argument = old_priority;
-  return _RTEMS_tasks_MP_Send_request_packet(
-    the_packet,
-    id,
-    RTEMS_TASKS_MP_SET_PRIORITY_REQUEST
-  );
-}
-
-rtems_status_code _RTEMS_tasks_MP_Suspend( rtems_id id )
-{
-  RTEMS_tasks_MP_Packet *the_packet;
-
-  the_packet = _RTEMS_tasks_MP_Get_request_packet( id );
-  if ( the_packet == NULL ) {
-    return RTEMS_INVALID_ID;
-  }
-
-  return _RTEMS_tasks_MP_Send_request_packet(
-    the_packet,
-    id,
-    RTEMS_TASKS_MP_SUSPEND_REQUEST
-  );
-}
-
-rtems_status_code _RTEMS_tasks_MP_Resume( rtems_id id )
-{
-  RTEMS_tasks_MP_Packet *the_packet;
-
-  the_packet = _RTEMS_tasks_MP_Get_request_packet( id );
-  if ( the_packet == NULL ) {
-    return RTEMS_INVALID_ID;
-  }
-
-  return _RTEMS_tasks_MP_Send_request_packet(
-    the_packet,
-    id,
-    RTEMS_TASKS_MP_RESUME_REQUEST
-  );
+  /*
+   *  The following line is included to satisfy compilers which
+   *  produce warnings when a function does not end with a return.
+   */
+  return RTEMS_SUCCESSFUL;
 }
 
 /*
@@ -177,7 +135,7 @@ rtems_status_code _RTEMS_tasks_MP_Resume( rtems_id id )
  *
  */
 
-static void _RTEMS_tasks_MP_Send_response_packet (
+void _RTEMS_tasks_MP_Send_response_packet (
   RTEMS_tasks_MP_Remote_operations  operation,
   Thread_Control                   *the_thread
 )
@@ -189,6 +147,8 @@ static void _RTEMS_tasks_MP_Send_response_packet (
     case RTEMS_TASKS_MP_SUSPEND_RESPONSE:
     case RTEMS_TASKS_MP_RESUME_RESPONSE:
     case RTEMS_TASKS_MP_SET_PRIORITY_RESPONSE:
+    case RTEMS_TASKS_MP_GET_NOTE_RESPONSE:
+    case RTEMS_TASKS_MP_SET_NOTE_RESPONSE:
 
       the_packet = (RTEMS_tasks_MP_Packet *) the_thread->receive_packet;
 
@@ -210,6 +170,8 @@ static void _RTEMS_tasks_MP_Send_response_packet (
     case RTEMS_TASKS_MP_SUSPEND_REQUEST:
     case RTEMS_TASKS_MP_RESUME_REQUEST:
     case RTEMS_TASKS_MP_SET_PRIORITY_REQUEST:
+    case RTEMS_TASKS_MP_GET_NOTE_REQUEST:
+    case RTEMS_TASKS_MP_SET_NOTE_REQUEST:
       break;
 
   }
@@ -227,6 +189,7 @@ void _RTEMS_tasks_MP_Process_packet (
 {
   RTEMS_tasks_MP_Packet *the_packet;
   Thread_Control   *the_thread;
+  bool           ignored;
 
   the_packet = (RTEMS_tasks_MP_Packet *) the_packet_prefix;
 
@@ -234,22 +197,19 @@ void _RTEMS_tasks_MP_Process_packet (
 
     case RTEMS_TASKS_MP_ANNOUNCE_CREATE:
 
-      _Objects_MP_Allocate_and_open(
-        &_RTEMS_tasks_Information.Objects,
-        the_packet->name,
-        the_packet->Prefix.id,
-        true
-      );
+      ignored = _Objects_MP_Allocate_and_open(
+                  &_RTEMS_tasks_Information,
+                  the_packet->name,
+                  the_packet->Prefix.id,
+                  true
+                );
 
       _MPCI_Return_packet( the_packet_prefix );
       break;
 
     case RTEMS_TASKS_MP_ANNOUNCE_DELETE:
 
-      _Objects_MP_Close(
-        &_RTEMS_tasks_Information.Objects,
-        the_packet->Prefix.id
-      );
+      _Objects_MP_Close( &_RTEMS_tasks_Information, the_packet->Prefix.id );
 
       _MPCI_Return_packet( the_packet_prefix );
       break;
@@ -268,6 +228,7 @@ void _RTEMS_tasks_MP_Process_packet (
 
     case RTEMS_TASKS_MP_SUSPEND_RESPONSE:
     case RTEMS_TASKS_MP_RESUME_RESPONSE:
+    case RTEMS_TASKS_MP_SET_NOTE_RESPONSE:
 
       the_thread = _MPCI_Process_response( the_packet_prefix );
 
@@ -309,6 +270,43 @@ void _RTEMS_tasks_MP_Process_packet (
 
       _MPCI_Return_packet( the_packet_prefix );
       break;
+
+    case RTEMS_TASKS_MP_GET_NOTE_REQUEST:
+
+      the_packet->Prefix.return_code = rtems_task_get_note(
+        the_packet->Prefix.id,
+        the_packet->notepad,
+        &the_packet->note
+      );
+
+      _RTEMS_tasks_MP_Send_response_packet(
+        RTEMS_TASKS_MP_GET_NOTE_RESPONSE,
+        _Thread_Executing
+      );
+      break;
+
+    case RTEMS_TASKS_MP_GET_NOTE_RESPONSE:
+
+      the_thread = _MPCI_Process_response( the_packet_prefix );
+
+      *(uint32_t   *)the_thread->Wait.return_argument = the_packet->note;
+
+      _MPCI_Return_packet( the_packet_prefix );
+      break;
+
+    case RTEMS_TASKS_MP_SET_NOTE_REQUEST:
+
+      the_packet->Prefix.return_code = rtems_task_set_note(
+        the_packet->Prefix.id,
+        the_packet->notepad,
+        the_packet->note
+      );
+
+      _RTEMS_tasks_MP_Send_response_packet(
+        RTEMS_TASKS_MP_SET_NOTE_RESPONSE,
+        _Thread_Executing
+      );
+      break;
   }
 }
 
@@ -327,5 +325,15 @@ void _RTEMS_tasks_MP_Process_packet (
  *  cannot be globally deleted.
  *
  */
+
+/*
+ *  _RTEMS_tasks_MP_Get_packet
+ *
+ */
+
+RTEMS_tasks_MP_Packet *_RTEMS_tasks_MP_Get_packet ( void )
+{
+  return (RTEMS_tasks_MP_Packet *) _MPCI_Get_packet();
+}
 
 /* end of file */

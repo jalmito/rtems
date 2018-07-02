@@ -56,7 +56,7 @@ void _Objects_Extend_information(
   bool              do_extend;
 
   _Assert(
-    _Objects_Allocator_is_owner()
+    _Debug_Is_owner_of_allocator()
       || !_System_state_Is_up( _System_state_Get() )
   );
 
@@ -113,7 +113,7 @@ void _Objects_Extend_information(
    *  Do we need to grow the tables?
    */
   if ( do_extend ) {
-    ISR_lock_Context  lock_context;
+    ISR_Level         level;
     void            **object_blocks;
     uint32_t         *inactive_per_block;
     Objects_Control **local_table;
@@ -225,8 +225,8 @@ void _Objects_Extend_information(
       local_table[ index ] = NULL;
     }
 
-    /* FIXME: https://devel.rtems.org/ticket/2280 */
-    _ISR_lock_ISR_disable( &lock_context );
+    _Thread_Disable_dispatch();
+    _ISR_Disable( level );
 
     old_tables = information->object_blocks;
 
@@ -241,7 +241,8 @@ void _Objects_Extend_information(
         information->maximum
       );
 
-    _ISR_lock_ISR_enable( &lock_context );
+    _ISR_Enable( level );
+    _Thread_Enable_dispatch();
 
     _Workspace_Free( old_tables );
 
@@ -265,7 +266,6 @@ void _Objects_Extend_information(
       index
     );
 
-    _Chain_Initialize_node( &the_object->Node );
     _Chain_Append_unprotected( &information->Inactive, &the_object->Node );
 
     the_object = (Objects_Control *)

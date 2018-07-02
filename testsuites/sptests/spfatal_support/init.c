@@ -22,7 +22,7 @@ static void print_test_begin_message(void)
 
   if (!done) {
     done = true;
-    TEST_BEGIN();
+    rtems_test_begink();
   }
 }
 
@@ -43,7 +43,7 @@ void Put_Error( uint32_t source, uint32_t error )
   }
   else if (source == INTERNAL_ERROR_RTEMS_API ){
     if (error >  RTEMS_NOT_IMPLEMENTED )
-      printk("Unknown Internal Rtems Error (0x%08" PRIx32 ")", error);
+      printk("Unknown Internal Rtems Error (0x%08x)", error);
     else
       printk( "%s", rtems_status_text( error ) );
   }
@@ -65,7 +65,7 @@ static bool is_expected_error( rtems_fatal_code error )
 
 void Fatal_extension(
   rtems_fatal_source source,
-  bool               always_set_to_false,
+  bool               is_internal,
   rtems_fatal_code   error
 )
 {
@@ -80,10 +80,17 @@ void Fatal_extension(
     printk( ")\n" );
   }
 
-  if ( always_set_to_false )
-    printk(
-      "ERROR==> Fatal Extension is internal set to true expected false\n"
-    );
+  if ( is_internal !=  FATAL_ERROR_EXPECTED_IS_INTERNAL )
+  {
+    if ( is_internal == TRUE )
+      printk(
+        "ERROR==> Fatal Extension is internal set to TRUE expected FALSE\n"
+      );
+    else
+      printk(
+        "ERROR==> Fatal Extension is internal set to FALSE expected TRUE\n"
+      );
+  }
 
 #ifdef FATAL_ERROR_EXPECTED_ERROR
   if ( error !=  FATAL_ERROR_EXPECTED_ERROR ) {
@@ -97,9 +104,10 @@ void Fatal_extension(
 
   if (
     source == FATAL_ERROR_EXPECTED_SOURCE
-      && !always_set_to_false
+      && is_internal == FATAL_ERROR_EXPECTED_IS_INTERNAL
       && is_expected_error( error )
   ) {
-    TEST_END();
+    rtems_test_endk();
   }
 }
+

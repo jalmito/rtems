@@ -116,7 +116,7 @@ void test_init()
     end_time,
     operation_count,
     overhead,
-    0
+    CALLING_OVERHEAD_MESSAGE_QUEUE_RECEIVE
   );
 
 }
@@ -164,7 +164,7 @@ rtems_task Low_task(
     end_time,
     operation_count - 1,
     0,
-    0
+    CALLING_OVERHEAD_MESSAGE_QUEUE_RECEIVE
   );
 
   TEST_END();

@@ -17,6 +17,8 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+#define RCSID	"$Id$"
+
 /*
  * TODO:
  * Randomize fsm id on link/init.
@@ -29,6 +31,8 @@
 
 #include "pppd.h"
 #include "fsm.h"
+
+static const char rcsid[] = RCSID;
 
 static void fsm_timeout(void *);
 static void fsm_rconfreq(fsm *, u_char, u_char *, int);

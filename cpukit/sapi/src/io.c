@@ -19,7 +19,7 @@
 #include "config.h"
 #endif
 
-#include <rtems/ioimpl.h>
+#include <rtems/io.h>
 
 bool _IO_All_drivers_initialized;
 

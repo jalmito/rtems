@@ -26,6 +26,7 @@
 #include <rtems/score/watchdog.h>
 #include <rtems/posix/muteximpl.h>
 #include <rtems/posix/priorityimpl.h>
+#include <rtems/posix/time.h>
 
 #if defined(_UNIX98_THREAD_MUTEX_ATTRIBUTES)
 int pthread_mutexattr_settype(

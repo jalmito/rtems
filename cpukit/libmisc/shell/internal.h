@@ -9,14 +9,25 @@
 #ifndef _RTEMS_SHELL_INTERNAL_H
 #define _RTEMS_SHELL_INTERNAL_H
 
-<<<<<<< HEAD
 #include "shell.h"
-=======
-#include <rtems/shell.h>
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
+
+struct rtems_shell_topic_tt;
+typedef struct rtems_shell_topic_tt rtems_shell_topic_t;
+
+struct rtems_shell_topic_tt {
+  const char          *topic;
+  rtems_shell_topic_t *next;
+};
+
 
 extern rtems_shell_cmd_t   * rtems_shell_first_cmd;
 extern rtems_shell_topic_t * rtems_shell_first_topic;
+
+rtems_shell_topic_t * rtems_shell_lookup_topic(const char *topic);
+
+bool rtems_shell_can_see_cmd(const rtems_shell_cmd_t *shell_cmd);
+
+int rtems_shell_execute_cmd(const char *cmd, int argc, char *argv[]);
 
 extern void rtems_shell_register_monitor_commands(void);
 

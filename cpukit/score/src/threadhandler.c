@@ -24,53 +24,9 @@
 #include <rtems/score/isrlevel.h>
 #include <rtems/score/userextimpl.h>
 
-/*
- *  Conditional magic to determine what style of C++ constructor
- *  initialization this target and compiler version uses.
- */
-#if defined(__USE_INIT_FINI__)
-  #if defined(__ARM_EABI__)
-    #define INIT_NAME __libc_init_array
-  #else
-    #define INIT_NAME _init
-  #endif
-
-  extern void INIT_NAME(void);
-  #define EXECUTE_GLOBAL_CONSTRUCTORS
-#endif
-
-#if defined(__USE__MAIN__)
-  extern void __main(void);
-  #define INIT_NAME __main
-  #define EXECUTE_GLOBAL_CONSTRUCTORS
-#endif
-
-Objects_Id _Thread_Global_constructor;
-
-static void _Thread_Global_construction( Thread_Control *executing )
-{
-#if defined(EXECUTE_GLOBAL_CONSTRUCTORS)
-  if ( executing->Object.id == _Thread_Global_constructor ) {
-    /*
-     * Prevent double construction in case the initialization thread is deleted
-     * and then recycled.  There is not need for extra synchronization since
-     * this variable is set during the sequential system boot procedure.
-     */
-    _Thread_Global_constructor = 0;
-
-    /*
-     *  _init could be a weak symbol and we SHOULD test it but it isn't
-     *  in any configuration I know of and it generates a warning on every
-     *  RTEMS target configuration.  --joel (12 May 2007)
-     */
-    INIT_NAME();
-  }
-#endif
-}
-
 void _Thread_Handler( void )
 {
-  Thread_Control  *executing;
+  Thread_Control  *executing = _Thread_Executing;
   ISR_Level        level;
   Per_CPU_Control *cpu_self;
 
@@ -80,7 +36,13 @@ void _Thread_Handler( void )
    * hook point where the port gets a shot at doing whatever it requires.
    */
   _Context_Initialization_at_thread_begin();
-  executing = _Thread_Executing;
+
+  #if defined(RTEMS_SMP)
+    /* On SMP we enter _Thread_Handler() with interrupts disabled */
+    _Assert( _ISR_Get_level() != 0 );
+
+    _Thread_Debug_set_real_processor( executing, _Per_CPU_Get() );
+  #endif
 
   /*
    * have to put level into a register for those cpu's that use
@@ -97,10 +59,17 @@ void _Thread_Handler( void )
   _Thread_Restore_fp( executing );
 
   /*
+   * Take care that 'begin' extensions get to complete before
+   * 'switch' extensions can run.  This means must keep dispatch
+   * disabled until all 'begin' extensions complete.
+   */
+  _User_extensions_Thread_begin( executing );
+
+  /*
    * Do not use the level of the thread control block, since it has a
    * different format.
    */
-  _ISR_Local_disable( level );
+  _ISR_Disable_without_giant( level );
 
   /*
    *  At this point, the dispatch disable level BETTER be 1.
@@ -117,30 +86,53 @@ void _Thread_Handler( void )
   _Thread_Do_dispatch( cpu_self, level );
 
   /*
-   * Invoke the thread begin extensions in the context of the thread entry
-   * function with thread dispatching enabled.  This enables use of dynamic
-   * memory allocation, creation of POSIX keys and use of C++ thread local
-   * storage.  Blocking synchronization primitives are allowed also.
-   */
-  _User_extensions_Thread_begin( executing );
-
-  _Thread_Global_construction( executing );
-
-  /*
    *  RTEMS supports multiple APIs and each API can define a different
    *  thread/task prototype. The following code supports invoking the
    *  user thread entry point using the prototype expected.
    */
-  ( *executing->Start.Entry.adaptor )( executing );
+  if ( executing->Start.prototype == THREAD_START_NUMERIC ) {
+    executing->Wait.return_argument =
+      (*(Thread_Entry_numeric) executing->Start.entry_point)(
+        executing->Start.numeric_argument
+      );
+  }
+  #if defined(RTEMS_POSIX_API)
+    else if ( executing->Start.prototype == THREAD_START_POINTER ) {
+      executing->Wait.return_argument =
+        (*(Thread_Entry_pointer) executing->Start.entry_point)(
+          executing->Start.pointer_argument
+        );
+    }
+  #endif
+  #if defined(FUNCTIONALITY_NOT_CURRENTLY_USED_BY_ANY_API)
+    else if ( executing->Start.prototype == THREAD_START_BOTH_POINTER_FIRST ) {
+      executing->Wait.return_argument =
+         (*(Thread_Entry_both_pointer_first) executing->Start.entry_point)(
+           executing->Start.pointer_argument,
+           executing->Start.numeric_argument
+         );
+    }
+    else if ( executing->Start.prototype == THREAD_START_BOTH_NUMERIC_FIRST ) {
+      executing->Wait.return_argument =
+       (*(Thread_Entry_both_numeric_first) executing->Start.entry_point)(
+         executing->Start.numeric_argument,
+         executing->Start.pointer_argument
+       );
+    }
+  #endif
 
   /*
-   *  In the call above, the return code from the user thread body which return
-   *  something was placed in return_argument.  This assumed that if it
-   *  returned anything (which is not supporting in all APIs), then it would be
+   *  In the switch above, the return code from the user thread body
+   *  was placed in return_argument.  This assumed that if it returned
+   *  anything (which is not supporting in all APIs), then it would be
    *  able to fit in a (void *).
    */
 
   _User_extensions_Thread_exitted( executing );
 
-  _Internal_error( INTERNAL_ERROR_THREAD_EXITTED );
+  _Terminate(
+    INTERNAL_ERROR_CORE,
+    true,
+    INTERNAL_ERROR_THREAD_EXITTED
+  );
 }

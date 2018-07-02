@@ -13,6 +13,7 @@
 #include "config.h"
 #endif
 
+#define CONFIGURE_INIT
 
 #include <bsp.h>
 #include <tmacros.h>  /* instantiate buffering code if needed */
@@ -32,7 +33,7 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS 1

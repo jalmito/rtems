@@ -36,6 +36,9 @@
 /* define this to print the Id of the calling task */
 /* #define TEST_ON_TASK_ID */
 
+/* define this to print statistics when acquiring the mutex */
+/* #define TEST_PRINT_STATISTICS */
+
 /* define this if you are (1) on a ERC32 and (2) want a SW ISR trigger */
 #if defined(__sparc__)
 /* #define TEST_USE_ISR */
@@ -54,8 +57,6 @@
 #include <bsp.h>
 #include <stdio.h>
 #include "tmacros.h"
-
-#include <rtems/score/threadimpl.h>
 
 const char rtems_test_name[] = "SP 35";
 
@@ -85,7 +86,7 @@ const char *CallerName(void)
   Thread_Control *executing = _Thread_Get_executing();
 #if defined(TEST_PRINT_TASK_ID)
   sprintf( buffer, "0x%08x -- %d",
-      rtems_task_self(), _Thread_Get_priority( executing ) );
+      rtems_task_self(), executing->current_priority );
 #else
   volatile union {
     uint32_t u;
@@ -99,7 +100,7 @@ const char *CallerName(void)
   #endif
   sprintf( buffer, "%c%c%c%c -- %" PRIdPriority_Control,
       TempName.c[0], TempName.c[1], TempName.c[2], TempName.c[3],
-      _Thread_Get_priority( executing )
+      executing->current_priority
   );
 #endif
   return buffer;
@@ -204,6 +205,9 @@ rtems_task LocalHwSim_Exec(rtems_task_argument TaskArg)
       rtems_task_wake_after(100);
 
       StartHw = FALSE;
+#if 0
+      fprintf( stderr, "StartHw -- fire ISR (%d)\n", ++ISRCount );
+#endif
 #if defined(TEST_USE_ISR)
       __asm__ volatile ("ta 5");
       __asm__ volatile ("nop");
@@ -229,7 +233,7 @@ rtems_isr  LocalHwIsr(/*in*/ rtems_vector_number   Vector)
   /* Signal synchroniztion semaphore to invoke waiting task */
   status = rtems_semaphore_release(LocalHwSync_S);
   if (status != RTEMS_SUCCESSFUL) {
-    printf( "LocalHwISR release %d\n", status );
+    fprintf( stderr, "LocalHwISR release %d\n", status );
     while(1); /* Error */
   }
 
@@ -239,6 +243,21 @@ rtems_isr  LocalHwIsr(/*in*/ rtems_vector_number   Vector)
 void AccessLocalHw(void)
 {
   rtems_status_code     Sts;
+
+#if defined(TEST_PRINT_STATISTICS)
+  rtems_task_priority   AccessPrio;  /*      :         */
+  uint32_t              AccessCnt;   /*      :         */
+  rtems_task_priority   EnterPrio;   /* Statistics log */
+  uint32_t              EnterCnt;    /*      :         */
+  rtems_task_priority   LeavePrio;   /*      :         */
+  uint32_t              LeaveCnt;    /*      :         */
+#endif
+
+#if defined(TEST_PRINT_STATISTICS)
+  /* Store information about the current situation */
+  EnterPrio = _Thread_Executing->current_priority;
+  EnterCnt  = _Thread_Executing->resource_count;
+#endif
 
   printf("  AccessLocalHw called by %s\n", CallerName());
 
@@ -254,8 +273,28 @@ void AccessLocalHw(void)
   Sts = rtems_semaphore_obtain(LocalHwSync_S, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
   directive_failed( Sts, "rtems_semaphore_obtain(LocalHwAccess_R...)" );
 
+#if defined(TEST_PRINT_STATISTICS)
+  /* Store information about the current situation */
+  AccessPrio = _Thread_Executing->current_priority;
+  AccessCnt  = _Thread_Executing->resource_count;
+#endif
+
   Sts = rtems_semaphore_release(LocalHwAccess_R);
   directive_failed( Sts, "rtems_semaphore_release(LocalHwAccess_R)" );
+
+#if defined(TEST_PRINT_STATISTICS)
+  /* Store information about the current situation */
+  LeavePrio = _Thread_Executing->current_priority;
+  LeaveCnt  = _Thread_Executing->resource_count;
+
+  printf(
+    "  AccessLocalHw from %s statistics:\n"
+    " - Prio: %d -> %d -> %d\n - Cnt: %d -> %d -> %d\n",
+    CallerName(),
+    EnterPrio, AccessPrio, LeavePrio,
+    EnterCnt, AccessCnt, LeaveCnt
+  );
+#endif
 
   printf("  AccessLocalHw returns to %s\n", CallerName());
   #if defined(TEST_EXIT_AFTER_ITERATIONS)
@@ -271,6 +310,21 @@ void AccessRemoteHw(void)
 {
   rtems_status_code     Sts;
 
+#if defined(TEST_PRINT_STATISTICS)
+  rtems_task_priority   EnterPrio;   /* Statistics log */
+  rtems_task_priority   AccessPrio;  /*      :         */
+  rtems_task_priority   LeavePrio;   /*      :         */
+  uint32_t              EnterCnt;    /*      :         */
+  uint32_t              AccessCnt;   /*      :         */
+  uint32_t              LeaveCnt;    /*      :         */
+#endif
+
+#if defined(TEST_PRINT_STATISTICS)
+  /* Store information about the current situation */
+  EnterPrio = _Thread_Executing->current_priority;
+  EnterCnt  = _Thread_Executing->resource_count;
+#endif
+
   printf("AccessRemoteHw called by %s\n", CallerName());
 
   /* Obtain exclusive access to remote HW, Start HW, Wait for completion,
@@ -284,8 +338,27 @@ void AccessRemoteHw(void)
   printf("AccessRemoteHw access local %s\n", CallerName());
   AccessLocalHw();
 
+#if defined(TEST_PRINT_STATISTICS)
+  /* Store information about the current situation */
+  AccessPrio = _Thread_Executing->current_priority;
+  AccessCnt  = _Thread_Executing->resource_count;
+#endif
+
   Sts = rtems_semaphore_release(RemoteHwAccess_R);
   directive_failed( Sts, "rtems_semaphore_release(RemoreHwAccess_R" );
+
+#if defined(TEST_PRINT_STATISTICS)
+  /* Store information about the current situation */
+  LeavePrio = _Thread_Executing->current_priority;
+  LeaveCnt  = _Thread_Executing->resource_count;
+
+  printf(
+    "\nAccessRemoteHw from %s statistics:\n"
+    " - Prio: %d -> %d -> %d\n - Cnt: %d -> %d -> %d\n",
+    CallerName(),
+    EnterPrio, AccessPrio, LeavePrio,
+    EnterCnt, AccessCnt, LeaveCnt);
+#endif
 
   printf("AccessRemoteHw returns to %s\n", CallerName());
   return;
@@ -432,7 +505,7 @@ rtems_task Init(rtems_task_argument ignored)
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION

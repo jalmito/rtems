@@ -20,28 +20,35 @@
 #endif
 
 #include <rtems/extensionimpl.h>
+#include <rtems/score/thread.h>
 #include <rtems/score/userextimpl.h>
 
 rtems_status_code rtems_extension_delete(
   rtems_id id
 )
 {
-  rtems_status_code  status;
-  Extension_Control *the_extension;
+  Extension_Control   *the_extension;
+  Objects_Locations    location;
 
   _Objects_Allocator_lock();
+  the_extension = _Extension_Get( id, &location );
+  switch ( location ) {
+    case OBJECTS_LOCAL:
+      _User_extensions_Remove_set( &the_extension->Extension );
+      _Objects_Close( &_Extension_Information, &the_extension->Object );
+      _Objects_Put( &the_extension->Object );
+      _Extension_Free( the_extension );
+      _Objects_Allocator_unlock();
+      return RTEMS_SUCCESSFUL;
 
-  the_extension = _Extension_Get( id );
-
-  if ( the_extension != NULL ) {
-    _Objects_Close( &_Extension_Information, &the_extension->Object );
-    _User_extensions_Remove_set( &the_extension->Extension );
-    _Extension_Free( the_extension );
-    status = RTEMS_SUCCESSFUL;
-  } else {
-    status = RTEMS_INVALID_ID;
+#if defined(RTEMS_MULTIPROCESSING)
+    case OBJECTS_REMOTE:            /* should never return this */
+#endif
+    case OBJECTS_ERROR:
+      break;
   }
 
   _Objects_Allocator_unlock();
-  return status;
+
+  return RTEMS_INVALID_ID;
 }

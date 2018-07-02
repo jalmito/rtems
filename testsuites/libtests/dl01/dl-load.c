@@ -27,46 +27,13 @@ int dl_load_test(void)
   int    call_ret;
   int    unresolved;
   char*  message = "loaded";
-  char*  err;
 
-  err = dlerror ();
-  if (err != NULL)
-  {
-    printf ("dlerror failed: did not return NULL for no error\n");
-    return 1;
-  }
+  printf("load: /dl-o1.o\n");
 
-  printf("load: /abcd.o (no found)\n");
-  handle = dlopen ("/abcd.o", RTLD_NOW | RTLD_GLOBAL);
-  if (handle)
-  {
-    printf ("dlopen failed: found unknown object file\n");
-    return 1;
-  }
-
-  err = dlerror ();
-  if (!err)
-  {
-    printf ("dlerror failed: no error message\n");
-    return 1;
-  }
-
-  printf ("dlerror: %s\n", err);
-
-  err = dlerror ();
-  if (err != NULL)
-  {
-    printf ("dlerror failed: did not return NULL so error no cleared\n");
-    return 1;
-  }
-
-  printf("load: /dl01-o1.o\n");
-
-  handle = dlopen ("/dl01-o1.o", RTLD_NOW | RTLD_GLOBAL);
+  handle = dlopen ("/dl-o1.o", RTLD_NOW | RTLD_GLOBAL);
   if (!handle)
   {
-    err = dlerror ();
-    printf ("dlopen failed: %s\n", err ? err : "");
+    printf("dlopen failed: %s\n", dlerror());
     return 1;
   }
 
@@ -100,8 +67,7 @@ int dl_load_test(void)
 
   if (dlclose (handle) < 0)
   {
-    err = dlerror ();
-    printf ("dlclose failed: %s\n", err ? err : "");
+    printf("dlclose failed: %s\n", dlerror());
     return 1;
   }
 

@@ -11,6 +11,7 @@
  */
 
 
+#include <coverhd.h>
 #include <tmacros.h>
 
 /* functions */
@@ -25,7 +26,7 @@ rtems_task Init(
 
 #define MESSAGE_SIZE (sizeof(long) * 4)
 
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS              (2 + OPERATION_COUNT)

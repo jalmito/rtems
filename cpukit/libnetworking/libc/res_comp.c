@@ -78,8 +78,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "res_config.h"
-
 #define BIND_4_COMPAT
 
 /*

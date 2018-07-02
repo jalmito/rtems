@@ -18,64 +18,18 @@
 #include "config.h"
 #endif
 
-#include <rtems/posix/semaphoreimpl.h>
-#include <rtems/score/wkspace.h>
-
 #include <stdarg.h>
+
+#include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
+#include <semaphore.h>
 #include <limits.h>
 
-static sem_t *_POSIX_Semaphore_Create_support(
-  const char   *name_arg,
-  size_t        name_len,
-  unsigned int  value
-)
-{
-  POSIX_Semaphore_Control *the_semaphore;
-  char                    *name;
-
-  if ( value > SEM_VALUE_MAX ) {
-    rtems_set_errno_and_return_value( EINVAL, SEM_FAILED );
-  }
-
-  /*
-   * Make a copy of the user's string for name just in case it was
-   * dynamically constructed.
-   */
-  name = _Workspace_String_duplicate( name_arg, name_len );
-  if ( name == NULL ) {
-    rtems_set_errno_and_return_value( ENOMEM, SEM_FAILED );
-  }
-
-  the_semaphore = _POSIX_Semaphore_Allocate_unprotected();
-  if ( the_semaphore == NULL ) {
-    _Workspace_Free( name );
-    rtems_set_errno_and_return_value( ENOSPC, SEM_FAILED );
-  }
-
-  the_semaphore->open_count = 1;
-  the_semaphore->linked = true;
-
-  /*
-   *  POSIX does not appear to specify what the discipline for
-   *  blocking tasks on this semaphore should be.  It could somehow
-   *  be derived from the current scheduling policy.  One
-   *  thing is certain, no matter what we decide, it won't be
-   *  the same as  all other POSIX implementations. :)
-   */
-  _POSIX_Semaphore_Initialize( &the_semaphore->Semaphore, name, value );
-
-  /*
-   *  Make the semaphore available for use.
-   */
-  _Objects_Open_string(
-    &_POSIX_Semaphore_Information,
-    &the_semaphore->Object,
-    name
-  );
-
-  return &the_semaphore->Semaphore;
-}
+#include <rtems/system.h>
+#include <rtems/posix/semaphoreimpl.h>
+#include <rtems/posix/time.h>
+#include <rtems/seterr.h>
 
 /*
  *  sem_open
@@ -102,14 +56,15 @@ sem_t *sem_open(
    * have it because we have to work through the variable
    * arguments to get to attr.
    */
-  mode_t                     mode RTEMS_UNUSED;
+  mode_t                     mode RTEMS_COMPILER_UNUSED_ATTRIBUTE;
 
   va_list                    arg;
   unsigned int               value = 0;
+  int                        status;
+  Objects_Id                 the_semaphore_id;
   POSIX_Semaphore_Control   *the_semaphore;
+  Objects_Locations          location;
   size_t                     name_len;
-  Objects_Get_by_name_error  error;
-  sem_t                     *sem;
 
   if ( oflag & O_CREAT ) {
     va_start(arg, oflag);
@@ -119,7 +74,7 @@ sem_t *sem_open(
   }
 
   _Objects_Allocator_lock();
-  the_semaphore = _POSIX_Semaphore_Get_by_name( name, &name_len, &error );
+  status = _POSIX_Semaphore_Name_to_id( name, &the_semaphore_id, &name_len );
 
   /*
    *  If the name to id translation worked, then the semaphore exists
@@ -128,19 +83,16 @@ sem_t *sem_open(
    *  or some other miscellaneous error on the name.
    */
 
-  if ( the_semaphore == NULL ) {
+  if ( status ) {
 
     /*
      * Unless provided a valid name that did not already exist
      * and we are willing to create then it is an error.
      */
 
-    if ( !( error == OBJECTS_GET_BY_NAME_NO_OBJECT && (oflag & O_CREAT) ) ) {
+    if ( !( status == ENOENT && (oflag & O_CREAT) ) ) {
       _Objects_Allocator_unlock();
-      rtems_set_errno_and_return_value(
-        _POSIX_Get_by_name_error( error ),
-        SEM_FAILED
-      );
+      rtems_set_errno_and_return_value( status, SEM_FAILED );
     }
   } else {
 
@@ -153,9 +105,11 @@ sem_t *sem_open(
       rtems_set_errno_and_return_value( EEXIST, SEM_FAILED );
     }
 
+    the_semaphore = _POSIX_Semaphore_Get( (sem_t *) &the_semaphore_id, &location );
     the_semaphore->open_count += 1;
+    _Thread_Enable_dispatch();
     _Objects_Allocator_unlock();
-    return &the_semaphore->Semaphore;
+    goto return_id;
   }
 
   /*
@@ -163,12 +117,28 @@ sem_t *sem_open(
    *  checked. We should go ahead and create a semaphore.
    */
 
-  sem = _POSIX_Semaphore_Create_support(
+  status =_POSIX_Semaphore_Create_support(
     name,
     name_len,
-    value
+    false,         /* not shared across processes */
+    value,
+    &the_semaphore
   );
 
+  /*
+   * errno was set by Create_support, so don't set it again.
+   */
+
   _Objects_Allocator_unlock();
-  return sem;
+
+  if ( status == -1 )
+    return SEM_FAILED;
+
+return_id:
+  #if defined(RTEMS_USE_16_BIT_OBJECT)
+    the_semaphore->Semaphore_id = the_semaphore->Object.id;
+    return &the_semaphore->Semaphore_id;
+  #else
+    return &the_semaphore->Object.id;
+  #endif
 }

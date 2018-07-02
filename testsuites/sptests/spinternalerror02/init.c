@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2018 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2012-2014 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
  *  Donierstr. 4
@@ -35,9 +35,7 @@ static void test_internal_error_text(void)
     puts( text );
   } while ( text != text_last );
 
-  rtems_test_assert(
-    error - 3 == INTERNAL_ERROR_ARC4RANDOM_GETENTROPY_FAIL
-  );
+  rtems_test_assert( error - 3 == INTERNAL_ERROR_RESOURCE_IN_USE );
 }
 
 static void test_fatal_source_text(void)
@@ -53,7 +51,7 @@ static void test_fatal_source_text(void)
     puts( text );
   } while ( text != text_last );
 
-  rtems_test_assert( source - 3 == RTEMS_FATAL_SOURCE_INVALID_HEAP_FREE );
+  rtems_test_assert( source - 3 == RTEMS_FATAL_SOURCE_SMP );
 }
 
 static void test_status_text(void)
@@ -86,7 +84,7 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS 1
 

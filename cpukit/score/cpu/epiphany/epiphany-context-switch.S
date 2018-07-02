@@ -39,6 +39,7 @@ PUBLIC(_CPU_Context_switch)
 PUBLIC(_CPU_Context_restore)
 PUBLIC(_CPU_Context_restore_fp)
 PUBLIC(_CPU_Context_save_fp)
+PUBLIC(restore)
 
 SYM(_CPU_Context_switch):
   /* Disable interrupts and store all registers */
@@ -121,7 +122,7 @@ SYM(_CPU_Context_switch):
   movfs r27, iret
   str r27, [r0,66]
 
-.Lrestore:
+SYM(restore):
 
   /* r1 contains buffer address, skip it */
   ldr r2,  [r1,2]
@@ -204,7 +205,7 @@ SYM(_CPU_Context_switch):
 
 SYM(_CPU_Context_restore):
   mov     r1, r0
-  b       .Lrestore
+  b       _restore
   nop
 
 /* No FP support for Epiphany yet */

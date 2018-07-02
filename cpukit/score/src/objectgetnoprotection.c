@@ -21,8 +21,9 @@
 #include <rtems/score/objectimpl.h>
 
 Objects_Control *_Objects_Get_no_protection(
-  Objects_Id                 id,
-  const Objects_Information *information
+  Objects_Information *information,
+  Objects_Id           id,
+  Objects_Locations   *location
 )
 {
   Objects_Control *the_object;
@@ -36,6 +37,7 @@ Objects_Control *_Objects_Get_no_protection(
 
   if ( information->maximum >= index ) {
     if ( (the_object = information->local_table[ index ]) != NULL ) {
+      *location = OBJECTS_LOCAL;
       return the_object;
     }
   }
@@ -44,5 +46,6 @@ Objects_Control *_Objects_Get_no_protection(
    *  This isn't supported or required yet for Global objects so
    *  if it isn't local, we don't find it.
    */
+  *location = OBJECTS_ERROR;
   return NULL;
 }

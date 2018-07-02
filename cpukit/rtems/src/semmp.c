@@ -20,17 +20,11 @@
 
 #include <rtems/rtems/semimpl.h>
 #include <rtems/rtems/optionsimpl.h>
-#include <rtems/rtems/statusimpl.h>
 
 RTEMS_STATIC_ASSERT(
   sizeof(Semaphore_MP_Packet) <= MP_PACKET_MINIMUM_PACKET_SIZE,
   Semaphore_MP_Packet
 );
-
-static Semaphore_MP_Packet *_Semaphore_MP_Get_packet( void )
-{
-  return (Semaphore_MP_Packet *) _MPCI_Get_packet();
-}
 
 void _Semaphore_MP_Send_process_packet (
   Semaphore_MP_Remote_operations  operation,
@@ -73,15 +67,14 @@ void _Semaphore_MP_Send_process_packet (
   }
 }
 
-static rtems_status_code _Semaphore_MP_Send_request_packet(
+rtems_status_code _Semaphore_MP_Send_request_packet (
+  Semaphore_MP_Remote_operations operation,
   Objects_Id                     semaphore_id,
   rtems_option                   option_set,
-  rtems_interval                 timeout,
-  Semaphore_MP_Remote_operations operation
+  rtems_interval                 timeout
 )
 {
   Semaphore_MP_Packet *the_packet;
-  Status_Control       status;
 
   switch ( operation ) {
 
@@ -99,12 +92,13 @@ static rtems_status_code _Semaphore_MP_Send_request_packet(
       the_packet->Prefix.id         = semaphore_id;
       the_packet->option_set        = option_set;
 
-      status = _MPCI_Send_request_packet(
-        _Objects_Get_node( semaphore_id ),
-        &the_packet->Prefix,
-        STATES_WAITING_FOR_SEMAPHORE
-      );
-      return _Status_Get( status );
+      return _MPCI_Send_request_packet(
+          _Objects_Get_node( semaphore_id ),
+          &the_packet->Prefix,
+          STATES_WAITING_FOR_SEMAPHORE,
+          RTEMS_TIMEOUT
+        );
+      break;
 
     case SEMAPHORE_MP_ANNOUNCE_CREATE:
     case SEMAPHORE_MP_ANNOUNCE_DELETE:
@@ -121,31 +115,7 @@ static rtems_status_code _Semaphore_MP_Send_request_packet(
   return RTEMS_SUCCESSFUL;
 }
 
-rtems_status_code _Semaphore_MP_Obtain(
-  rtems_id        id,
-  rtems_option    option_set,
-  rtems_interval  timeout
-)
-{
-  return _Semaphore_MP_Send_request_packet(
-    id,
-    option_set,
-    timeout,
-    SEMAPHORE_MP_OBTAIN_REQUEST
-  );
-}
-
-rtems_status_code _Semaphore_MP_Release( rtems_id id )
-{
-  return _Semaphore_MP_Send_request_packet(
-    id,
-    0,
-    MPCI_DEFAULT_TIMEOUT,
-    SEMAPHORE_MP_RELEASE_REQUEST
-  );
-}
-
-static void _Semaphore_MP_Send_response_packet (
+void _Semaphore_MP_Send_response_packet (
   Semaphore_MP_Remote_operations  operation,
   Objects_Id                      semaphore_id,
   Thread_Control                 *the_thread
@@ -189,6 +159,7 @@ void _Semaphore_MP_Process_packet (
 {
   Semaphore_MP_Packet *the_packet;
   Thread_Control      *the_thread;
+  bool                 ignored;
 
   the_packet = (Semaphore_MP_Packet *) the_packet_prefix;
 
@@ -196,12 +167,12 @@ void _Semaphore_MP_Process_packet (
 
     case SEMAPHORE_MP_ANNOUNCE_CREATE:
 
-      _Objects_MP_Allocate_and_open(
-        &_Semaphore_Information,
-        the_packet->name,
-        the_packet->Prefix.id,
-        true
-      );
+      ignored = _Objects_MP_Allocate_and_open(
+                  &_Semaphore_Information,
+                  the_packet->name,
+                  the_packet->Prefix.id,
+                  true
+                );
 
       _MPCI_Return_packet( the_packet_prefix );
       break;
@@ -263,32 +234,37 @@ void _Semaphore_MP_Process_packet (
 }
 
 void _Semaphore_MP_Send_object_was_deleted (
-  Thread_Control *the_proxy,
-  Objects_Id      mp_id
+  Thread_Control *the_proxy
 )
 {
   the_proxy->receive_packet->return_code = RTEMS_OBJECT_WAS_DELETED;
 
   _Semaphore_MP_Send_response_packet(
     SEMAPHORE_MP_OBTAIN_RESPONSE,
-    mp_id,
+    the_proxy->Wait.id,
     the_proxy
   );
 
 }
 
 void _Semaphore_MP_Send_extract_proxy (
-  Thread_Control *the_thread,
-  Objects_Id      id
+  void           *argument
 )
 {
+  Thread_Control *the_thread = (Thread_Control *)argument;
+
   _Semaphore_MP_Send_process_packet(
     SEMAPHORE_MP_EXTRACT_PROXY,
-    id,
+    the_thread->Wait.id,
     (rtems_name) 0,
     the_thread->Object.id
   );
 
+}
+
+Semaphore_MP_Packet *_Semaphore_MP_Get_packet ( void )
+{
+  return ( (Semaphore_MP_Packet *) _MPCI_Get_packet() );
 }
 
 #if defined(RTEMS_MULTIPROCESSING)

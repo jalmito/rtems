@@ -1,17 +1,21 @@
 include $(top_srcdir)/automake/compile.am
 
-noinst_LIBRARIES = libscorecpu.a
-libscorecpu_a_SOURCES =
-libscorecpu_a_SOURCES += access_le.c
-libscorecpu_a_SOURCES += access.S
-libscorecpu_a_SOURCES += cpu.c
-libscorecpu_a_SOURCES += cpu_asm.S
-libscorecpu_a_SOURCES += sparc-context-validate.S
-libscorecpu_a_SOURCES += sparc-context-volatile-clobber.S
-libscorecpu_a_SOURCES += sparc-counter-asm.S
-libscorecpu_a_SOURCES += sparc-counter.c
-libscorecpu_a_SOURCES += syscall.S
-libscorecpu_a_SOURCES += window.S
+include_rtemsdir = $(includedir)/rtems
+include_rtems_HEADERS = rtems/asm.h
 
+include_rtems_scoredir = $(includedir)/rtems/score
+include_rtems_score_HEADERS = rtems/score/sparc.h
+include_rtems_score_HEADERS += rtems/score/cpu.h
+include_rtems_score_HEADERS += rtems/score/types.h
+include_rtems_score_HEADERS += rtems/score/cpuatomic.h
+
+noinst_LIBRARIES = libscorecpu.a
+libscorecpu_a_SOURCES = cpu.c cpu_asm.S
+libscorecpu_a_SOURCES += sparc-context-volatile-clobber.S
+libscorecpu_a_SOURCES += sparc-context-validate.S
+libscorecpu_a_SOURCES += sparc-counter.c
+libscorecpu_a_SOURCES += sparcv8-atomic.c
+libscorecpu_a_CPPFLAGS = $(AM_CPPFLAGS)
+
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/automake/local.am
-include $(srcdir)/headers.am

@@ -45,20 +45,7 @@ static void create_not_defined(rtems_attribute attr)
 
 static void test_mrsp_create_errors(void)
 {
-  rtems_status_code sc;
-  rtems_id id;
-
   puts("test MrsP create errors");
-
-  sc = rtems_semaphore_create(
-    rtems_build_name('M', 'R', 'S', 'P'),
-    1,
-    RTEMS_MULTIPROCESSOR_RESOURCE_SHARING
-      | RTEMS_BINARY_SEMAPHORE,
-    UINT32_MAX,
-    &id
-  );
-  rtems_test_assert(sc == RTEMS_INVALID_PRIORITY);
 
   create_not_defined(
     RTEMS_MULTIPROCESSOR_RESOURCE_SHARING
@@ -323,7 +310,7 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS 2
 #define CONFIGURE_MAXIMUM_SEMAPHORES 1
@@ -334,8 +321,6 @@ static void Init(rtems_task_argument arg)
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
-
-#define CONFIGURE_DISABLE_SMP_CONFIGURATION
 
 #define CONFIGURE_INIT
 

@@ -47,7 +47,7 @@ static void sync_wrapper(FILE *f)
 }
 
 /* iterate over all FILE *'s for this thread */
-static bool sync_per_thread(Thread_Control *t, void *arg)
+static void sync_per_thread(Thread_Control *t)
 {
    struct _reent *current_reent;
    struct _reent *this_reent;
@@ -64,8 +64,6 @@ static bool sync_per_thread(Thread_Control *t, void *arg)
      _fwalk (t->libc_reent, sync_wrapper);
      executing->libc_reent = current_reent;
    }
-
-   return false;
 }
 
 /*
@@ -97,5 +95,5 @@ void sync(void)
   /*
    *  Now walk all the per-thread reentrancy structures.
    */
-  rtems_task_iterate(sync_per_thread, NULL);
+  rtems_iterate_over_all_threads(sync_per_thread);
 }

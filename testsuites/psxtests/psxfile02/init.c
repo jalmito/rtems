@@ -41,15 +41,9 @@ void do_with_fd(
 )
 {
   struct stat       stat_buff;
-  struct iovec      vec[2];
-  char              buf[2][1];
+  struct iovec      vec[4];
   off_t             res;
   int               status;
-
-  vec[0].iov_base = buf[0];
-  vec[0].iov_len = sizeof(buf[0]);
-  vec[1].iov_base = buf[1];
-  vec[1].iov_len = sizeof(buf[1]);
 
   printf("ftruncate %s\n", description);
   status = ftruncate(fd, 40);
@@ -94,13 +88,13 @@ void do_with_fd(
   rtems_test_assert( errno == EBADF );
 
   printf("readv %s\n", description);
-  status = readv(fd, vec, 2);
+  status = readv(fd, vec, 4);
   rtems_test_assert( status == -1 );
   printf( "%d: %s\n", errno, strerror( errno ) );
   rtems_test_assert( errno == EBADF );
 
   printf("writev %s\n", description);
-  status = writev(fd, vec, 2);
+  status = writev(fd, vec, 4);
   rtems_test_assert( status == -1 );
   printf( "%d: %s\n", errno, strerror( errno ) );
   rtems_test_assert( errno == EBADF );
@@ -148,7 +142,7 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 4
 #define CONFIGURE_MAXIMUM_TASKS 1

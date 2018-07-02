@@ -25,12 +25,10 @@
 #include <rtems/seterr.h>
 
 int tcflow (
-  int fd,
+  int fd __attribute__((unused)),
   int action
 )
 {
-  (void) fd;
-
   switch (action) {
     case TCOOFF:
     case TCOON:

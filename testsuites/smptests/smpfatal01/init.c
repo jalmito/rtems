@@ -16,9 +16,8 @@
   #include "config.h"
 #endif
 
-#include "tmacros.h"
-
 #include <rtems.h>
+#include <rtems/test.h>
 #include <rtems/score/percpu.h>
 #include <rtems/score/smpimpl.h>
 #include <rtems/score/smpbarrier.h>
@@ -41,7 +40,7 @@ static void Init(rtems_task_argument arg)
 
 static void fatal_extension(
   rtems_fatal_source source,
-  bool always_set_to_false,
+  bool is_internal,
   rtems_fatal_code code
 )
 {
@@ -50,7 +49,7 @@ static void fatal_extension(
   if (source == RTEMS_FATAL_SOURCE_SMP) {
     uint32_t self = rtems_get_current_processor();
 
-    assert(!always_set_to_false);
+    assert(!is_internal);
     assert(code == SMP_FATAL_SHUTDOWN);
 
     if (self == main_cpu) {
@@ -63,7 +62,7 @@ static void fatal_extension(
         assert(state == PER_CPU_STATE_SHUTDOWN);
       }
 
-      TEST_END();
+      rtems_test_endk();
     }
   }
 
@@ -80,7 +79,7 @@ static rtems_status_code test_driver_init(
   uint32_t cpu_count = rtems_get_processor_count();
   uint32_t cpu;
 
-  TEST_BEGIN();
+  rtems_test_begink();
 
   assert(rtems_configuration_get_maximum_processors() == MAX_CPUS);
 
@@ -108,7 +107,7 @@ static rtems_status_code test_driver_init(
 
     per_cpu->state = PER_CPU_STATE_SHUTDOWN;
   } else {
-    TEST_END();
+    rtems_test_endk();
     exit(0);
   }
 
@@ -116,7 +115,7 @@ static rtems_status_code test_driver_init(
 }
 
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 
 #define CONFIGURE_APPLICATION_EXTRA_DRIVERS \
   { .initialization_entry = test_driver_init }
@@ -125,7 +124,9 @@ static rtems_status_code test_driver_init(
   { .fatal = fatal_extension }, \
   RTEMS_TEST_INITIAL_EXTENSION
 
-#define CONFIGURE_MAXIMUM_PROCESSORS MAX_CPUS
+#define CONFIGURE_SMP_APPLICATION
+
+#define CONFIGURE_SMP_MAXIMUM_PROCESSORS MAX_CPUS
 
 #define CONFIGURE_MAXIMUM_TASKS 1
 

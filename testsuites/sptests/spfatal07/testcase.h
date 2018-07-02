@@ -9,8 +9,6 @@
  *  http://www.rtems.org/license/LICENSE.
  */
 
-#include <rtems/bspIo.h>
-
 /*
  *  Way too much stack space.  Should generate a fatal error
  *  on the init task create.
@@ -35,6 +33,7 @@ rtems_initialization_tasks_table Initialization_tasks[] = {
 #define FATAL_ERROR_DESCRIPTION \
         "Core Configuration Invalid ISR stack size"
 #define FATAL_ERROR_EXPECTED_SOURCE      INTERNAL_ERROR_CORE
+#define FATAL_ERROR_EXPECTED_IS_INTERNAL TRUE
 #define FATAL_ERROR_EXPECTED_ERROR       \
           INTERNAL_ERROR_INTERRUPT_STACK_TOO_SMALL
 
@@ -51,7 +50,7 @@ void force_error()
       "WARNING - Test not applicable on this target architecture.\n"
       "WARNING - Only applicable when CPU_ALLOCATE_INTERRUPT_STACK == TRUE.\n"
     );
-    TEST_END();
+    rtems_test_endk();
     rtems_test_exit(0);
   #endif
 }

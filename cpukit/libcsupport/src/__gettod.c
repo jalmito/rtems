@@ -39,7 +39,7 @@
  */
 int gettimeofday(
   struct timeval *__restrict tp,
-  void *__restrict __tz RTEMS_UNUSED
+  void *__restrict __tz __attribute__((unused))
 )
 {
   /* struct timezone* tzp = (struct timezone*) __tz; */
@@ -70,7 +70,7 @@ int gettimeofday(
  *  "Reentrant" version
  */
 int _gettimeofday_r(
-  struct _reent   *ignored_reentrancy_stuff RTEMS_UNUSED,
+  struct _reent   *ignored_reentrancy_stuff __attribute__((unused)),
   struct timeval  *tp,
   void           *__tz
 )

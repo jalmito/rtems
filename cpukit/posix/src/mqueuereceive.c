@@ -18,7 +18,19 @@
 #include "config.h"
 #endif
 
+#include <stdarg.h>
+
+#include <pthread.h>
+#include <limits.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <mqueue.h>
+
+#include <rtems/system.h>
+#include <rtems/score/watchdog.h>
+#include <rtems/seterr.h>
 #include <rtems/posix/mqueueimpl.h>
+#include <rtems/posix/time.h>
 
 ssize_t mq_receive(
   mqd_t         mqdes,
@@ -32,7 +44,7 @@ ssize_t mq_receive(
     msg_ptr,
     msg_len,
     msg_prio,
-    NULL,
-    _Thread_queue_Enqueue_do_nothing_extra
+    true,
+    WATCHDOG_NO_TIMEOUT
   );
 }

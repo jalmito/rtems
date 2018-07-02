@@ -30,6 +30,6 @@ int kill(
   int   sig
 )
 {
-  return _POSIX_signals_Send( pid, sig, NULL );
+  return killinfo( pid, sig, NULL );
 }
 

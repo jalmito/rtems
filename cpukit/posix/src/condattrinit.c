@@ -21,7 +21,11 @@
 #include <pthread.h>
 #include <errno.h>
 
+#include <rtems/system.h>
+#include <rtems/score/watchdog.h>
 #include <rtems/posix/condimpl.h>
+#include <rtems/posix/time.h>
+#include <rtems/posix/muteximpl.h>
 
 /*
  *  11.4.1 Condition Variable Initialization Attributes,
@@ -32,7 +36,7 @@ int pthread_condattr_init(
   pthread_condattr_t *attr
 )
 {
-  if ( attr == NULL )
+  if ( !attr )
     return EINVAL;
 
   *attr = _POSIX_Condition_variables_Default_attributes;

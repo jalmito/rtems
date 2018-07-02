@@ -88,7 +88,7 @@ bdbuf_test4_3_main()
      */
     CONTINUE_THREAD(1);
 
-    TEST_STOP();
+    TEST_END();
 }
 
 static rtems_task
@@ -153,3 +153,5 @@ bdbuf_test4_3_thread2(rtems_task_argument arg)
     }
     THREAD_END();
 }
+
+

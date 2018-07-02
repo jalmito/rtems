@@ -118,7 +118,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TIMER_CREATE
   );
 
   benchmark_timer_initialize();
@@ -131,7 +131,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TIMER_FIRE_AFTER
   );
 
   benchmark_timer_initialize();
@@ -144,7 +144,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TIMER_FIRE_AFTER
   );
 
   benchmark_timer_initialize();
@@ -157,7 +157,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TIMER_CANCEL
   );
 
   for ( benchmark_timer_initialize(), i=0 ; i<OPERATION_COUNT ; i++ )
@@ -171,7 +171,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TIMER_CANCEL
   );
 
   for ( benchmark_timer_initialize(), i=0 ; i<OPERATION_COUNT ; i++ )
@@ -185,7 +185,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TIMER_RESET
   );
 
   benchmark_timer_initialize();
@@ -198,7 +198,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TIMER_RESET
   );
 
   for ( index=1 ; index <= OPERATION_COUNT ; index++ )
@@ -222,7 +222,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TIMER_FIRE_WHEN
   );
 
   benchmark_timer_initialize();
@@ -236,7 +236,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TIMER_FIRE_WHEN
   );
 
   benchmark_timer_initialize();
@@ -249,7 +249,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TIMER_DELETE
   );
 
   benchmark_timer_initialize();
@@ -274,7 +274,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_TIMER_DELETE
   );
 
   benchmark_timer_initialize();
@@ -299,7 +299,7 @@ rtems_task Low_task(
     end_time,
     operation_count,
     0,
-    0
+    CALLING_OVERHEAD_TASK_WAKE_WHEN
   );
 
   TEST_END();

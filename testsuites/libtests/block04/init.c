@@ -27,7 +27,6 @@
 #include "tmacros.h"
 
 #include <rtems.h>
-#include <rtems/bspIo.h>
 #include <rtems/ramdisk.h>
 #include <rtems/bdbuf.h>
 #include <rtems/diskdevs.h>
@@ -102,7 +101,7 @@ static void task_high(rtems_task_argument arg)
 
   printk("H: release done: 0\n");
 
-  TEST_END();
+  rtems_test_endk();
 
   exit(0);
 }
@@ -112,7 +111,7 @@ static rtems_task Init(rtems_task_argument argument)
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   dev_t dev = 0;
 
-  TEST_BEGIN();
+  rtems_test_begink();
 
   sc = rtems_disk_io_initialize();
   ASSERT_SC(sc);
@@ -156,7 +155,7 @@ static rtems_task Init(rtems_task_argument argument)
 #define CONFIGURE_INIT
 
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_LIBBLOCK
 
 #define CONFIGURE_MAXIMUM_TASKS 3

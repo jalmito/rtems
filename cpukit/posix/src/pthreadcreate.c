@@ -27,12 +27,14 @@
 
 #include <rtems/posix/priorityimpl.h>
 #include <rtems/posix/pthreadimpl.h>
-#include <rtems/posix/pthreadattrimpl.h>
-#include <rtems/score/assert.h>
+#include <rtems/posix/time.h>
+#include <rtems/score/cpusetimpl.h>
 #include <rtems/score/threadimpl.h>
 #include <rtems/score/apimutex.h>
 #include <rtems/score/stackimpl.h>
+#include <rtems/score/watchdogimpl.h>
 #include <rtems/score/schedulerimpl.h>
+
 
 static inline size_t _POSIX_Threads_Ensure_minimum_stack (
   size_t size
@@ -51,36 +53,19 @@ int pthread_create(
   void                   *arg
 )
 {
-  Thread_Entry_information entry = {
-    .adaptor = _Thread_Entry_adaptor_pointer,
-    .Kinds = {
-      .Pointer = {
-        .entry = start_routine,
-        .argument = arg
-      }
-    }
-  };
   const pthread_attr_t               *the_attr;
-  int                                 normal_prio;
-  int                                 low_prio;
-  bool                                valid;
-  Priority_Control                    core_normal_prio;
-  Priority_Control                    core_low_prio;
+  Priority_Control                    core_priority;
   Thread_CPU_budget_algorithms        budget_algorithm;
   Thread_CPU_budget_algorithm_callout budget_callout;
   bool                                is_fp;
   bool                                status;
   Thread_Control                     *the_thread;
   Thread_Control                     *executing;
-  const Scheduler_Control            *scheduler;
   POSIX_API_Control                  *api;
-  const POSIX_API_Control            *executing_api;
   int                                 schedpolicy = SCHED_RR;
   struct sched_param                  schedparam;
-  size_t                              stacksize;
   Objects_Name                        name;
-  int                                 error;
-  ISR_lock_Context                    lock_context;
+  int                                 rc;
 
   if ( !start_routine )
     return EFAULT;
@@ -97,15 +82,8 @@ int pthread_create(
    *  NOTE: If the user provides the stack we will let it drop below
    *        twice the minimum.
    */
-  if ( the_attr->stackaddr != NULL ) {
-    if ( !_Stack_Is_enough(the_attr->stacksize) ) {
-      return EINVAL;
-    }
-
-    stacksize = the_attr->stacksize;
-  } else {
-    stacksize = _POSIX_Threads_Ensure_minimum_stack( the_attr->stacksize );
-  }
+  if ( the_attr->stackaddr && !_Stack_Is_enough(the_attr->stacksize) )
+    return EINVAL;
 
   #if 0
     int  cputime_clock_allowed;  /* see time.h */
@@ -124,12 +102,9 @@ int pthread_create(
    */
   switch ( the_attr->inheritsched ) {
     case PTHREAD_INHERIT_SCHED:
-      error = pthread_getschedparam(
-        pthread_self(),
-        &schedpolicy,
-        &schedparam
-      );
-      _Assert( error == 0 );
+      api = executing->API_Extensions[ THREAD_API_POSIX ];
+      schedpolicy = api->schedpolicy;
+      schedparam  = api->schedparam;
       break;
 
     case PTHREAD_EXPLICIT_SCHED:
@@ -148,39 +123,33 @@ int pthread_create(
   if ( the_attr->contentionscope != PTHREAD_SCOPE_PROCESS )
     return ENOTSUP;
 
-  error = _POSIX_Thread_Translate_sched_param(
+  /*
+   *  Interpret the scheduling parameters.
+   */
+  if ( !_POSIX_Priority_Is_valid( schedparam.sched_priority ) )
+    return EINVAL;
+
+  core_priority = _POSIX_Priority_To_core( schedparam.sched_priority );
+
+  /*
+   *  Set the core scheduling policy information.
+   */
+  rc = _POSIX_Thread_Translate_sched_param(
     schedpolicy,
     &schedparam,
     &budget_algorithm,
     &budget_callout
   );
-  if ( error != 0 ) {
-    return error;
-  }
+  if ( rc )
+    return rc;
 
-  normal_prio = schedparam.sched_priority;
-
-  scheduler = _Thread_Scheduler_get_home( executing );
-
-  core_normal_prio = _POSIX_Priority_To_core( scheduler, normal_prio, &valid );
-  if ( !valid ) {
+#if defined(RTEMS_SMP)
+#if __RTEMS_HAVE_SYS_CPUSET_H__
+  status = _CPU_set_Is_valid( the_attr->affinityset, the_attr->affinitysetsize );
+  if ( !status )
     return EINVAL;
-  }
-
-  if ( schedpolicy == SCHED_SPORADIC ) {
-    low_prio = schedparam.sched_ss_low_priority;
-  } else {
-    low_prio = normal_prio;
-  }
-
-  core_low_prio = _POSIX_Priority_To_core( scheduler, low_prio, &valid );
-  if ( !valid ) {
-    return EINVAL;
-  }
-
-  if ( the_attr->affinityset == NULL ) {
-    return EINVAL;
-  }
+#endif
+#endif
 
   /*
    *  Currently all POSIX threads are floating point if the hardware
@@ -206,11 +175,11 @@ int pthread_create(
   status = _Thread_Initialize(
     &_POSIX_Threads_Information,
     the_thread,
-    scheduler,
+    _Scheduler_Get( executing ),
     the_attr->stackaddr,
-    stacksize,
+    _POSIX_Threads_Ensure_minimum_stack(the_attr->stacksize),
     is_fp,
-    core_normal_prio,
+    core_priority,
     true,                 /* preemptible */
     budget_algorithm,
     budget_callout,
@@ -223,53 +192,42 @@ int pthread_create(
     return EAGAIN;
   }
 
-  if ( the_attr->detachstate == PTHREAD_CREATE_DETACHED ) {
-    the_thread->Life.state |= THREAD_LIFE_DETACHED;
-  }
-
-  the_thread->Life.state |= THREAD_LIFE_CHANGE_DEFERRED;
-
-  _ISR_lock_ISR_disable( &lock_context );
+#if defined(RTEMS_SMP) && __RTEMS_HAVE_SYS_CPUSET_H__
    status = _Scheduler_Set_affinity(
      the_thread,
      the_attr->affinitysetsize,
      the_attr->affinityset
    );
-  _ISR_lock_ISR_enable( &lock_context );
    if ( !status ) {
      _POSIX_Threads_Free( the_thread );
      _RTEMS_Unlock_allocator();
      return EINVAL;
    }
+#endif
 
   /*
    *  finish initializing the per API structure
    */
   api = the_thread->API_Extensions[ THREAD_API_POSIX ];
-  executing_api = executing->API_Extensions[ THREAD_API_POSIX ];
 
-  api->signals_unblocked = executing_api->signals_unblocked;
+  _POSIX_Threads_Copy_attributes( &api->Attributes, the_attr );
+  api->detachstate = the_attr->detachstate;
+  api->schedpolicy = schedpolicy;
+  api->schedparam  = schedparam;
 
-  the_thread->was_created_with_inherited_scheduler =
-    ( the_attr->inheritsched == PTHREAD_INHERIT_SCHED );
-
-  _Priority_Node_set_priority( &api->Sporadic.Low_priority, core_low_prio );
-  api->Sporadic.sched_ss_repl_period =
-    the_attr->schedparam.sched_ss_repl_period;
-  api->Sporadic.sched_ss_init_budget =
-    the_attr->schedparam.sched_ss_init_budget;
-  api->Sporadic.sched_ss_max_repl =
-    the_attr->schedparam.sched_ss_max_repl;
-
-  if ( schedpolicy == SCHED_SPORADIC ) {
-    _POSIX_Threads_Sporadic_timer( &api->Sporadic.Timer );
-  }
+  _Thread_Disable_dispatch();
 
   /*
    *  POSIX threads are allocated and started in one operation.
    */
-  _ISR_lock_ISR_disable( &lock_context );
-  status = _Thread_Start( the_thread, &entry, &lock_context );
+  status = _Thread_Start(
+    the_thread,
+    THREAD_START_POINTER,
+    start_routine,
+    arg,
+    0,                    /* unused */
+    NULL
+  );
 
   #if defined(RTEMS_DEBUG)
     /*
@@ -279,11 +237,21 @@ int pthread_create(
      *        thread while we are creating it.
      */
     if ( !status ) {
+      _Thread_Enable_dispatch();
       _POSIX_Threads_Free( the_thread );
       _Objects_Allocator_unlock();
       return EINVAL;
     }
   #endif
+
+  if ( schedpolicy == SCHED_SPORADIC ) {
+    _Watchdog_Insert_ticks(
+      &api->Sporadic_timer,
+      _Timespec_To_ticks( &api->schedparam.sched_ss_repl_period )
+    );
+  }
+
+  _Thread_Enable_dispatch();
 
   /*
    *  Return the id and indicate we successfully created the thread

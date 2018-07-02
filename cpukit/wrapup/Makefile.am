@@ -5,16 +5,10 @@ include $(top_srcdir)/automake/compile.am
 ARCH = o-optimize
 
 project_lib_LIBRARIES = librtemscpu.a
-
-$(PROJECT_LIB)/librtemscpu.a: librtemscpu.a
-	$(INSTALL_DATA) $< $(PROJECT_LIB)/librtemscpu.a
-TMPINSTALL_FILES = $(PROJECT_LIB)/librtemscpu.a
-
 librtemscpu_a_SOURCES =
 
 TMP_LIBS =
 TMP_LIBS += ../dev/libdev.a
-TMP_LIBS += ../dtc/libfdt/libfdt.a
 TMP_LIBS += ../score/cpu/@RTEMS_CPU@/libscorecpu.a
 TMP_LIBS += ../score/libscore.a
 TMP_LIBS += ../sapi/libsapi.a
@@ -26,7 +20,6 @@ TMP_LIBS += ../libgnat/libgnat.a
 endif
 
 TMP_LIBS += ../libcrypt/libcrypt.a
-TMP_LIBS += ../libstdthreads/libstdthreads.a
 TMP_LIBS += ../libcsupport/libcsupport.a
 TMP_LIBS += ../libcsupport/libcalloc.a
 TMP_LIBS += ../libblock/libblock.a
@@ -62,7 +55,6 @@ TMP_LIBS += ../libmisc/libfsmount.a
 TMP_LIBS += ../libmisc/libmouse.a
 TMP_LIBS += ../libmisc/libmw-fb.a
 TMP_LIBS += ../libmisc/libredirector.a
-TMP_LIBS += ../libmisc/librtemsfdt.a
 TMP_LIBS += ../libmisc/libstringto.a
 TMP_LIBS += ../libmisc/libtestsupport.a
 
@@ -71,7 +63,6 @@ TMP_LIBS += ../libmisc/libutf8proc.a
 endif
 
 TMP_LIBS += ../libmisc/libuuid.a
-TMP_LIBS += ../libmisc/libxz.a
 TMP_LIBS += ../libi2c/libi2c.a
 
 if LIBPCI
@@ -86,6 +77,9 @@ if LIBNETWORKING
 TMP_LIBS += ../libnetworking/libnetworking.a
 TMP_LIBS += ../libnetworking/libc.a
 TMP_LIBS += ../libnetworking/lib.a
+endif
+
+if LIBRPC
 TMP_LIBS += ../librpc/librpc.a
 TMP_LIBS += ../librpc/libxdr.a
 endif
@@ -99,10 +93,10 @@ TMP_LIBS += ../libdl/libdl.a
 endif
 
 librtemscpu.a: $(TMP_LIBS)
-	$(AM_V_GEN)rm -f $@
-	$(AM_V_GEN)$(MKDIR_P) $(ARCH)
-	$(AM_V_GEN)rm -rf $(ARCH)/*.$(OBJEXT) $(ARCH)/*.rel
-	$(AM_V_at)for f in $(TMP_LIBS); do \
+	rm -f $@
+	$(MKDIR_P) $(ARCH)
+	rm -rf $(ARCH)/*.$(OBJEXT) $(ARCH)/*.rel
+	for f in $(TMP_LIBS); do \
 	  case $$f in \
 	  *.$(OBJEXT) | *.rel) \
 	    if test -f $(ARCH)/`basename $$f`; then \
@@ -119,17 +113,18 @@ librtemscpu.a: $(TMP_LIBS)
 	    ;; \
 	  *.a) \
 	    cd $(ARCH); \
-	      $(AR) xv ../$$f > /dev/null || exit 1; \
+	      $(AR) xv ../$$f || exit 1; \
 	      chmod a-w * ; \
             cd ..; \
 	    ;; \
 	  esac; \
 	done
-	$(AM_V_GEN)ls $(ARCH)/* > $@-list
-	$(AM_V_AR)$(AR) rc $@ @$@-list
-	$(AM_V_GEN)rm -f $@-list $(ARCH)/*.$(OBJEXT) $(ARCH)/*.rel
-	$(AM_V_at)$(RANLIB) $@
+	ls $(ARCH)/* > $@-list
+	$(AR) rc $@ @$@-list
+	rm -f $@-list $(ARCH)/*.$(OBJEXT) $(ARCH)/*.rel
+	$(RANLIB) $@
 
 all-local: $(TMPINSTALL_FILES)
 
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/automake/local.am

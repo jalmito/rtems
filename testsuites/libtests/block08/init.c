@@ -19,22 +19,19 @@
 #include "config.h"
 #endif
 
-#include "tmacros.h"
-
 #define CONFIGURE_INIT
 #include "system.h"
 
 #include "bdbuf_tests.h"
 
-#include <stdlib.h> /* for exit */
-
 const char rtems_test_name[] = "BLOCK 8";
 
 rtems_task Init(rtems_task_argument argument)
 {
-  TEST_BEGIN();
+  rtems_test_begin();
   run_bdbuf_tests();
-  TEST_END();
+  rtems_test_end();
 
   exit(0);
 }
+

@@ -20,16 +20,13 @@
 
 #include <rtems/system.h>
 #include <rtems/config.h>
-#include <rtems/sysinit.h>
 #include <rtems/rtems/status.h>
 #include <rtems/rtems/support.h>
+#include <rtems/score/thread.h>
 #include <rtems/rtems/timerimpl.h>
+#include <rtems/score/watchdog.h>
 
-Timer_server_Control *volatile _Timer_server;
-
-Objects_Information  _Timer_Information;
-
-static void _Timer_Manager_initialization(void)
+void _Timer_Manager_initialization(void)
 {
   _Objects_Initialize_information(
     &_Timer_Information,       /* object information table */
@@ -39,13 +36,18 @@ static void _Timer_Manager_initialization(void)
                                /* maximum objects of this class */
     sizeof( Timer_Control ),   /* size of this object's control block */
     false,                     /* true if the name is a string */
-    RTEMS_MAXIMUM_NAME_LENGTH, /* maximum length of an object name */
+    RTEMS_MAXIMUM_NAME_LENGTH  /* maximum length of an object name */
+#if defined(RTEMS_MULTIPROCESSING)
+    ,
+    false,                     /* true if this is a global object class */
     NULL                       /* Proxy extraction support callout */
+#endif
   );
-}
 
-RTEMS_SYSINIT_ITEM(
-  _Timer_Manager_initialization,
-  RTEMS_SYSINIT_CLASSIC_TIMER,
-  RTEMS_SYSINIT_ORDER_MIDDLE
-);
+  /*
+   *  Initialize the pointer to the default timer server control block to NULL
+   *  indicating that task-based timer support is not initialized.
+   */
+
+  _Timer_server = NULL;
+}

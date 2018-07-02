@@ -18,30 +18,55 @@
 #include "config.h"
 #endif
 
+#include <pthread.h>
+#include <errno.h>
+
+#include <rtems/system.h>
+#include <rtems/score/watchdog.h>
 #include <rtems/posix/condimpl.h>
+#include <rtems/posix/time.h>
+#include <rtems/posix/muteximpl.h>
 
 /**
  *  11.4.2 Initializing and Destroying a Condition Variable,
  *         P1003.1c/Draft 10, p. 87
  */
-int pthread_cond_destroy( pthread_cond_t *cond )
+int pthread_cond_destroy(
+  pthread_cond_t           *cond
+)
 {
   POSIX_Condition_variables_Control *the_cond;
-  unsigned long                      flags;
-  Thread_queue_Context               queue_context;
+  Objects_Locations                  location;
 
-  the_cond = _POSIX_Condition_variables_Get( cond );
-  POSIX_CONDITION_VARIABLES_VALIDATE_OBJECT( the_cond, flags );
+  _Objects_Allocator_lock();
+  the_cond = _POSIX_Condition_variables_Get( cond, &location );
+  switch ( location ) {
 
-  _Thread_queue_Context_initialize( &queue_context );
-  _POSIX_Condition_variables_Acquire( the_cond, &queue_context );
+    case OBJECTS_LOCAL:
 
-  if ( !_Thread_queue_Is_empty( &the_cond->Queue.Queue ) ) {
-    _POSIX_Condition_variables_Release( the_cond, &queue_context );
-    return EBUSY;
+      if ( _Thread_queue_First( &the_cond->Wait_queue ) ) {
+        _Objects_Put( &the_cond->Object );
+        _Objects_Allocator_unlock();
+        return EBUSY;
+      }
+
+      _Objects_Close(
+        &_POSIX_Condition_variables_Information,
+        &the_cond->Object
+      );
+      _Objects_Put( &the_cond->Object );
+      _POSIX_Condition_variables_Free( the_cond );
+      _Objects_Allocator_unlock();
+      return 0;
+
+#if defined(RTEMS_MULTIPROCESSING)
+    case OBJECTS_REMOTE:
+#endif
+    case OBJECTS_ERROR:
+      break;
   }
 
-  _POSIX_Condition_variables_Release( the_cond, &queue_context );
-  _POSIX_Condition_variables_Destroy( the_cond );
-  return 0;
+  _Objects_Allocator_unlock();
+
+  return EINVAL;
 }

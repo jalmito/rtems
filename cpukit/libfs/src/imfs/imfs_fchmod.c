@@ -18,7 +18,7 @@
   #include "config.h"
 #endif
 
-#include <rtems/imfs.h>
+#include "imfs.h"
 
 int IMFS_fchmod(
   const rtems_filesystem_location_info_t *loc,

@@ -18,59 +18,69 @@
 #include "config.h"
 #endif
 
+#include <rtems/system.h>
+#include <rtems/rtems/status.h>
+#include <rtems/rtems/support.h>
+#include <rtems/rtems/attrimpl.h>
+#include <rtems/score/isr.h>
+#include <rtems/rtems/options.h>
 #include <rtems/rtems/semimpl.h>
+#include <rtems/score/coremuteximpl.h>
+#include <rtems/score/coresemimpl.h>
+#include <rtems/score/thread.h>
 
-rtems_status_code rtems_semaphore_flush( rtems_id id )
-{
-  Semaphore_Control    *the_semaphore;
-  Thread_queue_Context  queue_context;
+#include <rtems/score/interr.h>
 
-  the_semaphore = _Semaphore_Get( id, &queue_context );
-
-  if ( the_semaphore == NULL ) {
 #if defined(RTEMS_MULTIPROCESSING)
-    if ( _Semaphore_MP_Is_remote( id ) ) {
-      return RTEMS_ILLEGAL_ON_REMOTE_OBJECT;
-    }
+#define SEND_OBJECT_WAS_DELETED _Semaphore_MP_Send_object_was_deleted
+#else
+#define SEND_OBJECT_WAS_DELETED NULL
 #endif
 
-    return RTEMS_INVALID_ID;
-  }
+rtems_status_code rtems_semaphore_flush(
+  rtems_id        id
+)
+{
+  Semaphore_Control          *the_semaphore;
+  Objects_Locations           location;
+  rtems_attribute             attribute_set;
 
-  _Thread_queue_Acquire_critical(
-    &the_semaphore->Core_control.Wait_queue,
-    &queue_context
-  );
-  _Thread_queue_Context_set_MP_callout(
-    &queue_context,
-    _Semaphore_MP_Send_object_was_deleted
-  );
+  the_semaphore = _Semaphore_Get( id, &location );
+  switch ( location ) {
 
-  switch ( the_semaphore->variant ) {
+    case OBJECTS_LOCAL:
+      attribute_set = the_semaphore->attribute_set;
 #if defined(RTEMS_SMP)
-    case SEMAPHORE_VARIANT_MRSP:
-      _Thread_queue_Release(
-        &the_semaphore->Core_control.Wait_queue,
-        &queue_context
-      );
-      return RTEMS_NOT_DEFINED;
+      if ( _Attributes_Is_multiprocessor_resource_sharing( attribute_set ) ) {
+        _Objects_Put( &the_semaphore->Object );
+        return RTEMS_NOT_DEFINED;
+      } else
 #endif
-    default:
-      _Assert(
-        the_semaphore->variant == SEMAPHORE_VARIANT_MUTEX_INHERIT_PRIORITY
-          || the_semaphore->variant == SEMAPHORE_VARIANT_MUTEX_PRIORITY_CEILING
-          || the_semaphore->variant == SEMAPHORE_VARIANT_MUTEX_NO_PROTOCOL
-          || the_semaphore->variant == SEMAPHORE_VARIANT_SIMPLE_BINARY
-          || the_semaphore->variant == SEMAPHORE_VARIANT_COUNTING
-      );
-      _Thread_queue_Flush_critical(
-        &the_semaphore->Core_control.Wait_queue.Queue,
-        _Semaphore_Get_operations( the_semaphore ),
-        _Thread_queue_Flush_status_unavailable,
-        &queue_context
-      );
+      if ( !_Attributes_Is_counting_semaphore( attribute_set ) ) {
+        _CORE_mutex_Flush(
+          &the_semaphore->Core_control.mutex,
+          SEND_OBJECT_WAS_DELETED,
+          CORE_MUTEX_STATUS_UNSATISFIED_NOWAIT
+        );
+      } else {
+        _CORE_semaphore_Flush(
+          &the_semaphore->Core_control.semaphore,
+          SEND_OBJECT_WAS_DELETED,
+          CORE_SEMAPHORE_STATUS_UNSATISFIED_NOWAIT
+        );
+      }
+      _Objects_Put( &the_semaphore->Object );
+      return RTEMS_SUCCESSFUL;
+
+#if defined(RTEMS_MULTIPROCESSING)
+    case OBJECTS_REMOTE:
+      _Thread_Dispatch();
+      return RTEMS_ILLEGAL_ON_REMOTE_OBJECT;
+#endif
+
+    case OBJECTS_ERROR:
       break;
   }
 
-  return RTEMS_SUCCESSFUL;
+  return RTEMS_INVALID_ID;
 }

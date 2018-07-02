@@ -1,44 +1,56 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
-include $(top_srcdir)/../../bsp.am
 
-dist_project_lib_DATA = ../../../../../../bsps/nios2/nios2_iss/start/bsp_specs
+dist_project_lib_DATA = bsp_specs
 
+include_bspdir = $(includedir)/bsp
 
+include_HEADERS = include/bsp.h
+include_HEADERS += ../../shared/include/tm27.h
 
-start.$(OBJEXT): ../../../../../../bsps/nios2/nios2_iss/start/start.S
-	$(CPPASCOMPILE) -o $@ -c $<
-crtnn.$(OBJEXT): ../../../../../../bsps/nios2/nios2_iss/start/crtnn.S
-	$(CPPASCOMPILE) -o $@ -c $<
+nodist_include_HEADERS = include/bspopts.h
+nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
+nodist_include_bsp_HEADERS += ../../shared/include/console-polled.h
+DISTCLEANFILES = include/bspopts.h
+
+include_HEADERS += ../../shared/include/coverhd.h
+
+EXTRA_DIST = times
+noinst_LIBRARIES = libbspstart.a
+libbspstart_a_SOURCES = start/crtnn.s
+libbspstart_a_SOURCES += start/start.S
 project_lib_DATA = start.$(OBJEXT) crtnn.$(OBJEXT)
 
-project_lib_DATA += linkcmds
+dist_project_lib_DATA += startup/linkcmds
 
-project_lib_LIBRARIES = librtemsbsp.a
-librtemsbsp_a_SOURCES =
-librtemsbsp_a_CPPFLAGS = $(AM_CPPFLAGS)
+noinst_LIBRARIES += libbsp.a
+libbsp_a_SOURCES =
+libbsp_a_CPPFLAGS =
 
 # startup
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspreset-loop.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/nios2/nios2_iss/start/bspstart.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/nios2/nios2_iss/start/setvec.c
+libbsp_a_SOURCES += ../../shared/bspclean.c
+libbsp_a_SOURCES += ../../shared/bsplibc.c
+libbsp_a_SOURCES += ../../shared/bspreset_loop.c
+libbsp_a_SOURCES += ../../shared/bsppost.c
+libbsp_a_SOURCES += startup/bspstart.c
+libbsp_a_SOURCES += ../../shared/bsppretaskinghook.c
+libbsp_a_SOURCES += ../../shared/bspgetworkarea.c
+libbsp_a_SOURCES += ../../shared/bootcard.c
+libbsp_a_SOURCES += ../../shared/sbrk.c
+libbsp_a_SOURCES += startup/setvec.c
+libbsp_a_SOURCES += ../../shared/gnatinstallhandler.c
+libbsp_a_SOURCES += ../../shared/bsppredriverhook.c
 
 # clock
-librtemsbsp_a_SOURCES +=../../../../../../bsps/nios2/nios2_iss/clock/clock.c
+libbsp_a_SOURCES += clock/clock.c ../../../shared/clockdrv_shell.h
 # console
-librtemsbsp_a_SOURCES += ../../../../../../bsps/nios2/nios2_iss/console/console.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/console-polled.c
+libbsp_a_SOURCES += console/console.c ../../shared/console-polled.c
 # timer
-librtemsbsp_a_SOURCES += ../../../../../../bsps/nios2/nios2_iss/btimer/btimer.c
+libbsp_a_SOURCES += timer/timer.c
 
 # Cache
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/cache/nocache.c
+libbsp_a_LIBADD = ../../../libcpu/@RTEMS_CPU@/shared/cache.rel
 
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
-include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/nios2/nios2_iss/headers.am

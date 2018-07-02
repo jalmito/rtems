@@ -20,57 +20,37 @@
 #endif
 
 #include <rtems/score/schedulercbsimpl.h>
+#include <rtems/score/threadimpl.h>
+#include <rtems/score/watchdogimpl.h>
 
 void _Scheduler_CBS_Release_job(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread,
-  Priority_Node           *priority_node,
-  uint64_t                 deadline,
-  Thread_queue_Context    *queue_context
+  uint32_t                 deadline
 )
 {
-  Scheduler_CBS_Node   *node;
-  Scheduler_CBS_Server *serv_info;
+  Scheduler_CBS_Node   *node = _Scheduler_CBS_Thread_get_node( the_thread );
+  Scheduler_CBS_Server *serv_info = node->cbs_server;
+  Priority_Control      new_priority;
+  Priority_Control      unused;
 
-  node = _Scheduler_CBS_Thread_get_node( the_thread );
-  serv_info = node->cbs_server;
+  if (deadline) {
+    /* Initializing or shifting deadline. */
+    if (serv_info)
+      new_priority = (_Watchdog_Ticks_since_boot + serv_info->parameters.deadline)
+        & ~SCHEDULER_EDF_PRIO_MSB;
+    else
+      new_priority = (_Watchdog_Ticks_since_boot + deadline)
+        & ~SCHEDULER_EDF_PRIO_MSB;
+  }
+  else {
+    /* Switch back to background priority. */
+    new_priority = the_thread->Start.initial_priority;
+  }
 
   /* Budget replenishment for the next job. */
-  if ( serv_info != NULL ) {
+  if (serv_info)
     the_thread->cpu_time_budget = serv_info->parameters.budget;
-  }
 
-  node->deadline_node = priority_node;
-
-  _Scheduler_EDF_Release_job(
-    scheduler,
-    the_thread,
-    priority_node,
-    deadline,
-    queue_context
-  );
-}
-
-void _Scheduler_CBS_Cancel_job(
-  const Scheduler_Control *scheduler,
-  Thread_Control          *the_thread,
-  Priority_Node           *priority_node,
-  Thread_queue_Context    *queue_context
-)
-{
-  Scheduler_CBS_Node *node;
-
-  node = _Scheduler_CBS_Thread_get_node( the_thread );
-
-  if ( node->deadline_node != NULL ) {
-    _Assert( node->deadline_node == priority_node );
-    node->deadline_node = NULL;
-
-    _Scheduler_EDF_Cancel_job(
-      scheduler,
-      the_thread,
-      priority_node,
-      queue_context
-    );
-  }
+  _Thread_Set_priority( the_thread, new_priority, &unused, true );
 }

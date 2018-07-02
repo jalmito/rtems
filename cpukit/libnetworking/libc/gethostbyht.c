@@ -60,7 +60,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <rtems/rtems_netdb.h>
 #include <stdio.h>
 #include <stdlib.h> /* realloc, malloc, free */
 #include <ctype.h>
@@ -214,36 +213,17 @@ _gethostbyhtaddr(
 
 
 #ifdef _THREAD_SAFE
-int
-gethostent_r(
-	struct hostent *pe,
-	char *buf,
-	size_t len,
-	struct hostent **result,
-	int *h_errnop)
+struct hostent* gethostent_r(char* buf, int len) 
 {
   char  *dest;
+  struct hostent* pe=(struct hostent*)buf;
   char*  last;
   char*  max=buf+len;
   int    aliasidx;
   int    curlen;
-  int    rv;
-
-  if (pe == NULL || buf == NULL || result == NULL || h_errnop == NULL) {
-    if (h_errnop != NULL) {
-      *h_errnop = NETDB_INTERNAL;
-    }
-    return EINVAL;
-  }
-
-  *result = NULL;
-  *h_errnop = NETDB_INTERNAL;
-  rv = -1;
-
-  if (!hostf) {
-    rv = ENOENT;
-    return rv;
-  }
+  
+   
+  if (!hostf) return 0;
   fseek(hostf,0,SEEK_END);
   curlen=ftell(hostf);
   fseek(hostf,0,SEEK_SET);
@@ -267,22 +247,16 @@ gethostent_r(
   last=hostmap+hostlen;
 again:
   if ((size_t)len<sizeof(struct hostent)+11*sizeof(char*)) goto nospace;
-  dest=buf;
+  dest=buf+sizeof(struct hostent);
   pe->h_name=0;
   pe->h_aliases=(char**)dest; pe->h_aliases[0]=0; dest+=10*sizeof(char*);
   pe->h_addr_list=(char**)dest; dest+=2*sizeof(char**);
-  if (cur>=last) {
-    rv = ERANGE;
-    return rv;
-  }
+  if (cur>=last) return 0;
   if (*cur=='#' || *cur=='\n') goto parseerror;
   /* first, the ip number */
   pe->h_name=cur;
   while (cur<last && !isspace((unsigned char)*cur)) cur++;
-  if (cur>=last) {
-    rv = ERANGE;
-    return rv;
-  }
+  if (cur>=last) return 0;
   if (*cur=='\n') goto parseerror;
   {
     char save=*cur;
@@ -326,22 +300,19 @@ again:
   pe->h_aliases[aliasidx]=0;
   pe->h_name=pe->h_aliases[0];
   pe->h_aliases++;
-  *result = pe;
-  *h_errnop = 0;
-  rv = 0;
-  return rv;
+  return pe;
 parseerror:
   while (cur<last && *cur!='\n') cur++;
   cur++;
   goto again;
 nospace:
-  rv=ERANGE;
+  errno=ERANGE;
   goto __error;
 error:
-  rv=ENOMEM;
+  errno=ENOMEM;
 __error:
   if (hostmap!=NULL) free(hostmap);
   hostmap=NULL;
-  return rv;
+  return 0;
 }
 #endif

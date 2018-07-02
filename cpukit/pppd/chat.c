@@ -218,7 +218,7 @@ void *copy_of(
     return dup_mem(s, strlen (s) + 1);
 }
 
-static char *getnextcommand(char *string,char *buff)
+char *getnextcommand(char *string,char *buff)
 {
 	char *token;
 	int len;

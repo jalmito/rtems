@@ -105,7 +105,7 @@ void test_init(void)
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_EVENT_RECEIVE
   );
 
 
@@ -126,7 +126,7 @@ void test_init(void)
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_EVENT_RECEIVE
   );
 }
 
@@ -144,7 +144,7 @@ rtems_task Low_task(
     end_time,
     OPERATION_COUNT,
     0,
-    0
+    CALLING_OVERHEAD_EVENT_RECEIVE
   );
 
   benchmark_timer_initialize();
@@ -162,7 +162,7 @@ rtems_task Low_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_EVENT_SEND
   );
 
   benchmark_timer_initialize();
@@ -179,7 +179,7 @@ rtems_task Low_task(
     end_time,
     1,
     0,
-    0
+    CALLING_OVERHEAD_EVENT_RECEIVE
   );
 
   benchmark_timer_initialize();
@@ -192,7 +192,7 @@ rtems_task Low_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    0
+    CALLING_OVERHEAD_EVENT_SEND
   );
 
   TEST_END();

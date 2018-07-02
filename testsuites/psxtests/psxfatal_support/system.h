@@ -25,7 +25,10 @@ void force_error(void);
 
 void Put_Source( rtems_fatal_source source );
 
-void Put_Error( rtems_fatal_source source, rtems_fatal_code error );
+void Put_Error(
+  uint32_t source,
+  uint32_t error
+);
 
 void *POSIX_Init(
   void *argument
@@ -33,7 +36,7 @@ void *POSIX_Init(
 
 void Fatal_extension(
   rtems_fatal_source source,
-  bool               always_set_to_false,
+  bool               is_internal,
   rtems_fatal_code   error
 );
 
@@ -59,7 +62,7 @@ extern rtems_extensions_table initial_extensions;
   RTEMS_TEST_INITIAL_EXTENSION
 
 /* extra parameters may be in testcase.h */
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 /* always need an Init task, some cases need more tasks */

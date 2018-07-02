@@ -35,20 +35,17 @@ const char rtems_test_name[] = "MATHL";
 extern void domathl(void);
 
 #if __rtems__
-#include <tmacros.h>
-
 /* NOTICE: the clock driver is explicitly disabled */
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS           1
 #define CONFIGURE_INIT_TASK_ATTRIBUTES    RTEMS_FLOATING_POINT
+#define CONFIGURE_USE_DEVFS_AS_BASE_FILESYSTEM
 
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
-
-#define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
 
 #define CONFIGURE_INIT
 #include <rtems/confdefs.h>
@@ -61,14 +58,13 @@ int main( void )
 #endif
 {
 #if __rtems__
-  rtems_print_printer_fprintf_putc(&rtems_test_printer);
-  TEST_BEGIN();
+  rtems_test_begin();
 #endif
 
-  domathl();
+  domathl();  
 
 #if __rtems__
-  TEST_END();
+  rtems_test_end();
 #endif
   exit( 0 );
 }

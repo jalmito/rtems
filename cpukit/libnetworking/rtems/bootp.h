@@ -3,7 +3,6 @@
 #if !defined (__RTEMS_BOOTP_H__)
 #define __RTEMS_BOOTP_H__
 
-#include <stddef.h>
 #include <stdbool.h>
 
 #if __cplusplus
@@ -22,9 +21,7 @@ bool bootpc_init(bool, bool);
 int bootpc_call(
      struct bootp_packet *call,
      struct bootp_packet *reply,
-     struct proc *procp,
-     const void *exp_vend,
-     size_t exp_vend_len);
+     struct proc *procp);
 int bootpc_fakeup_interface(struct ifreq *ireq,
                                     struct socket *so,
                                     struct proc *procp);

@@ -1,65 +1,88 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
-include $(top_srcdir)/../../bsp.am
 
-dist_project_lib_DATA = ../../../../../../bsps/powerpc/t32mppc/start/bsp_specs
+include_bspdir = $(includedir)/bsp
 
+dist_project_lib_DATA = bsp_specs
 
+include_HEADERS = include/bsp.h
+include_HEADERS += ../../shared/include/tm27.h
+
+nodist_include_HEADERS = include/bspopts.h
+DISTCLEANFILES = include/bspopts.h
+
+EXTRA_DIST = README
 
 noinst_PROGRAMS =
 
+include_HEADERS += ../../shared/include/coverhd.h
 
-start.$(OBJEXT): ../../../../../../bsps/powerpc/t32mppc/start/start.S
-	$(CPPASCOMPILE) -o $@ -c $<
+include_bsp_HEADERS = include/irq.h \
+	../../shared/include/irq-generic.h \
+	../../shared/include/irq-info.h \
+	../../shared/include/bootcard.h \
+	../../shared/include/utility.h \
+	../shared/include/start.h \
+	../shared/include/tictac.h \
+	../shared/include/linker-symbols.h
+
+noinst_LIBRARIES = libbspstart.a
+libbspstart_a_SOURCES = start/start.S
 project_lib_DATA = start.$(OBJEXT)
 
-rtems_crti.$(OBJEXT): ../../../../../../bsps/powerpc/shared/start/rtems_crti.S
-	$(CPPASCOMPILE) -o $@ -c $<
+libbspstart_a_SOURCES += ../../powerpc/shared/start/rtems_crti.S
 project_lib_DATA += rtems_crti.$(OBJEXT)
 
-project_lib_DATA += linkcmds
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/shared/start/linkcmds.base
-dist_project_lib_DATA += ../../../../../../bsps/powerpc/t32mppc/start/linkcmds.t32mppc
+dist_project_lib_DATA += startup/linkcmds \
+	../shared/startup/linkcmds.base \
+	startup/linkcmds.t32mppc
 
-project_lib_LIBRARIES = librtemsbsp.a
-librtemsbsp_a_SOURCES =
+noinst_LIBRARIES += libbsp.a
+libbsp_a_SOURCES =
 
 # Startup
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/exceptions/ppc-exc-handler-table.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/start/tictac.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/start/bsp-start-zero.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/t32mppc/start/bspstart.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/t32mppc/start/bspreset.c
+libbsp_a_SOURCES += ../../shared/bsplibc.c \
+	../../shared/bsppost.c \
+	../../shared/bootcard.c \
+	../../shared/bsppretaskinghook.c \
+	../../shared/bsppredriverhook.c \
+	../../shared/sbrk.c \
+	../../shared/gnatinstallhandler.c \
+	../../shared/bspclean.c \
+	../../shared/bspgetworkarea.c \
+	../shared/src/tictac.c \
+	../shared/src/bsp-start-zero.S \
+	startup/bspstart.c \
+	startup/bspreset.c
 
 # Clock
-librtemsbsp_a_SOURCES +=../../../../../../bsps/powerpc/t32mppc/clock/clock-config.c
+libbsp_a_SOURCES += ../shared/clock/clock.c
 
 # Timer
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/btimer/btimer-stub.c
+libbsp_a_SOURCES += ../../shared/timerstub.c
 
 # IRQ
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/irq/irq-default-handler.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/t32mppc/irq/irq.c
+libbsp_a_SOURCES += ../../shared/src/irq-default-handler.c
+libbsp_a_SOURCES += ../../shared/src/irq-generic.c
+libbsp_a_SOURCES += ../../shared/src/irq-info.c
+libbsp_a_SOURCES += ../../shared/src/irq-legacy.c
+libbsp_a_SOURCES += ../../shared/src/irq-server.c
+libbsp_a_SOURCES += ../../shared/src/irq-shell.c
+libbsp_a_SOURCES += irq/irq.c
 
 # Console
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/console-termios.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/t32mppc/console/console.c
+libbsp_a_SOURCES += ../../shared/console.c \
+        ../../shared/console_select.c \
+	console/console-config.c \
+        ../../shared/console_read.c \
+        ../../shared/console_write.c \
+        ../../shared/console_control.c
 
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/cache/cache.c
+libbsp_a_LIBADD = ../../../libcpu/@RTEMS_CPU@/shared/cpuIdent.rel \
+	../../../libcpu/@RTEMS_CPU@/shared/cache.rel \
+	../../../libcpu/@RTEMS_CPU@/@exceptions@/rtems-cpu.rel \
+	../../../libcpu/@RTEMS_CPU@/@exceptions@/exc_bspsupport.rel
 
-if HAS_SMP
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspsmp-dummy.c
-endif
-
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
-include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
-include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
-include $(srcdir)/../../../../../../bsps/powerpc/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/powerpc/shared/exceptions-sources.am
-include $(srcdir)/../../../../../../bsps/powerpc/t32mppc/headers.am

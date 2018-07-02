@@ -200,7 +200,8 @@ static void delay_ipi_task(rtems_task_argument variant)
   test_context *ctx = &test_instance;
   ISR_Level level;
 
-  _ISR_Local_disable(level);
+  _ISR_Disable_without_giant(level);
+  (void) level;
 
   /* (C) */
   barrier(ctx, &ctx->worker_barrier_state);
@@ -212,19 +213,17 @@ static void delay_ipi_task(rtems_task_argument variant)
   rtems_counter_delay_nanoseconds(100000000);
 
   if (variant != 0) {
-    _Thread_Dispatch_disable();
+    _Thread_Disable_dispatch();
   }
-
-  _ISR_Local_enable(level);
 
   /*
    * We get deleted as a side effect of enabling the thread life protection or
    * later if we enable the thread dispatching.
    */
-  _Thread_Set_life_protection( THREAD_LIFE_PROTECTED );
+  _Thread_Set_life_protection(true);
 
   if (variant != 0) {
-    _Thread_Dispatch_enable( _Per_CPU_Get() );
+    _Thread_Enable_dispatch();
   }
 
   rtems_test_assert(0);
@@ -265,6 +264,10 @@ static void delay_switch_task(rtems_task_argument arg)
 {
   test_context *ctx = &test_instance;
   rtems_status_code sc;
+  ISR_Level level;
+
+  _ISR_Disable_without_giant(level);
+  (void) level;
 
   ctx->delay_switch_for_executing = _Thread_Get_executing();
 
@@ -327,42 +330,34 @@ typedef enum {
 
 static void op_begin_suspend(void)
 {
-  rtems_status_code sc;
-
-  sc = rtems_task_suspend(RTEMS_SELF);
-  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+  rtems_task_suspend(RTEMS_SELF);
+  rtems_test_assert(0);
 }
 
 static void op_begin_event(void)
 {
-  rtems_status_code sc;
   rtems_event_set events;
 
-  events = 0;
-  sc = rtems_event_receive(
+  rtems_event_receive(
     RTEMS_EVENT_0,
     RTEMS_EVENT_ALL | RTEMS_WAIT,
     RTEMS_NO_TIMEOUT,
     &events
   );
-  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
-  rtems_test_assert(events == RTEMS_EVENT_0);
+  rtems_test_assert(0);
 }
 
 static void op_begin_event_system(void)
 {
-  rtems_status_code sc;
   rtems_event_set events;
 
-  events = 0;
-  sc = rtems_event_system_receive(
+  rtems_event_system_receive(
     RTEMS_EVENT_0,
     RTEMS_EVENT_ALL | RTEMS_WAIT,
     RTEMS_NO_TIMEOUT,
     &events
   );
-  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
-  rtems_test_assert(events == RTEMS_EVENT_0);
+  rtems_test_assert(0);
 }
 
 static void (*const test_ops_begin[])(void) = {
@@ -405,9 +400,10 @@ static void op_worker_task(rtems_task_argument arg)
 {
   test_context *ctx = &test_instance;
   test_op op = arg;
-  Thread_Life_state previous_life_state;
+  ISR_Level level;
 
-  previous_life_state = _Thread_Set_life_protection(THREAD_LIFE_PROTECTED);
+  _ISR_Disable_without_giant(level);
+  (void) level;
 
   /* (E) */
   barrier(ctx, &ctx->worker_barrier_state);
@@ -416,9 +412,6 @@ static void op_worker_task(rtems_task_argument arg)
   barrier(ctx, &ctx->worker_barrier_state);
 
   (*test_ops_begin[op])();
-
-  _Thread_Set_life_protection(previous_life_state);
-  rtems_test_assert(0);
 }
 
 static void help_task(rtems_task_argument arg)
@@ -504,9 +497,11 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 
-#define CONFIGURE_MAXIMUM_PROCESSORS CPU_COUNT
+#define CONFIGURE_SMP_APPLICATION
+
+#define CONFIGURE_SMP_MAXIMUM_PROCESSORS CPU_COUNT
 
 #define CONFIGURE_MAXIMUM_TASKS (CPU_COUNT + 1)
 

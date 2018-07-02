@@ -70,8 +70,8 @@ rtems_task Init(
 
   test_init();
 
-  status = rtems_task_suspend( RTEMS_SELF );
-  directive_failed( status, "rtems_task_suspend" );
+  status = rtems_task_delete( RTEMS_SELF );
+  directive_failed( status, "rtems_task_delete" );
 }
 
 void test_init(void)
@@ -175,7 +175,7 @@ rtems_task Low_task(
     end_time,
     operation_count - 1,
     0,
-    0
+    CALLING_OVERHEAD_SEMAPHORE_OBTAIN
   );
 
   TEST_END();

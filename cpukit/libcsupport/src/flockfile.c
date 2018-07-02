@@ -23,9 +23,8 @@
 /**
  *  This is a non-functional stub 
  */
-void flockfile(FILE* file)
+void flockfile(FILE* file __attribute__((unused)))
 {
-  (void) file;
 }
 
 #endif

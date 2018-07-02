@@ -25,27 +25,34 @@ rtems_status_code rtems_task_resume(
   rtems_id id
 )
 {
-  Thread_Control   *the_thread;
-  ISR_lock_Context  lock_context;
-  Per_CPU_Control  *cpu_self;
-  States_Control    previous_state;
+  Thread_Control          *the_thread;
+  Objects_Locations        location;
+  States_Control           previous_state;
 
-  the_thread = _Thread_Get( id, &lock_context );
+  the_thread = _Thread_Get( id, &location );
+  switch ( location ) {
 
-  if ( the_thread == NULL ) {
+    case OBJECTS_LOCAL:
+      previous_state = _Thread_Clear_state( the_thread, STATES_SUSPENDED );
+      _Objects_Put( &the_thread->Object );
+
+      return _States_Is_suspended( previous_state ) ?
+        RTEMS_SUCCESSFUL : RTEMS_INCORRECT_STATE;
+
 #if defined(RTEMS_MULTIPROCESSING)
-    return _RTEMS_tasks_MP_Resume( id );
-#else
-    return RTEMS_INVALID_ID;
+    case OBJECTS_REMOTE:
+      return _RTEMS_tasks_MP_Send_request_packet(
+          RTEMS_TASKS_MP_RESUME_REQUEST,
+          id,
+          0,          /* Not used */
+          0,          /* Not used */
+          0           /* Not used */
+        );
 #endif
+
+    case OBJECTS_ERROR:
+      break;
   }
 
-  cpu_self = _Thread_Dispatch_disable_critical( &lock_context );
-  _ISR_lock_ISR_enable( &lock_context );
-
-  previous_state = _Thread_Clear_state( the_thread, STATES_SUSPENDED );
-
-  _Thread_Dispatch_enable( cpu_self );
-  return _States_Is_suspended( previous_state ) ?
-    RTEMS_SUCCESSFUL : RTEMS_INCORRECT_STATE;
+  return RTEMS_INVALID_ID;
 }

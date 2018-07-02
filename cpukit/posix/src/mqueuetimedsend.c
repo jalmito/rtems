@@ -18,7 +18,19 @@
 #include "config.h"
 #endif
 
+#include <stdarg.h>
+
+#include <pthread.h>
+#include <limits.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <mqueue.h>
+
+#include <rtems/system.h>
+#include <rtems/score/watchdog.h>
+#include <rtems/seterr.h>
 #include <rtems/posix/mqueueimpl.h>
+#include <rtems/posix/time.h>
 
 int mq_timedsend(
   mqd_t                  mqdes,
@@ -28,12 +40,33 @@ int mq_timedsend(
   const struct timespec *abstime
 )
 {
+  Watchdog_Interval                            ticks;
+  bool                                         do_wait = true;
+  POSIX_Absolute_timeout_conversion_results_t  status;
+
+  /*
+   *  POSIX requires that blocking calls with timeouts that take
+   *  an absolute timeout must ignore issues with the absolute
+   *  time provided if the operation would otherwise succeed.
+   *  So we check the abstime provided, and hold on to whether it
+   *  is valid or not.  If it isn't correct and in the future,
+   *  then we do a polling operation and convert the UNSATISFIED
+   *  status into the appropriate error.
+   *
+   *  If the status is POSIX_ABSOLUTE_TIMEOUT_INVALID,
+   *  POSIX_ABSOLUTE_TIMEOUT_IS_IN_PAST, or POSIX_ABSOLUTE_TIMEOUT_IS_NOW,
+   *  then we should not wait.
+   */
+  status = _POSIX_Absolute_timeout_to_ticks( abstime, &ticks );
+  if ( status != POSIX_ABSOLUTE_TIMEOUT_IS_IN_FUTURE )
+    do_wait = false;
+
   return _POSIX_Message_queue_Send_support(
     mqdes,
     msg_ptr,
     msg_len,
     msg_prio,
-    abstime,
-    _Thread_queue_Add_timeout_realtime_timespec
+    do_wait,
+    ticks
   );
 }

@@ -21,34 +21,33 @@
 #include <rtems/score/coremsgimpl.h>
 #include <rtems/score/wkspace.h>
 
-static Thread_Control *_CORE_message_queue_Was_deleted(
-  Thread_Control       *the_thread,
-  Thread_queue_Queue   *queue,
-  Thread_queue_Context *queue_context
-)
-{
-  the_thread->Wait.return_code = STATUS_MESSAGE_QUEUE_WAS_DELETED;
-
-  return the_thread;
-}
-
 void _CORE_message_queue_Close(
   CORE_message_queue_Control *the_message_queue,
-  Thread_queue_Context       *queue_context
+  Thread_queue_Flush_callout  remote_extract_callout,
+  uint32_t                    status
 )
 {
+  ISR_lock_Context lock_context;
 
   /*
    *  This will flush blocked threads whether they were blocked on
    *  a send or receive.
    */
 
-  _Thread_queue_Flush_critical(
-    &the_message_queue->Wait_queue.Queue,
-    the_message_queue->operations,
-    _CORE_message_queue_Was_deleted,
-    queue_context
+  _Thread_queue_Flush(
+    &the_message_queue->Wait_queue,
+    remote_extract_callout,
+    status
   );
+
+  /*
+   *  This removes all messages from the pending message queue.  Since
+   *  we just flushed all waiting threads, we don't have to worry about
+   *  the flush satisfying any blocked senders as a side-effect.
+   */
+
+  _ISR_lock_ISR_disable( &lock_context );
+  (void) _CORE_message_queue_Flush( the_message_queue, &lock_context );
 
   (void) _Workspace_Free( the_message_queue->message_buffers );
 

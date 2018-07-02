@@ -27,17 +27,10 @@ const char rtems_test_name[] = "libdl (RTL) 5";
 /* forward declarations to avoid warnings */
 static rtems_task Init(rtems_task_argument argument);
 
-<<<<<<< HEAD
 #include "dl-tar.h"
 
 #define TARFILE_START dl_tar
 #define TARFILE_SIZE  dl_tar_size
-=======
-#include "dl05-tar.h"
-
-#define TARFILE_START dl05_tar
-#define TARFILE_SIZE  dl05_tar_size
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 
 static int test(void)
 {
@@ -70,11 +63,7 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-<<<<<<< HEAD
 #define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
-=======
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 4
 
@@ -86,21 +75,12 @@ static void Init(rtems_task_argument arg)
 
 #define CONFIGURE_MAXIMUM_POSIX_KEYS 2
 
-<<<<<<< HEAD
 #define CONFIGURE_MAXIMUM_SEMAPHORES 4
-=======
-#define CONFIGURE_MAXIMUM_SEMAPHORES 1
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
 
-<<<<<<< HEAD
-=======
-#define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
-
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 #define CONFIGURE_INIT
 
 #include <rtems/confdefs.h>

@@ -21,10 +21,9 @@
 #include "config.h"
 #endif
 
-#include <rtems/ioimpl.h>
+#include <rtems/io.h>
 #include <rtems/rtems/intr.h>
-
-ISR_LOCK_DEFINE( , _IO_Driver_registration_lock, "IO Driver Registration" )
+#include <rtems/score/threaddispatch.h>
 
 static inline bool rtems_io_is_empty_table(
   const rtems_driver_address_table *table
@@ -65,7 +64,6 @@ rtems_status_code rtems_io_register_driver(
 )
 {
   rtems_device_major_number major_limit = _IO_Number_of_drivers;
-  ISR_lock_Context lock_context;
 
   if ( rtems_interrupt_is_in_progress() )
     return RTEMS_CALLED_FROM_ISR;
@@ -85,13 +83,13 @@ rtems_status_code rtems_io_register_driver(
   if ( major >= major_limit )
     return RTEMS_INVALID_NUMBER;
 
-  _IO_Driver_registration_acquire( &lock_context );
+  _Thread_Disable_dispatch();
 
   if ( major == 0 ) {
     rtems_status_code sc = rtems_io_obtain_major_number( registered_major );
 
     if ( sc != RTEMS_SUCCESSFUL ) {
-      _IO_Driver_registration_release( &lock_context );
+      _Thread_Enable_dispatch();
       return sc;
     }
     major = *registered_major;
@@ -99,7 +97,7 @@ rtems_status_code rtems_io_register_driver(
     rtems_driver_address_table *const table = _IO_Driver_address_table + major;
 
     if ( !rtems_io_is_empty_table( table ) ) {
-      _IO_Driver_registration_release( &lock_context );
+      _Thread_Enable_dispatch();
       return RTEMS_RESOURCE_IN_USE;
     }
 
@@ -108,7 +106,7 @@ rtems_status_code rtems_io_register_driver(
 
   _IO_Driver_address_table [major] = *driver_table;
 
-  _IO_Driver_registration_release( &lock_context );
+  _Thread_Enable_dispatch();
 
   if ( _IO_All_drivers_initialized ) {
     /* Other drivers have already been initialized, we initialize

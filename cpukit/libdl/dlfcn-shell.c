@@ -1,5 +1,5 @@
 /*
- *  COPYRIGHT (c) 2012, 2018 Chris Johns <chrisj@rtems.org>
+ *  COPYRIGHT (c) 2012 Chris Johns <chrisj@rtems.org>
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
@@ -38,8 +38,7 @@ convert_ascii_to_voidp (const char* arg)
 int
 shell_dlopen (int argc, char* argv[])
 {
-  int   arg;
-  char *err;
+  int arg;
   for (arg = 1; arg < argc; arg++)
   {
     void* handle = dlopen (argv[arg], RTLD_NOW | RTLD_GLOBAL);
@@ -54,10 +53,7 @@ shell_dlopen (int argc, char* argv[])
       printf ("handle: %p %s\n", handle, message);
     }
     else
-    {
-      err = dlerror ();
-      printf ("error: %s\n", err ? err : "");
-    }
+      printf ("error: %s\n", dlerror ());
   }
   return 0;
 }
@@ -102,7 +98,7 @@ shell_dlsym (int argc, char* argv[])
   return -1;
 }
 
-typedef int (*call_p)(int argc, char* argv[]);
+typedef int (*call_t)(int argc, char* argv[]);
 
 int
 shell_dlcall (int argc, char* argv[])
@@ -110,7 +106,7 @@ shell_dlcall (int argc, char* argv[])
   void* value;
   if (lookup_dlsym (&value, argc, argv))
   {
-    call_p call = value;
+    call_t call = value;
     int    r;
     printf ("(*%p)(%d, ....)\n", value, argc - 3);
     r = call (argc - 3, argv + 3);

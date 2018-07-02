@@ -8,115 +8,172 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
-include $(top_srcdir)/../../bsp.am
 
-dist_project_lib_DATA = ../../../../../../bsps/arm/lpc32xx/start/bsp_specs
+include_bspdir = $(includedir)/bsp
+include_libcpudir = $(includedir)/libcpu
+
+dist_project_lib_DATA = bsp_specs
 
 ###############################################################################
 #                  Header                                                     #
 ###############################################################################
 
+include_HEADERS = include/bsp.h
+include_HEADERS += include/tm27.h
+
+nodist_include_HEADERS = ../../shared/include/coverhd.h \
+	include/bspopts.h
+
+nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
+
+include_bsp_HEADERS =
+include_bsp_HEADERS += ../../shared/include/utility.h
+include_bsp_HEADERS += ../../shared/include/irq-generic.h
+include_bsp_HEADERS += ../../shared/include/irq-info.h
+include_bsp_HEADERS += ../../shared/include/stackalloc.h
+include_bsp_HEADERS += ../../shared/include/uart-output-char.h
+include_bsp_HEADERS += ../shared/include/start.h
+include_bsp_HEADERS += ../shared/include/arm-cp15-start.h
+include_bsp_HEADERS += ../shared/include/arm-errata.h
+include_bsp_HEADERS += ../shared/lpc/include/lpc-timer.h
+include_bsp_HEADERS += ../shared/lpc/include/lpc-dma.h
+include_bsp_HEADERS += ../shared/lpc/include/lpc-i2s.h
+include_bsp_HEADERS += ../shared/lpc/include/lpc-emc.h
+include_bsp_HEADERS += ../shared/lpc/include/lpc-lcd.h
+include_bsp_HEADERS += ../shared/include/arm-release-id.h
+include_bsp_HEADERS += include/irq.h
+include_bsp_HEADERS += include/mmu.h
+include_bsp_HEADERS += include/lpc32xx.h
+include_bsp_HEADERS += include/lpc-clock-config.h
+include_bsp_HEADERS += include/lpc-ethernet-config.h
+include_bsp_HEADERS += include/nand-mlc.h
+include_bsp_HEADERS += include/boot.h
+include_bsp_HEADERS += include/hsu.h
+include_bsp_HEADERS += include/i2c.h
+include_bsp_HEADERS += include/emc.h
+
+include_libcpu_HEADERS = ../../../libcpu/arm/shared/include/arm-cp15.h
+
 ###############################################################################
 #                  Data                                                       #
 ###############################################################################
 
-start.$(OBJEXT): ../../../../../../bsps/arm/shared/start/start.S
-	$(CPPASCOMPILE) -o $@ -c $<
+noinst_LIBRARIES = libbspstart.a
+
+libbspstart_a_SOURCES = ../shared/start/start.S
+
 project_lib_DATA = start.$(OBJEXT)
 
-project_lib_DATA += linkcmds
-dist_project_lib_DATA += ../../../../../../bsps/arm/lpc32xx/start/linkcmds.lpc32xx
-dist_project_lib_DATA += ../../../../../../bsps/arm/lpc32xx/start/linkcmds.lpc32xx_phycore
-dist_project_lib_DATA += ../../../../../../bsps/arm/lpc32xx/start/linkcmds.lpc32xx_mzx_stage_1
-dist_project_lib_DATA += ../../../../../../bsps/arm/lpc32xx/start/linkcmds.lpc32xx_mzx_stage_2
-dist_project_lib_DATA += ../../../../../../bsps/arm/lpc32xx/start/linkcmds.lpc32xx_mzx
+project_lib_DATA += startup/linkcmds
+project_lib_DATA += startup/linkcmds.lpc32xx
+
+EXTRA_DIST = startup/linkcmds.lpc32xx_phycore \
+	startup/linkcmds.lpc32xx_mzx_stage_1 \
+	startup/linkcmds.lpc32xx_mzx_stage_2 \
+	startup/linkcmds.lpc32xx_mzx
 
 ###############################################################################
 #                  LibBSP                                                     #
 ###############################################################################
 
-project_lib_LIBRARIES = librtemsbsp.a
+noinst_LIBRARIES += libbsp.a
 
-librtemsbsp_a_SOURCES =
+libbsp_a_SOURCES =
+libbsp_a_CPPFLAGS =
+libbsp_a_LIBADD =
 
 # Shared
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/cpucounter/cpucounterdiff.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/stackalloc.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/uart-output-char.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/start/bsp-start-memcpy.S
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/cp15/arm-cp15-set-ttb-entries.c
+libbsp_a_SOURCES += ../../shared/bootcard.c
+libbsp_a_SOURCES += ../../shared/bspclean.c
+libbsp_a_SOURCES += ../../shared/bspgetworkarea.c
+libbsp_a_SOURCES += ../../shared/bsplibc.c
+libbsp_a_SOURCES += ../../shared/bsppost.c
+libbsp_a_SOURCES += ../../shared/bsppredriverhook.c
+libbsp_a_SOURCES += ../../shared/bsppretaskinghook.c
+libbsp_a_SOURCES += ../../shared/cpucounterdiff.c
+libbsp_a_SOURCES += ../../shared/gnatinstallhandler.c
+libbsp_a_SOURCES += ../../shared/sbrk.c
+libbsp_a_SOURCES += ../../shared/src/stackalloc.c
+libbsp_a_SOURCES += ../../shared/src/uart-output-char.c
+libbsp_a_SOURCES += ../shared/startup/bsp-start-memcpy.S
+libbsp_a_SOURCES += ../shared/arm-cp15-set-ttb-entries.c
 
 # Startup
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/start/bspreset.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/start/bspstart.c
+libbsp_a_SOURCES += startup/bspreset.c
+libbsp_a_SOURCES += startup/bspstart.c
 
 # IRQ
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/irq/irq-default-handler.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/irq/irq.c
+libbsp_a_SOURCES += ../../shared/src/irq-default-handler.c
+libbsp_a_SOURCES += ../../shared/src/irq-generic.c
+libbsp_a_SOURCES += ../../shared/src/irq-info.c
+libbsp_a_SOURCES += ../../shared/src/irq-legacy.c
+libbsp_a_SOURCES += ../../shared/src/irq-server.c
+libbsp_a_SOURCES += ../../shared/src/irq-shell.c
+libbsp_a_SOURCES += irq/irq.c
 
 # Console
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/console-termios-init.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/console-termios.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/console/console-config.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/console/hsu.c
+libbsp_a_SOURCES += ../../shared/console-termios-init.c
+libbsp_a_SOURCES += ../../shared/console-termios.c
+libbsp_a_SOURCES += console/console-config.c
+libbsp_a_SOURCES += console/hsu.c
 
 # Clock
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/clock/clock-nxp-lpc.c
+libbsp_a_SOURCES += ../shared/lpc/clock/lpc-clock-config.c
+libbsp_a_SOURCES += ../../shared/clockdrv_shell.h
 
 # RTC
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/rtc/rtc-support.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/rtc/rtc-config.c
+libbsp_a_SOURCES += ../../shared/tod.c \
+	rtc/rtc-config.c
 
 # Misc
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/start/boot.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/start/emc.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/i2c/i2c.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/nand/nand-mlc.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/nand/nand-mlc-erase-block-safe.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/nand/nand-mlc-read-blocks.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/nand/nand-mlc-write-blocks.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/start/restart.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/start/system-clocks.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/start/timer.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/nand/nand-select.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/start/bspidle.c
+libbsp_a_SOURCES += misc/boot.c
+libbsp_a_SOURCES += misc/emc.c
+libbsp_a_SOURCES += misc/i2c.c
+libbsp_a_SOURCES += misc/nand-mlc.c
+libbsp_a_SOURCES += misc/nand-mlc-erase-block-safe.c
+libbsp_a_SOURCES += misc/nand-mlc-read-blocks.c
+libbsp_a_SOURCES += misc/nand-mlc-write-blocks.c
+libbsp_a_SOURCES += misc/restart.c
+libbsp_a_SOURCES += misc/system-clocks.c
+libbsp_a_SOURCES += misc/timer.c
+libbsp_a_SOURCES += misc/nand-select.c
+libbsp_a_SOURCES += misc/idle-thread.c
 
 # SSP
 
 # I2C
 
 # Cache
-<<<<<<< HEAD
 libbsp_a_SOURCES += ../../../libcpu/shared/src/cache_manager.c
 libbsp_a_SOURCES += ../shared/include/arm-cache-l1.h
 libbsp_a_SOURCES += ../shared/armv467ar-basic-cache/cache_.h
 libbsp_a_CPPFLAGS += -I$(srcdir)/../shared/armv467ar-basic-cache
 
-=======
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/cache/cache-cp15.c
->>>>>>> e8b28ba0047c533b842f9704c95d0e76dcb16cbf
 
 # Start hooks
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/lpc32xx/start/bspstarthooks.c
+libbsp_a_SOURCES += startup/bspstarthooks.c
 
 ###############################################################################
 #                  Network                                                    #
 ###############################################################################
 
 if HAS_NETWORKING
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/net/
+
+noinst_PROGRAMS = network.rel
+
+network_rel_SOURCES = ../shared/lpc/network/lpc-ethernet.c
+network_rel_CPPFLAGS = $(AM_CPPFLAGS) -D__INSIDE_RTEMS_BSD_TCPIP_STACK__ -D__BSD_VISIBLE
+network_rel_LDFLAGS = $(RTEMS_RELLDFLAGS)
+
+libbsp_a_LIBADD += network.rel
+
 endif
 
 ###############################################################################
 #                  Special Rules                                              #
 ###############################################################################
 
+DISTCLEANFILES = include/bspopts.h
 
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
-include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
-include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/arm/lpc32xx/headers.am

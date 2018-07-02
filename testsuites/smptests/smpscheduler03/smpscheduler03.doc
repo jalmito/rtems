@@ -4,8 +4,8 @@ test set name: smpscheduler03
 
 directives:
 
-  - Scheduler operations.
+  - _Scheduler_SMP_Change_priority()
 
 concepts:
 
-  - Ensure that the scheduler operations basically work.
+  - Ensure that priority changes work.

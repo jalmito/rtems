@@ -22,34 +22,18 @@
 
 #include <rtems/score/schedulerpriorityimpl.h>
 
-void _Scheduler_priority_Unblock (
+Scheduler_Void_or_thread _Scheduler_priority_Unblock (
   const Scheduler_Control *scheduler,
-  Thread_Control          *the_thread,
-  Scheduler_Node          *node
+  Thread_Control          *the_thread
 )
 {
-  Scheduler_priority_Context *context;
-  Scheduler_priority_Node    *the_node;
-  unsigned int                priority;
-  unsigned int                unmapped_priority;
-
-  context = _Scheduler_priority_Get_context( scheduler );
-  the_node = _Scheduler_priority_Node_downcast( node );
-  priority = (unsigned int ) _Scheduler_Node_get_priority( &the_node->Base );
-  unmapped_priority = SCHEDULER_PRIORITY_UNMAP( priority );
-
-  if ( unmapped_priority != the_node->Ready_queue.current_priority ) {
-    _Scheduler_priority_Ready_queue_update(
-      &the_node->Ready_queue,
-      unmapped_priority,
-      &context->Bit_map,
-      &context->Ready[ 0 ]
-    );
-  }
+  Scheduler_priority_Context *context =
+    _Scheduler_priority_Get_context( scheduler );
+  Scheduler_priority_Node *node = _Scheduler_priority_Thread_get_node( the_thread );
 
   _Scheduler_priority_Ready_queue_enqueue(
     &the_thread->Object.Node,
-    &the_node->Ready_queue,
+    &node->Ready_queue,
     &context->Bit_map
   );
 
@@ -67,7 +51,12 @@ void _Scheduler_priority_Unblock (
    *    Even if the thread isn't preemptible, if the new heir is
    *    a pseudo-ISR system task, we need to do a context switch.
    */
-  if ( priority < _Thread_Get_priority( _Thread_Heir ) ) {
-    _Scheduler_Update_heir( the_thread, priority == PRIORITY_PSEUDO_ISR );
+  if ( the_thread->current_priority < _Thread_Heir->current_priority ) {
+    _Scheduler_Update_heir(
+      the_thread,
+      the_thread->current_priority == PRIORITY_PSEUDO_ISR
+    );
   }
+
+  SCHEDULER_RETURN_VOID_OR_NULL;
 }

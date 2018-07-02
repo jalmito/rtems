@@ -1,58 +1,73 @@
 ACLOCAL_AMFLAGS = -I ../../../../aclocal
 
 include $(top_srcdir)/../../../../automake/compile.am
-include $(top_srcdir)/../../bsp.am
 
-dist_project_lib_DATA = ../../../../../../bsps/arm/gdbarmsim/start/bsp_specs
+include_bspdir = $(includedir)/bsp
 
+dist_project_lib_DATA = bsp_specs
+
+include_HEADERS = include/bsp.h
+include_HEADERS += ../../shared/include/tm27.h
+include_bsp_HEADERS = include/irq.h
+include_bsp_HEADERS += include/swi.h
+include_bsp_HEADERS += ../shared/include/start.h
+include_bsp_HEADERS += ../../shared/include/irq-generic.h
+include_bsp_HEADERS += ../../shared/include/irq-info.h
+
+nodist_include_HEADERS = include/bspopts.h
+nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
+nodist_include_bsp_HEADERS += ../../shared/include/console-polled.h
+DISTCLEANFILES = include/bspopts.h
 noinst_PROGRAMS =
 
+nodist_include_HEADERS += ../../shared/include/coverhd.h
 
-start.$(OBJEXT): ../../../../../../bsps/arm/shared/start/start.S
-	$(CPPASCOMPILE) -o $@ -c $<
+noinst_LIBRARIES = libbspstart.a
+libbspstart_a_SOURCES = ../shared/start/start.S
 project_lib_DATA = start.$(OBJEXT)
 
-project_lib_DATA += linkcmds
+dist_project_lib_DATA += startup/linkcmds
 
-project_lib_LIBRARIES = librtemsbsp.a
-librtemsbsp_a_SOURCES =
+noinst_LIBRARIES += libbsp.a
+libbsp_a_SOURCES =
 
 # startup
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspstart-empty.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/gdbarmsim/start/bspreset.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/gdbarmsim/start/syscalls.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/cpucounter/cpucounterread.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/cpucounter/cpucounterdiff.c
+libbsp_a_SOURCES += ../../shared/bsplibc.c ../../shared/bsppost.c \
+    ../../shared/bspgetworkarea.c ../../shared/bsppretaskinghook.c \
+    ../../shared/bsppredriverhook.c ../../shared/bspstart.c \
+    ../../shared/bspclean.c startup/bspreset.c ../../shared/bootcard.c \
+    ../../shared/sbrk.c ../../shared/gnatinstallhandler.c startup/syscalls.c
+libbsp_a_SOURCES += ../../shared/cpucounterread.c
+libbsp_a_SOURCES += ../../shared/cpucounterdiff.c
 # console
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/console-polled.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/gdbarmsim/console/console-io.c
+libbsp_a_SOURCES += ../../shared/console-polled.c console/console-io.c
 # clock
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/clock/clock-simidle.c
+libbsp_a_SOURCES += ../../shared/clock_driver_simidle.c
 # timer
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/btimer/btimer-stub.c
+libbsp_a_SOURCES += ../../shared/timerstub.c
 # start hooks
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/gdbarmsim/start/bspstarthooks.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/start/bsp-start-memcpy.S
+libbsp_a_SOURCES += startup/bspstarthooks.c
+libbsp_a_SOURCES += ../shared/startup/bsp-start-memcpy.S
 
 # IRQ
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/gdbarmsim/irq/irq.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/gdbarmsim/irq/irq-dispatch.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/irq/irq-default-handler.c
+libbsp_a_SOURCES += irq/irq.c
+libbsp_a_SOURCES += irq/irq-dispatch.c
+libbsp_a_SOURCES += ../../shared/src/irq-default-handler.c
+libbsp_a_SOURCES += ../../shared/src/irq-generic.c
+libbsp_a_SOURCES += ../../shared/src/irq-info.c
+libbsp_a_SOURCES += ../../shared/src/irq-legacy.c
+libbsp_a_SOURCES += ../../shared/src/irq-server.c
+libbsp_a_SOURCES += ../../shared/src/irq-shell.c
 
 # Cache
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/cache/nocache.c
+libbsp_a_SOURCES += ../../../libcpu/shared/src/cache_manager.c
+libbsp_a_SOURCES += ../../shared/include/cache_.h
+libbsp_a_CPPFLAGS = -I$(srcdir)/../../shared/include
 
-# Shared
-if shared
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/cp15/arm-cp15-set-exception-handler.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/cp15/arm-cp15-set-ttb-entries.c
-endif
+#libbsp_a_LIBADD = ../../../libcpu/@RTEMS_CPU@/shared/arm920.rel \
+#    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/clock.rel \
+#    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/timer.rel \
+#    ../../../libcpu/@RTEMS_CPU@/@RTEMS_CPU_MODEL@/irq.rel
 
+include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am
-include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
-include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
-include $(srcdir)/../../../../../../bsps/arm/gdbarmsim/headers.am

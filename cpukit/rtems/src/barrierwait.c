@@ -18,32 +18,44 @@
 #include "config.h"
 #endif
 
+#include <rtems/system.h>
+#include <rtems/rtems/status.h>
+#include <rtems/rtems/support.h>
 #include <rtems/rtems/barrierimpl.h>
-#include <rtems/rtems/statusimpl.h>
-
-THREAD_QUEUE_OBJECT_ASSERT( Barrier_Control, Barrier.Wait_queue );
+#include <rtems/score/thread.h>
 
 rtems_status_code rtems_barrier_wait(
   rtems_id        id,
   rtems_interval  timeout
 )
 {
-  Barrier_Control      *the_barrier;
-  Thread_queue_Context  queue_context;
-  Status_Control        status;
+  Barrier_Control   *the_barrier;
+  Objects_Locations  location;
+  Thread_Control    *executing;
 
-  the_barrier = _Barrier_Get( id, &queue_context );
+  the_barrier = _Barrier_Get( id, &location );
+  switch ( location ) {
 
-  if ( the_barrier == NULL ) {
-    return RTEMS_INVALID_ID;
+    case OBJECTS_LOCAL:
+      executing = _Thread_Executing;
+      _CORE_barrier_Wait(
+        &the_barrier->Barrier,
+        executing,
+        id,
+        true,
+        timeout,
+        NULL
+      );
+      _Objects_Put( &the_barrier->Object );
+      return _Barrier_Translate_core_barrier_return_code(
+                executing->Wait.return_code );
+
+#if defined(RTEMS_MULTIPROCESSING)
+    case OBJECTS_REMOTE:
+#endif
+    case OBJECTS_ERROR:
+      break;
   }
 
-  _Thread_queue_Context_set_enqueue_timeout_ticks( &queue_context, timeout );
-  status = _CORE_barrier_Seize(
-    &the_barrier->Barrier,
-    _Thread_Executing,
-    true,
-    &queue_context
-  );
-  return _Status_Get( status );
+  return RTEMS_INVALID_ID;
 }

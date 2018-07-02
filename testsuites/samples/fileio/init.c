@@ -639,12 +639,8 @@ static void fileio_start_shell(void)
   }
 
   printf(
-    "Creating /etc/passwd and group with four useable accounts:\n"
-    "  root/pwd\n"
-    "  test/pwd\n"
-    "  rtems/NO PASSWORD\n"
-    "  chroot/NO PASSWORD\n"
-    "Only the root user has access to all available commands.\n"
+    "Creating /etc/passwd and group with three useable accounts\n"
+    "root/pwd , test/pwd, rtems/NO PASSWORD, chroot/NO PASSWORD"
   );
 
   writeFile(
@@ -712,7 +708,7 @@ static void fileio_start_shell(void)
                        rtems_rfs_rtems_trace_shell_command);
 #endif
 
-  printf(" =========================\n");
+  printf("\n =========================\n");
   printf(" starting shell\n");
   printf(" =========================\n");
   rtems_shell_init(

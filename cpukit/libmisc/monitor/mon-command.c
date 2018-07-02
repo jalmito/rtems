@@ -175,7 +175,7 @@ void rtems_monitor_help_cmd(
   int                                argc,
   char                             **argv,
   const rtems_monitor_command_arg_t *command_arg,
-  bool                               verbose RTEMS_UNUSED
+  bool                               verbose __attribute__((unused))
 )
 {
   int arg;

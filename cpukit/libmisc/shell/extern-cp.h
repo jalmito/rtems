@@ -43,7 +43,6 @@ typedef struct {
 } PATH_T;
 
 #include <setjmp.h>
-#include <rtems.h>
 
 typedef struct {
   PATH_T to;

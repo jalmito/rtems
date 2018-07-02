@@ -20,12 +20,9 @@
  * http://www.rtems.org/license/LICENSE.
  */
 
-#include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
-
-#include <rtems/media.h>
 
 #include <rtems.h>
 #include <rtems/bdbuf.h>
@@ -33,7 +30,8 @@
 #include <rtems/bdpart.h>
 #include <rtems/libio.h>
 #include <rtems/dosfs.h>
-#include <rtems/thread.h>
+
+#include <rtems/media.h>
 
 typedef struct {
   rtems_bdpart_partition *partitions;
@@ -63,16 +61,26 @@ static RTEMS_CHAIN_DEFINE_EMPTY(listener_item_chain);
 
 static RTEMS_CHAIN_DEFINE_EMPTY(media_item_chain);
 
-static rtems_mutex media_mutex = RTEMS_MUTEX_INITIALIZER("Media");
+static rtems_id media_mutex = RTEMS_ID_NONE;
 
-static void lock(void)
+static rtems_status_code lock(void)
 {
-  rtems_mutex_lock(&media_mutex);
+  rtems_status_code sc = RTEMS_SUCCESSFUL;
+
+  sc = rtems_semaphore_obtain(media_mutex, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
+  if (sc != RTEMS_SUCCESSFUL) {
+    sc = RTEMS_NOT_CONFIGURED;
+  }
+
+  return sc;
 }
 
 static void unlock(void)
 {
-  rtems_mutex_unlock(&media_mutex);
+  rtems_status_code sc = RTEMS_SUCCESSFUL;
+
+  sc = rtems_semaphore_release(media_mutex);
+  assert(sc == RTEMS_SUCCESSFUL);
 }
 
 static listener_item *find_listener(
@@ -101,27 +109,26 @@ rtems_status_code rtems_media_listener_add(
 )
 {
   rtems_status_code sc = RTEMS_SUCCESSFUL;
-  listener_item *item;
 
-  lock();
+  sc = lock();
+  if (sc == RTEMS_SUCCESSFUL) {
+    listener_item *item = find_listener(listener, listener_arg);
 
-  item = find_listener(listener, listener_arg);
-
-  if (item == NULL) {
-    item = malloc(sizeof(*item));
-    if (item != NULL) {
-      item->listener = listener;
-      item->listener_arg = listener_arg;
-      rtems_chain_initialize_node(&item->node);
-      rtems_chain_append_unprotected(&listener_item_chain, &item->node);
+    if (item == NULL) {
+      item = malloc(sizeof(*item));
+      if (item != NULL) {
+        item->listener = listener;
+        item->listener_arg = listener_arg;
+        rtems_chain_append_unprotected(&listener_item_chain, &item->node);
+      } else {
+        sc = RTEMS_NO_MEMORY;
+      }
     } else {
-      sc = RTEMS_NO_MEMORY;
+      sc = RTEMS_TOO_MANY;
     }
-  } else {
-    sc = RTEMS_TOO_MANY;
-  }
 
-  unlock();
+    unlock();
+  }
 
   return sc;
 }
@@ -132,20 +139,20 @@ rtems_status_code rtems_media_listener_remove(
 )
 {
   rtems_status_code sc = RTEMS_SUCCESSFUL;
-  listener_item *item;
 
-  lock();
+  sc = lock();
+  if (sc == RTEMS_SUCCESSFUL) {
+    listener_item *item = find_listener(listener, listener_arg);
 
-  item = find_listener(listener, listener_arg);
+    if (item != NULL) {
+      rtems_chain_extract_unprotected(&item->node);
+      free(item);
+    } else {
+      sc = RTEMS_INVALID_ID;
+    }
 
-  if (item != NULL) {
-    rtems_chain_extract_unprotected(&item->node);
-    free(item);
-  } else {
-    sc = RTEMS_INVALID_ID;
+    unlock();
   }
-
-  unlock();
 
   return sc;
 }
@@ -241,7 +248,6 @@ static void create_item(
     item->parent = parent;
     item->disk_path = (char *) item + sizeof(*item);
     memcpy(item->disk_path, disk_path, disk_path_size);
-    rtems_chain_initialize_node(&item->node);
     rtems_chain_append(&media_item_chain, &item->node);
   }
 }
@@ -642,7 +648,7 @@ static rtems_status_code attach_and_mount_partitions(
 static rtems_status_code partition_inquiry_worker(
   rtems_media_state state,
   const char *src,
-  char **dest RTEMS_UNUSED,
+  char **dest __attribute__((unused)),
   void *worker_arg
 )
 {
@@ -745,8 +751,8 @@ static rtems_status_code do_disk_attach(
 static rtems_status_code unmount_worker(
   rtems_media_state state,
   const char *src,
-  char **dest RTEMS_UNUSED,
-  void *worker_arg RTEMS_UNUSED
+  char **dest __attribute__((unused)),
+  void *worker_arg __attribute__((unused))
 )
 {
   rtems_status_code sc = RTEMS_SUCCESSFUL;
@@ -791,8 +797,8 @@ static rtems_status_code do_unmount(
 static rtems_status_code disk_detach_worker(
   rtems_media_state state,
   const char *src,
-  char **dest RTEMS_UNUSED,
-  void *worker_arg RTEMS_UNUSED
+  char **dest __attribute__((unused)),
+  void *worker_arg __attribute__((unused))
 )
 {
   rtems_status_code rsc = RTEMS_SUCCESSFUL;
@@ -920,7 +926,10 @@ rtems_status_code rtems_media_post_event(
 {
   rtems_status_code sc = RTEMS_SUCCESSFUL;
 
-  lock();
+  sc = lock();
+  if (sc != RTEMS_SUCCESSFUL) {
+    return sc;
+  }
 
   switch (event) {
     case RTEMS_MEDIA_EVENT_DISK_ATTACH:
@@ -950,6 +959,27 @@ rtems_status_code rtems_media_post_event(
   }
 
   unlock();
+
+  return sc;
+}
+
+rtems_status_code rtems_media_initialize(void)
+{
+  rtems_status_code sc = RTEMS_SUCCESSFUL;
+
+  if (media_mutex == RTEMS_ID_NONE) {
+    sc = rtems_semaphore_create(
+      rtems_build_name('M', 'D', 'I', 'A'),
+      1,
+      RTEMS_LOCAL | RTEMS_PRIORITY
+        | RTEMS_INHERIT_PRIORITY | RTEMS_BINARY_SEMAPHORE,
+      0,
+      &media_mutex
+    );
+    if (sc != RTEMS_SUCCESSFUL) {
+      sc = RTEMS_NO_MEMORY;
+    }
+  }
 
   return sc;
 }

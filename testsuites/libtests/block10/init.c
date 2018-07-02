@@ -23,11 +23,8 @@
 #include "config.h"
 #endif
 
-#include "tmacros.h"
-
 #include <assert.h>
 #include <errno.h>
-#include <stdlib.h>
 
 #include <rtems.h>
 #include <rtems/bdbuf.h>
@@ -156,12 +153,12 @@ static rtems_bdbuf_buffer *do_get(char task)
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   rtems_bdbuf_buffer *bd = NULL;
 
-  printf("%c: try get\n", task);
+  printk("%c: try get\n", task);
 
   sc = rtems_bdbuf_get(dd, 0, &bd);
   ASSERT_SC(sc);
 
-  printf("%c: get\n", task);
+  printk("%c: get\n", task);
 
   return bd;
 }
@@ -171,7 +168,7 @@ static rtems_bdbuf_buffer *do_get_mod(char task)
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   rtems_bdbuf_buffer *bd = NULL;
 
-  printf("%c: try get modified\n", task);
+  printk("%c: try get modified\n", task);
 
   sc = rtems_bdbuf_get(dd, 0, &bd);
   ASSERT_SC(sc);
@@ -182,7 +179,7 @@ static rtems_bdbuf_buffer *do_get_mod(char task)
   sc = rtems_bdbuf_get(dd, 0, &bd);
   ASSERT_SC(sc);
 
-  printf("%c: get modified\n", task);
+  printk("%c: get modified\n", task);
 
   return bd;
 }
@@ -192,12 +189,12 @@ static rtems_bdbuf_buffer *do_read(char task)
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   rtems_bdbuf_buffer *bd = NULL;
 
-  printf("%c: try read\n", task);
+  printk("%c: try read\n", task);
 
   sc = rtems_bdbuf_read(dd, 0, &bd);
   ASSERT_SC(sc);
 
-  printf("%c: read\n", task);
+  printk("%c: read\n", task);
 
   return bd;
 }
@@ -206,41 +203,41 @@ static void do_rel(char task, rtems_bdbuf_buffer *bd)
 {
   rtems_status_code sc = RTEMS_SUCCESSFUL;
 
-  printf("%c: release\n", task);
+  printk("%c: release\n", task);
 
   sc = rtems_bdbuf_release(bd);
   ASSERT_SC(sc);
 
-  printf("%c: release done\n", task);
+  printk("%c: release done\n", task);
 }
 
 static void do_rel_mod(char task, rtems_bdbuf_buffer *bd)
 {
   rtems_status_code sc = RTEMS_SUCCESSFUL;
 
-  printf("%c: release modified\n", task);
+  printk("%c: release modified\n", task);
 
   sc = rtems_bdbuf_release_modified(bd);
   ASSERT_SC(sc);
 
-  printf("%c: release modified done\n", task);
+  printk("%c: release modified done\n", task);
 }
 
 static void do_sync(char task, rtems_bdbuf_buffer *bd)
 {
   rtems_status_code sc = RTEMS_SUCCESSFUL;
 
-  printf("%c: sync\n", task);
+  printk("%c: sync\n", task);
 
   sc = rtems_bdbuf_sync(bd);
   ASSERT_SC(sc);
 
-  printf("%c: sync done\n", task);
+  printk("%c: sync done\n", task);
 }
 
 static void purge(char task)
 {
-  printf("%c: purge\n", task);
+  printk("%c: purge\n", task);
 
   rtems_bdbuf_purge_dev(dd);
 }
@@ -404,7 +401,7 @@ static rtems_task Init(rtems_task_argument argument)
   size_t i_rel = 0;
   size_t i_p = 0;
 
-  TEST_BEGIN();
+  rtems_test_begink();
 
   task_id_init = rtems_task_self();
 
@@ -448,7 +445,7 @@ static rtems_task Init(rtems_task_argument argument)
   for (i_ac = 0; i_ac < ACCESS_COUNT; ++i_ac) {
     for (i_rel = 0; i_rel < RELEASE_COUNT; ++i_rel) {
       for (i_w = 0; i_w < WAITER_COUNT; ++i_w) {
-        printf("test case [access]: %s and %s %s\n", access_assoc_table [i_ac], release_assoc_table [i_rel], waiter_assoc_table [i_w]);
+        printk("test case [access]: %s and %s %s\n", access_assoc_table [i_ac], release_assoc_table [i_rel], waiter_assoc_table [i_w]);
         check_access(access_table [i_ac], release_table [i_rel], waiter_table [i_w]);
       }
     }
@@ -456,19 +453,19 @@ static rtems_task Init(rtems_task_argument argument)
 
   for (i_rel = 0; i_rel < RELEASE_COUNT; ++i_rel) {
     for (i_w = 0; i_w < WAITER_COUNT; ++i_w) {
-      printf("test case [intermediate]: %s %s\n", release_assoc_table [i_rel], waiter_assoc_table [i_w]);
+      printk("test case [intermediate]: %s %s\n", release_assoc_table [i_rel], waiter_assoc_table [i_w]);
       check_intermediate(release_table [i_rel], waiter_table [i_w]);
     }
   }
 
   for (i_p = 0; i_p < PURGER_COUNT; ++i_p) {
     for (i_w = 0; i_w < WAITER_COUNT; ++i_w) {
-      printf("test case [transfer]: %s %s\n", purger_assoc_table [i_p], waiter_assoc_table [i_w]);
+      printk("test case [transfer]: %s %s\n", purger_assoc_table [i_p], waiter_assoc_table [i_w]);
       check_transfer(purger_table [i_p], waiter_table [i_w]);
     }
   }
 
-  TEST_END();
+  rtems_test_endk();
 
   exit(0);
 }
@@ -476,7 +473,7 @@ static rtems_task Init(rtems_task_argument argument)
 #define CONFIGURE_INIT
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_LIBBLOCK
 
 #define CONFIGURE_MAXIMUM_TASKS 3

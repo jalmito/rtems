@@ -49,7 +49,11 @@ void _ISR_Handler_initialization( void )
     uint32_t cpu_index;
 
     if ( !_Stack_Is_enough( stack_size ) )
-      _Internal_error( INTERNAL_ERROR_INTERRUPT_STACK_TOO_SMALL );
+      _Terminate(
+        INTERNAL_ERROR_CORE,
+        true,
+        INTERNAL_ERROR_INTERRUPT_STACK_TOO_SMALL
+      );
 
     for ( cpu_index = 0 ; cpu_index < cpu_max; ++cpu_index ) {
       Per_CPU_Control *cpu = _Per_CPU_Get_by_index( cpu_index );
