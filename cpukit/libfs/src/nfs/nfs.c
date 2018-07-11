@@ -12,8 +12,22 @@
  * ETH Zurich D-INFK, Haldeneggsteig 4, CH-8092 Zurich. Attn: Systems Group.
  */
 
+
+/*RTEMS*/
+
 #include <assert.h>
-#include <barrelfish/barrelfish.h>
+#include <ctype.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <rtems.h>
+#include <rtems/libio.h>
+#include <rtems/libio_.h>
+#include <rtems/seterr.h>
+
+/*NFS*/
+
 #include <nfs/nfs.h>
 #include "nfs_debug.h"
 #include "rpc.h"
