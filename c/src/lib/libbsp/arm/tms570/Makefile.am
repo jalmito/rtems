@@ -43,9 +43,6 @@ include_bsp_HEADERS += include/tms570-sci-driver.h
 include_bsp_HEADERS += include/system-clocks.h
 include_bsp_HEADERS += include/tms570-pinmux.h
 
-include_bsp_HEADERS += include/tms570-pins.h
-include_bsp_HEADERS += include/tms570ls3137zwt-pins.h
-
 include_bsp_ti_hercules_HEADERS = include/ti_herc/reg_adc.h
 include_bsp_ti_hercules_HEADERS += include/ti_herc/reg_ccmsr.h
 include_bsp_ti_hercules_HEADERS += include/ti_herc/reg_crc.h
@@ -171,36 +168,24 @@ libbsp_a_SOURCES += ../../../libcpu/shared/src/cache_manager.c
 libbsp_a_SOURCES += ../../../libcpu/arm/shared/include/cache_.h
 libbsp_a_CPPFLAGS += -I$(srcdir)/../../../libcpu/arm/shared/include
 
-if TMS570_USE_HWINIT_STARTUP
-libbsp_a_SOURCES += hwinit/tms570_sys_core.S
-libbsp_a_SOURCES += hwinit/fail_notification.c
-libbsp_a_SOURCES += hwinit/init_emif_sdram.c
-libbsp_a_SOURCES += hwinit/init_esm.c
-libbsp_a_SOURCES += hwinit/init_pinmux.c
-libbsp_a_SOURCES += hwinit/init_system.c
-libbsp_a_SOURCES += hwinit/tms570_selftest.c
-libbsp_a_SOURCES += hwinit/tms570_selftest_par_can.c
-libbsp_a_SOURCES += hwinit/tms570_selftest_par_mibspi.c
-libbsp_a_SOURCES += hwinit/tms570_selftest_par_std.c
-libbsp_a_SOURCES += hwinit/tms570_selftest_parity.c
-libbsp_a_SOURCES += hwinit/tms570_tcram_tests.c
+network_CPPFLAGS = -D__INSIDE_RTEMS_BSD_TCPIP_STACK__
+noinst_PROGRAMS = network.rel
+network_rel_SOURCES = network/include/emac.h
+network_rel_SOURCES += network/source/network.c network/source/emac.c network/source/mdio.c  network/source/phy_dp83640.c
+network_rel_CPPFLAGS = $(AM_CPPFLAGS) $(network_CPPFLAGS)
+#network_rel_CPPFLAGS += -I network/include 
+network_rel_LDFLAGS = $(RTEMS_RELLDFLAGS)
 
-include_bsp_HEADERS += hwinit/tms570_selftest_parity.h
-include_bsp_HEADERS += hwinit/tms570_hwinit.h
-include_bsp_HEADERS += hwinit/tms570_selftest.h
-
-# Start hooks
-libbsp_a_SOURCES += hwinit/bspstarthooks-hwinit.c
-else
 # Start hooks
 libbsp_a_SOURCES += startup/bspstarthooks.c
-endif
 
 # ----------------------------
 # ------  Special Rules
 # ----------------------------
 
 DISTCLEANFILES = include/bspopts.h
+
+libbsp_a_LIBADD += network.rel
 
 include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am

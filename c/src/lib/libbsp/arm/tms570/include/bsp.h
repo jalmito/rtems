@@ -46,7 +46,16 @@
 extern "C" {
 #endif /* __cplusplus */
 
+   /*
+    *RTEMS Network Driver configuration
+    */ 
+    
 struct rtems_bsdnet_ifconfig;
+
+extern int rtems_tms_driver_attach (struct rtems_bsdnet_ifconfig *config, int attaching);
+#define RTEMS_BSP_NETWORK_DRIVER_NAME	"tms1"
+#define RTEMS_BSP_NETWORK_DRIVER_ATTACH	rtems_tms_driver_attach
+
 
 /** @} */
 
