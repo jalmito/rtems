@@ -13,7 +13,7 @@
  */
 
 #include <nfs/xdr.h>
-#include <assert.h>
+#include <score/assert.h>
 #include <net_sockets/net_sockets.h>
 
 #include <barrelfish/barrelfish.h>
