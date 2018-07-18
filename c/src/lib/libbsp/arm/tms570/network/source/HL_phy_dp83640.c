@@ -10,9 +10,9 @@
  * ALL RIGHTS RESERVED
  */
 
-#include "HL_sys_common.h"
-#include "HL_mdio.h"
-#include "HL_phy_dp83640.h"
+#include "../include/HL_sys_common.h"
+#include "../include/HL_mdio.h"
+#include "../include/HL_phy_dp83640.h"
 
 /*******************************************************************************
 *                        API FUNCTION DEFINITIONS

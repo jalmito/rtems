@@ -17,7 +17,7 @@
 #include <bsp/irq.h>
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
-#include "emac.h"
+#include "../include/HL_emac.h"
 
 /*
  * Number of SCCs supported by this driver
@@ -87,236 +87,236 @@ hdkif_t hdkif_data[1];
 
 
 
-void EMACDMAInit(hdkif_t *hdkif)
-{
-
-      uint32 num_bd, pbuf_cnt = 0U;
-      volatile emac_tx_bd_t *curr_txbd, *last_txbd;
-      volatile emac_rx_bd_t *curr_bd, *last_bd;
-      txch_t *txch_dma;
-      rxch_t *rxch_dma;
-      uint8_t *p;
-
-      txch_dma = &(hdkif->txchptr);
-
-      /**
-      * Initialize the Descriptor Memory For TX and RX
-      * Only single channel is supported for both TX and RX
-      */
-      /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
-      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-      txch_dma->free_head = (volatile emac_tx_bd_t*)(hdkif->emac_ctrl_ram);
-      txch_dma->next_bd_to_process = txch_dma->free_head;
-      txch_dma->active_tail = NULL;
-
-      /* Set the number of descriptors for the channel */
-      num_bd = (SIZE_EMAC_CTRL_RAM >> 1U) / sizeof(emac_tx_bd_t);
-
-      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-      curr_txbd = txch_dma->free_head;
-      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
-      last_txbd = curr_txbd;
-
-      /* Initialize all the TX buffer Descriptors */
-      while(num_bd != 0U) {
-        /*SAFETYMCUSW 567 S MR:17.1,17.4 <APPROVED> "Struct pointer used for linked list is incremented." */
-        curr_txbd->next = curr_txbd + 1U;
-        /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
-        curr_txbd->flags_pktlen = 0U;
-        /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
-        last_txbd = curr_txbd;
-        /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
-        curr_txbd = curr_txbd->next;
-        num_bd--;
-      }
-      /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
-      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
-      last_txbd->next = txch_dma->free_head;
-
-      /* Initialize the descriptors for the RX channel */
-      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-      rxch_dma = &(hdkif->rxchptr);
-      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-      /*SAFETYMCUSW 567 S MR:17.1,17.4 <APPROVED> "Struct pointer used for linked list is incremented." */
-      curr_txbd++;
-      /*SAFETYMCUSW 94 S MR:11.1,11.2,11.4 <APPROVED> "Linked List pointer needs to be assigned." */
-      /*SAFETYMCUSW 95 S MR:11.1,11.4 <APPROVED> "Linked List pointer needs to be assigned." */
-      /*SAFETYMCUSW 344 S MR:11.5 <APPROVED> "Linked List pointer needs to be assigned to a different structure." */      
-      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-      rxch_dma->active_head = (volatile emac_rx_bd_t *)curr_txbd;
-
-      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */         
-      rxch_dma->free_head = NULL;
-      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
-      curr_bd = rxch_dma->active_head;
-      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
-      last_bd = curr_bd;
-
-
-      /*
-      **  Static allocation of a specific number of packet buffers as specified by MAX_RX_PBUF_ALLOC, whose value is entered by the user in  HALCoGen GUI.
-      */
-
-      /*Commented part of allocation of pbufs need to check whether its true*/
-
-      for(pbuf_cnt = 0U;pbuf_cnt < MAX_RX_PBUF_ALLOC;pbuf_cnt++)
-        {
-         /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */  
-         p = pbuf_array[pbuf_cnt];
-         /*SAFETYMCUSW 439 S MR:11.3 <APPROVED> "RHS is a pointer value required to be stored. - Advisory as per MISRA" */
-         /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
-         curr_bd->bufptr = (uint32)p;
-	 memset(curr_bd->bufptr,0xff,MAX_TRANSFER_UNIT);
-         /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */  
-         curr_bd->bufoff_len = MAX_TRANSFER_UNIT;
-         /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
-         curr_bd->flags_pktlen = EMAC_BUF_DESC_OWNER;
-         if (pbuf_cnt == (MAX_RX_PBUF_ALLOC - 1U))
-         {
-             /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */  
-	   curr_bd->next = rxch_dma->active_head;//NULL;
-             /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */              
-             last_bd = curr_bd;
-
-         }
-         else
-         {
-             /*SAFETYMCUSW 567 S MR:17.1,17.4 <APPROVED> "Struct pointer used for linked list is incremented." */
-             curr_bd->next = (curr_bd + 1U);
-             /*SAFETYMCUSW 567 S MR:17.1,17.4 <APPROVED> "Struct pointer used for linked list is incremented." */
-             curr_bd++;
-             /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */  
-             last_bd = curr_bd;
-         }
-       }
-      
-      /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
-      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */         
-      // last_bd->next = NULL;
-      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
-      rxch_dma->active_tail = last_bd;
-}
-
-
-boolean EMACTransmit(hdkif_t *hdkif, pbuf_t *pbuf)
-{
-    
-  txch_t *txch;
-  pbuf_t *q;
-  uint16 totLen;
-  uint16 qLen;
-  volatile emac_tx_bd_t *curr_bd,*active_head, *bd_end;
-  boolean retValue = FALSE;
-  if((pbuf != NULL) && (hdkif != NULL))
-  {
-  txch = &(hdkif->txchptr);
-
-  /* Get the buffer descriptor which is free to transmit */
-  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-  curr_bd = txch->free_head;
-  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-  bd_end = curr_bd;
-  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-  active_head = curr_bd;
-
-  /* Update the total packet length */
-  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */       
-  curr_bd->flags_pktlen &= (~((uint32)0xFFFFU));
-  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-  totLen = pbuf->tot_len;
-  curr_bd->flags_pktlen |= (uint32)(totLen);
-
-  /* Indicate the start of the packet */
-  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-  curr_bd->flags_pktlen |= (EMAC_BUF_DESC_SOP | EMAC_BUF_DESC_OWNER);
+//void EMACDMAInit(hdkif_t *hdkif)
+//{
+//
+//      uint32 num_bd, pbuf_cnt = 0U;
+//      volatile emac_tx_bd_t *curr_txbd, *last_txbd;
+//      volatile emac_rx_bd_t *curr_bd, *last_bd;
+//      txch_t *txch_dma;
+//      rxch_t *rxch_dma;
+//      uint8_t *p;
+//
+//      txch_dma = &(hdkif->txchptr);
+//
+//      /**
+//      * Initialize the Descriptor Memory For TX and RX
+//      * Only single channel is supported for both TX and RX
+//      */
+//      /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
+//      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+//      txch_dma->free_head = (volatile emac_tx_bd_t*)(hdkif->emac_ctrl_ram);
+//      txch_dma->next_bd_to_process = txch_dma->free_head;
+//      txch_dma->active_tail = NULL;
+//
+//      /* Set the number of descriptors for the channel */
+//      num_bd = (SIZE_EMAC_CTRL_RAM >> 1U) / sizeof(emac_tx_bd_t);
+//
+//      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+//      curr_txbd = txch_dma->free_head;
+//      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
+//      last_txbd = curr_txbd;
+//
+//      /* Initialize all the TX buffer Descriptors */
+//      while(num_bd != 0U) {
+//        /*SAFETYMCUSW 567 S MR:17.1,17.4 <APPROVED> "Struct pointer used for linked list is incremented." */
+//        curr_txbd->next = curr_txbd + 1U;
+//        /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
+//        curr_txbd->flags_pktlen = 0U;
+//        /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
+//        last_txbd = curr_txbd;
+//        /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
+//        curr_txbd = curr_txbd->next;
+//        num_bd--;
+//      }
+//      /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
+//      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
+//      last_txbd->next = txch_dma->free_head;
+//
+//      /* Initialize the descriptors for the RX channel */
+//      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+//      rxch_dma = &(hdkif->rxchptr);
+//      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+//      /*SAFETYMCUSW 567 S MR:17.1,17.4 <APPROVED> "Struct pointer used for linked list is incremented." */
+//      curr_txbd++;
+//      /*SAFETYMCUSW 94 S MR:11.1,11.2,11.4 <APPROVED> "Linked List pointer needs to be assigned." */
+//      /*SAFETYMCUSW 95 S MR:11.1,11.4 <APPROVED> "Linked List pointer needs to be assigned." */
+//      /*SAFETYMCUSW 344 S MR:11.5 <APPROVED> "Linked List pointer needs to be assigned to a different structure." */      
+//      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+//      rxch_dma->active_head = (volatile emac_rx_bd_t *)curr_txbd;
+//
+//      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */         
+//      rxch_dma->free_head = NULL;
+//      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
+//      curr_bd = rxch_dma->active_head;
+//      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
+//      last_bd = curr_bd;
+//
+//
+//      /*
+//      **  Static allocation of a specific number of packet buffers as specified by MAX_RX_PBUF_ALLOC, whose value is entered by the user in  HALCoGen GUI.
+//      */
+//
+//      /*Commented part of allocation of pbufs need to check whether its true*/
+//
+//      for(pbuf_cnt = 0U;pbuf_cnt < MAX_RX_PBUF_ALLOC;pbuf_cnt++)
+//        {
+//         /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */  
+//         p = pbuf_array[pbuf_cnt];
+//         /*SAFETYMCUSW 439 S MR:11.3 <APPROVED> "RHS is a pointer value required to be stored. - Advisory as per MISRA" */
+//         /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
+//         curr_bd->bufptr = (uint32)p;
+//	 memset(curr_bd->bufptr,0xff,MAX_TRANSFER_UNIT);
+//         /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */  
+//         curr_bd->bufoff_len = MAX_TRANSFER_UNIT;
+//         /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
+//         curr_bd->flags_pktlen = EMAC_BUF_DESC_OWNER;
+//         if (pbuf_cnt == (MAX_RX_PBUF_ALLOC - 1U))
+//         {
+//             /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */  
+//	   curr_bd->next = rxch_dma->active_head;//NULL;
+//             /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */              
+//             last_bd = curr_bd;
+//
+//         }
+//         else
+//         {
+//             /*SAFETYMCUSW 567 S MR:17.1,17.4 <APPROVED> "Struct pointer used for linked list is incremented." */
+//             curr_bd->next = (curr_bd + 1U);
+//             /*SAFETYMCUSW 567 S MR:17.1,17.4 <APPROVED> "Struct pointer used for linked list is incremented." */
+//             curr_bd++;
+//             /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */  
+//             last_bd = curr_bd;
+//         }
+//       }
+//      
+//      /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
+//      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */         
+//      // last_bd->next = NULL;
+//      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
+//      rxch_dma->active_tail = last_bd;
+//}
 
 
-  /* Copy pbuf information into TX buffer descriptors */
-    q = pbuf;
-    while(q != NULL)
-    {
-    /* Initialize the buffer pointer and length */
-    /*SAFETYMCUSW 439 S MR:11.3 <APPROVED> "RHS is a pointer value required to be stored. - Advisory as per MISRA" */
-    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
-    curr_bd->bufptr = (uint32)(q->payload);
-    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */
-    qLen = q->len;
-    curr_bd->bufoff_len = ((uint32)(qLen) & 0xFFFFU);
-    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */      
-    bd_end = curr_bd;
-    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
-    curr_bd = curr_bd->next;
-    curr_bd->flags_pktlen = 0x0; //not here in master
-    q = q->next;
-    }
-
-
-  /* Indicate the start and end of the packet */
-  /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
-  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */       
-  bd_end->next = NULL;
-  /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
-  bd_end->flags_pktlen |= EMAC_BUF_DESC_EOP;
-
-  /*SAFETYMCUSW 71 S MR:17.6 <APPROVED> "Assigned pointer value has required scope." */
-  txch->free_head = curr_bd;
-
-  /* For the first time, write the HDP with the filled bd */
-  if(txch->active_tail == NULL) {
-  /*SAFETYMCUSW 439 S MR:11.3 <APPROVED> "Address stored in pointer is passed as as an int parameter. - Advisory as per MISRA" */
-    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */      
-    EMACTxHdrDescPtrWrite(hdkif->emac_base, (uint32)(active_head), (uint32)EMAC_CHANNELNUMBER);
-  }
-
-  /*
-   * Chain the bd's. If the DMA engine, already reached the end of the chain,
-   * the EOQ will be set. In that case, the HDP shall be written again.
-   */
-  else {			
-    txch->active_tail->next = active_head; //Not here originally in master
-    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
-    curr_bd = txch->active_tail;
-    /* Wait for the EOQ bit is set */
-    /*SAFETYMCUSW 28 D MR:NA <APPROVED> "Hardware status bit read check" */
-    /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
-    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
-    while (EMAC_BUF_DESC_EOQ != (curr_bd->flags_pktlen & EMAC_BUF_DESC_EOQ))
-    {
-    }
-//    /* Don't write to TXHDP0 until it turns to zero */
+//boolean EMACTransmit(hdkif_t *hdkif, pbuf_t *pbuf)
+//{
+//    
+//  txch_t *txch;
+//  pbuf_t *q;
+//  uint16 totLen;
+//  uint16 qLen;
+//  volatile emac_tx_bd_t *curr_bd,*active_head, *bd_end;
+//  boolean retValue = FALSE;
+//  if((pbuf != NULL) && (hdkif != NULL))
+//  {
+//  txch = &(hdkif->txchptr);
+//
+//  /* Get the buffer descriptor which is free to transmit */
+//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+//  curr_bd = txch->free_head;
+//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+//  bd_end = curr_bd;
+//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+//  active_head = curr_bd;
+//
+//  /* Update the total packet length */
+//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */       
+//  curr_bd->flags_pktlen &= (~((uint32)0xFFFFU));
+//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+//  totLen = pbuf->tot_len;
+//  curr_bd->flags_pktlen |= (uint32)(totLen);
+//
+//  /* Indicate the start of the packet */
+//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+//  curr_bd->flags_pktlen |= (EMAC_BUF_DESC_SOP | EMAC_BUF_DESC_OWNER);
+//
+//
+//  /* Copy pbuf information into TX buffer descriptors */
+//    q = pbuf;
+//    while(q != NULL)
+//    {
+//    /* Initialize the buffer pointer and length */
+//    /*SAFETYMCUSW 439 S MR:11.3 <APPROVED> "RHS is a pointer value required to be stored. - Advisory as per MISRA" */
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
+//    curr_bd->bufptr = (uint32)(q->payload);
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */
+//    qLen = q->len;
+//    curr_bd->bufoff_len = ((uint32)(qLen) & 0xFFFFU);
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */      
+//    bd_end = curr_bd;
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
+//    curr_bd = curr_bd->next;
+//    curr_bd->flags_pktlen = 0x0; //not here in master
+//    q = q->next;
+//    }
+//
+//
+//  /* Indicate the start and end of the packet */
+//  /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
+//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */       
+//  bd_end->next = NULL;
+//  /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
+//  bd_end->flags_pktlen |= EMAC_BUF_DESC_EOP;
+//
+//  /*SAFETYMCUSW 71 S MR:17.6 <APPROVED> "Assigned pointer value has required scope." */
+//  txch->free_head = curr_bd;
+//
+//  /* For the first time, write the HDP with the filled bd */
+//  if(txch->active_tail == NULL) {
+//  /*SAFETYMCUSW 439 S MR:11.3 <APPROVED> "Address stored in pointer is passed as as an int parameter. - Advisory as per MISRA" */
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */      
+//    EMACTxHdrDescPtrWrite(hdkif->emac_base, (uint32)(active_head), (uint32)EMAC_CHANNELNUMBER);
+//  }
+//
+//  /*
+//   * Chain the bd's. If the DMA engine, already reached the end of the chain,
+//   * the EOQ will be set. In that case, the HDP shall be written again.
+//   */
+//  else {			
+//    txch->active_tail->next = active_head; //Not here originally in master
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
+//    curr_bd = txch->active_tail;
+//    /* Wait for the EOQ bit is set */
 //    /*SAFETYMCUSW 28 D MR:NA <APPROVED> "Hardware status bit read check" */
 //    /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
-    while (((uint32)0U != *((uint32 *)0xFCF78600U)))
-    {
-//	rtems_event_set events;
-//				rtems_bsdnet_event_receive (INTERRUPT_EVENT,
-//						RTEMS_WAIT|RTEMS_EVENT_ANY,
-//						RTEMS_NO_TIMEOUT,
-//						&events);
-    }
-    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
-    curr_bd->next = active_head;
-    /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
-    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */      
-    if (EMAC_BUF_DESC_EOQ == (curr_bd->flags_pktlen & EMAC_BUF_DESC_EOQ)) {
-      /* Write the Header Descriptor Pointer and start DMA */
-      /*SAFETYMCUSW 439 S MR:11.3 <APPROVED> "Address stored in pointer is passed as as an int parameter. - Advisory as per MISRA" */
-      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
-      EMACTxHdrDescPtrWrite(hdkif->emac_base, (uint32)(active_head), (uint32)EMAC_CHANNELNUMBER);
-    }
-  }
-   
-  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-  txch->active_tail = bd_end;
-  retValue = TRUE;
-  }
-  else
-  {
-    retValue = FALSE;
-  }
-  return retValue;
-}
-
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
+//    while (EMAC_BUF_DESC_EOQ != (curr_bd->flags_pktlen & EMAC_BUF_DESC_EOQ))
+//    {
+//    }
+////    /* Don't write to TXHDP0 until it turns to zero */
+////    /*SAFETYMCUSW 28 D MR:NA <APPROVED> "Hardware status bit read check" */
+////    /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
+//    while (((uint32)0U != *((uint32 *)0xFCF78600U)))
+//    {
+////	rtems_event_set events;
+////				rtems_bsdnet_event_receive (INTERRUPT_EVENT,
+////						RTEMS_WAIT|RTEMS_EVENT_ANY,
+////						RTEMS_NO_TIMEOUT,
+////						&events);
+//    }
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
+//    curr_bd->next = active_head;
+//    /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */      
+//    if (EMAC_BUF_DESC_EOQ == (curr_bd->flags_pktlen & EMAC_BUF_DESC_EOQ)) {
+//      /* Write the Header Descriptor Pointer and start DMA */
+//      /*SAFETYMCUSW 439 S MR:11.3 <APPROVED> "Address stored in pointer is passed as as an int parameter. - Advisory as per MISRA" */
+//      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
+//      EMACTxHdrDescPtrWrite(hdkif->emac_base, (uint32)(active_head), (uint32)EMAC_CHANNELNUMBER);
+//    }
+//  }
+//   
+//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+//  txch->active_tail = bd_end;
+//  retValue = TRUE;
+//  }
+//  else
+//  {
+//    retValue = FALSE;
+//  }
+//  return retValue;
+//}
+//
 /*
  * SCC1 interrupt handler
  */

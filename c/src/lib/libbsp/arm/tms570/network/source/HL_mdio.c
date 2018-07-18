@@ -11,8 +11,8 @@
  */
 
 
-#include "HL_hw_reg_access.h"
-#include "HL_mdio.h"
+#include "../include/HL_hw_reg_access.h"
+#include "../include/HL_mdio.h"
 
 /*******************************************************************************
 *                       INTERNAL MACRO DEFINITIONS
