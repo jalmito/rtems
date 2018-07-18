@@ -32,7 +32,7 @@
 #ifndef __FSDATA_H__
 #define __FSDATA_H__
 
-#include "lwip/opt.h"
+#include <lwip/src/include/lwip/opt.h>
 #include "fs.h"
 
 struct fsdata_file {

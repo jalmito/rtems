@@ -32,9 +32,9 @@
 #ifndef __NETIF_LOOPIF_H__
 #define __NETIF_LOOPIF_H__
 
-#include "lwip/opt.h"
-#include "lwip/netif.h"
-#include "lwip/err.h"
+#include <lwip/src/include/lwip/opt.h>
+#include <lwip/src/include/lwip/netif.h>
+#include <lwip/src/include/lwip/err.h>
 
 #ifdef __cplusplus
 extern "C" {

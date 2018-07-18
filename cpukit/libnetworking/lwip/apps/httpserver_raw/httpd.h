@@ -36,9 +36,9 @@
 #ifndef __HTTPD_H__
 #define __HTTPD_H__
 
-#include "lwip/opt.h"
-#include "lwip/err.h"
-#include "lwip/pbuf.h"
+#include <lwip/src/include/lwip/opt.h>
+#include <lwip/src/include/lwip/err.h>
+#include <lwip/src/include/lwip/pbuf.h>
 
 
 /** Set this to 1 to support CGI */

@@ -32,8 +32,8 @@
 #ifndef __LWIP_SYS_H__
 #define __LWIP_SYS_H__
 
-#include "lwip/opt.h"
-#include "arch/sys_arch.h"
+#include <lwip/src/include/lwip/opt.h>
+#include <lwip/ports/hdk/include/arch/sys_arch.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -83,8 +83,8 @@ typedef u8_t sys_mbox_t;
  */
 #define SYS_MBOX_EMPTY SYS_ARCH_TIMEOUT 
 
-#include "lwip/err.h"
-#include "arch/sys_arch.h"
+#include <lwip/src/include/lwip/err.h>
+#include <lwip/ports/hdk/include/arch/sys_arch.h>
 
 /** Function prototype for thread functions */
 typedef void (*lwip_thread_fn)(void *arg);

@@ -35,21 +35,21 @@
  * Author: Christiaan Simons <christiaan.simons@axon.tv>
  */
 
-#include "lwip/opt.h"
+#include <lwip/src/include/lwip/opt.h>
 
 #if LWIP_SNMP /* don't build if not configured for use in lwipopts.h */
 
-#include "lwip/snmp.h"
-#include "lwip/netif.h"
-#include "lwip/ip.h"
-#include "lwip/ip_frag.h"
-#include "lwip/mem.h"
-#include "lwip/tcp_impl.h"
-#include "lwip/udp.h"
-#include "lwip/snmp_asn1.h"
-#include "lwip/snmp_structs.h"
-#include "lwip/sys.h"
-#include "netif/etharp.h"
+#include <lwip/src/include/lwip/snmp.h>
+#include <lwip/src/include/lwip/netif.h>
+#include <lwip/src/include/lwip/ip.h>
+#include <lwip/src/include/lwip/ip_frag.h>
+#include <lwip/src/include/lwip/mem.h>
+#include <lwip/src/include/lwip/tcp_impl.h>
+#include <lwip/src/include/lwip/udp.h>
+#include <lwip/src/include/lwip/snmp_asn1.h>
+#include <lwip/src/include/lwip/snmp_structs.h>
+#include <lwip/src/include/lwip/sys.h>
+#include <lwip/src/include/netif/etharp.h>
 
 /**
  * IANA assigned enterprise ID for lwIP is 26381

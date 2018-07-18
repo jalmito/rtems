@@ -80,10 +80,10 @@
  * the 'g_psHTTPHeaders' list.
  */
 #include "httpd.h"
-#include "lwip/debug.h"
-#include "lwip/stats.h"
+#include <lwip/src/include/lwip/debug.h>
+#include <lwip/src/include/lwip/stats.h>
 #include "httpd_structs.h"
-#include "lwip/tcp.h"
+#include <lwip/src/include/lwip/tcp.h>
 #include "fs.h"
 
 #include <string.h>

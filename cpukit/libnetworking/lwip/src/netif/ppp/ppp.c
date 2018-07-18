@@ -79,12 +79,12 @@
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include "lwip/opt.h"
+#include <lwip/src/include/lwip/opt.h>
 
 #if PPP_SUPPORT /* don't build if not configured for use in lwipopts.h */
 
 #include "ppp_impl.h"
-#include "lwip/ip.h" /* for ip_input() */
+#include <lwip/src/include/lwip/ip.h> /* for ip_input() */
 
 #include "pppdebug.h"
 
@@ -104,12 +104,12 @@
 #include "vj.h"
 #endif /* VJ_SUPPORT */
 #if PPPOE_SUPPORT
-#include "netif/ppp_oe.h"
+#include <lwip/src/include/netif/ppp_oe.h>
 #endif /* PPPOE_SUPPORT */
 
-#include "lwip/tcpip.h"
-#include "lwip/api.h"
-#include "lwip/snmp.h"
+#include <lwip/src/include/lwip/tcpip.h>
+#include <lwip/src/include/lwip/api.h>
+#include <lwip/src/include/lwip/snmp.h>
 
 #include <string.h>
 

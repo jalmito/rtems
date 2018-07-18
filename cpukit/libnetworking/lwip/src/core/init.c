@@ -36,27 +36,27 @@
  *
  */
 
-#include "lwip/opt.h"
+#include <lwip/src/include/lwip/opt.h>
 
-#include "lwip/init.h"
-#include "lwip/stats.h"
-#include "lwip/sys.h"
-#include "lwip/mem.h"
-#include "lwip/memp.h"
-#include "lwip/pbuf.h"
-#include "lwip/netif.h"
-#include "lwip/sockets.h"
-#include "lwip/ip.h"
-#include "lwip/raw.h"
-#include "lwip/udp.h"
-#include "lwip/tcp_impl.h"
-#include "lwip/snmp_msg.h"
-#include "lwip/autoip.h"
-#include "lwip/igmp.h"
-#include "lwip/dns.h"
-#include "lwip/timers.h"
-#include "netif/etharp.h"
-#include "lwip/api.h"
+#include <lwip/src/include/lwip/init.h>
+#include <lwip/src/include/lwip/stats.h>
+#include <lwip/src/include/lwip/sys.h>
+#include <lwip/src/include/lwip/mem.h>
+#include <lwip/src/include/lwip/memp.h>
+#include <lwip/src/include/lwip/pbuf.h>
+#include <lwip/src/include/lwip/netif.h>
+#include <lwip/src/include/lwip/sockets.h>
+#include <lwip/src/include/lwip/ip.h>
+#include <lwip/src/include/lwip/raw.h>
+#include <lwip/src/include/lwip/udp.h>
+#include <lwip/src/include/lwip/tcp_impl.h>
+#include <lwip/src/include/lwip/snmp_msg.h>
+#include <lwip/src/include/lwip/autoip.h>
+#include <lwip/src/include/lwip/igmp.h>
+#include <lwip/src/include/lwip/dns.h>
+#include <lwip/src/include/lwip/timers.h>
+#include <lwip/src/include/netif/etharp.h>
+#include <lwip/src/include/lwip/api.h>
 
 /* Compile-time sanity checks for configuration errors.
  * These can be done independently of LWIP_DEBUG, without penalty.

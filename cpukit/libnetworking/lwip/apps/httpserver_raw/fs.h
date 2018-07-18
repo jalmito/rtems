@@ -32,8 +32,8 @@
 #ifndef __FS_H__
 #define __FS_H__
 
-#include "lwip/opt.h"
-#include "lwip/err.h"
+#include <lwip/src/include/lwip/opt.h>
+#include <lwip/src/include/lwip/err.h>
 
 /** Set this to 1 and provide the functions:
  * - "int fs_open_custom(struct fs_file *file, const char *name)"

@@ -1,8 +1,8 @@
 #include "test_etharp.h"
 
-#include "lwip/udp.h"
-#include "netif/etharp.h"
-#include "lwip/stats.h"
+#include <lwip/src/include/lwip/udp.h>
+#include <lwip/src/include/netif/etharp.h>
+#include <lwip/src/include/lwip/stats.h>
 
 #if !LWIP_STATS || !UDP_STATS || !MEMP_STATS || !ETHARP_STATS
 #error "This tests needs UDP-, MEMP- and ETHARP-statistics enabled"

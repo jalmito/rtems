@@ -1,9 +1,9 @@
 #include "tcp_helper.h"
 
-#include "lwip/tcp_impl.h"
-#include "lwip/stats.h"
-#include "lwip/pbuf.h"
-#include "lwip/inet_chksum.h"
+#include <lwip/src/include/lwip/tcp_impl.h>
+#include <lwip/src/include/lwip/stats.h>
+#include <lwip/src/include/lwip/pbuf.h>
+#include <lwip/src/include/lwip/inet_chksum.h>
 
 #if !LWIP_STATS || !TCP_STATS || !MEMP_STATS
 #error "This tests needs TCP- and MEMP-statistics enabled"

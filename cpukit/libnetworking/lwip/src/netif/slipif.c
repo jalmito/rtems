@@ -55,17 +55,17 @@
  * provided by another file. They are sio_open, sio_read/sio_tryread and sio_send
  */
 
-#include "netif/slipif.h"
-#include "lwip/opt.h"
+#include <lwip/src/include/netif/slipif.h>
+#include <lwip/src/include/lwip/opt.h>
 
 #if LWIP_HAVE_SLIPIF
 
-#include "lwip/def.h"
-#include "lwip/pbuf.h"
-#include "lwip/stats.h"
-#include "lwip/snmp.h"
-#include "lwip/sio.h"
-#include "lwip/sys.h"
+#include <lwip/src/include/lwip/def.h>
+#include <lwip/src/include/lwip/pbuf.h>
+#include <lwip/src/include/lwip/stats.h>
+#include <lwip/src/include/lwip/snmp.h>
+#include <lwip/src/include/lwip/sio.h>
+#include <lwip/src/include/lwip/sys.h>
 
 #define SLIP_END     0xC0 /* 0300: start and end of every packet */
 #define SLIP_ESC     0xDB /* 0333: escape start (one byte escaped data follows) */

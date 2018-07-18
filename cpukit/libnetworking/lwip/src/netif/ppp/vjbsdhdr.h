@@ -1,7 +1,7 @@
 #ifndef VJBSDHDR_H
 #define VJBSDHDR_H
 
-#include "lwip/tcp.h"
+#include <lwip/src/include/lwip/tcp.h>
 
 /*
  * Structure of an internet header, naked of options.

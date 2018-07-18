@@ -35,12 +35,12 @@
  * Author: Adam Dunkels <adam@sics.se>
  *
  */
-#include "lwip/opt.h"
+#include <lwip/src/include/lwip/opt.h>
 
 #if LWIP_HAVE_LOOPIF
 
-#include "netif/loopif.h"
-#include "lwip/snmp.h"
+#include <lwip/src/include/netif/loopif.h>
+#include <lwip/src/include/lwip/snmp.h>
 
 /**
  * Initialize a lwip network interface structure for a loopback interface

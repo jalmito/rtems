@@ -1,7 +1,7 @@
 #include "test_mem.h"
 
-#include "lwip/mem.h"
-#include "lwip/stats.h"
+#include <lwip/src/include/lwip/mem.h>
+#include <lwip/src/include/lwip/stats.h>
 
 #if !LWIP_STATS || !MEM_STATS
 #error "This tests needs MEM-statistics enabled"

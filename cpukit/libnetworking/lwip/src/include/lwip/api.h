@@ -32,16 +32,16 @@
 #ifndef __LWIP_API_H__
 #define __LWIP_API_H__
 
-#include "lwip/opt.h"
+#include <lwip/src/include/lwip/opt.h>
 
 #if LWIP_NETCONN /* don't build if not configured for use in lwipopts.h */
 
 #include <stddef.h> /* for size_t */
 
-#include "lwip/netbuf.h"
-#include "lwip/sys.h"
-#include "lwip/ip_addr.h"
-#include "lwip/err.h"
+#include <lwip/src/include/lwip/netbuf.h>
+#include <lwip/src/include/lwip/sys.h>
+#include <lwip/src/include/lwip/ip_addr.h>
+#include <lwip/src/include/lwip/err.h>
 
 #ifdef __cplusplus
 extern "C" {

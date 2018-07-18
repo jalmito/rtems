@@ -32,12 +32,12 @@
 #ifndef __LWIP_ICMP_H__
 #define __LWIP_ICMP_H__
 
-#include "lwip/opt.h"
+#include <lwip/src/include/lwip/opt.h>
 
 #if LWIP_ICMP /* don't build if not configured for use in lwipopts.h */
 
-#include "lwip/pbuf.h"
-#include "lwip/netif.h"
+#include <lwip/src/include/lwip/pbuf.h>
+#include <lwip/src/include/lwip/netif.h>
 
 #ifdef __cplusplus
 extern "C" {

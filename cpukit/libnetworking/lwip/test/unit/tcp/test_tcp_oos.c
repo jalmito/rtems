@@ -1,7 +1,7 @@
 #include "test_tcp_oos.h"
 
-#include "lwip/tcp_impl.h"
-#include "lwip/stats.h"
+#include <lwip/src/include/lwip/tcp_impl.h>
+#include <lwip/src/include/lwip/stats.h>
 #include "tcp_helper.h"
 
 #if !LWIP_STATS || !TCP_STATS || !MEMP_STATS

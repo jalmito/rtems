@@ -6,7 +6,7 @@
 #include "core/test_mem.h"
 #include "etharp/test_etharp.h"
 
-#include "lwip/init.h"
+#include <lwip/src/include/lwip/init.h>
 
 
 int main()

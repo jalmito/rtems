@@ -34,18 +34,18 @@
 #ifndef PPP_IMPL_H
 #define PPP_IMPL_H
 
-#include "lwip/opt.h"
+#include <lwip/src/include/lwip/opt.h>
 
 #if PPP_SUPPORT /* don't build if not configured for use in lwipopts.h */
 
 #include "ppp.h"
-#include "lwip/def.h"
-#include "lwip/sio.h"
-#include "lwip/stats.h"
-#include "lwip/mem.h"
-#include "lwip/netif.h"
-#include "lwip/sys.h"
-#include "lwip/timers.h"
+#include <lwip/src/include/lwip/def.h>
+#include <lwip/src/include/lwip/sio.h>
+#include <lwip/src/include/lwip/stats.h>
+#include <lwip/src/include/lwip/mem.h>
+#include <lwip/src/include/lwip/netif.h>
+#include <lwip/src/include/lwip/sys.h>
+#include <lwip/src/include/lwip/timers.h>
 
 /** Some defines for code we skip compared to the original pppd.
  *  These are just here to minimise the use of the ugly "#if 0". */

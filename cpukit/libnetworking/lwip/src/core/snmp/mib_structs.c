@@ -32,13 +32,13 @@
  * Author: Christiaan Simons <christiaan.simons@axon.tv>
  */
 
-#include "lwip/opt.h"
+#include <lwip/src/include/lwip/opt.h>
 
 #if LWIP_SNMP /* don't build if not configured for use in lwipopts.h */
 
-#include "lwip/snmp_structs.h"
-#include "lwip/memp.h"
-#include "lwip/netif.h"
+#include <lwip/src/include/lwip/snmp_structs.h>
+#include <lwip/src/include/lwip/memp.h>
+#include <lwip/src/include/lwip/netif.h>
 
 /** .iso.org.dod.internet address prefix, @see snmp_iso_*() */
 const s32_t prefix[4] = {1, 3, 6, 1};

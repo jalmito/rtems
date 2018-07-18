@@ -32,9 +32,9 @@
 #ifndef __LWIP_INET_H__
 #define __LWIP_INET_H__
 
-#include "lwip/opt.h"
-#include "lwip/pbuf.h"
-#include "lwip/ip_addr.h"
+#include <lwip/src/include/lwip/opt.h>
+#include <lwip/src/include/lwip/pbuf.h>
+#include <lwip/src/include/lwip/ip_addr.h>
 
 #ifdef __cplusplus
 extern "C" {

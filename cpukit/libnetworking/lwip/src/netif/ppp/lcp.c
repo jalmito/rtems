@@ -51,7 +51,7 @@
  */
  
 
-#include "lwip/opt.h"
+#include <lwip/src/include/lwip/opt.h>
 
 #if PPP_SUPPORT /* don't build if not configured for use in lwipopts.h */
 
@@ -67,7 +67,7 @@
 #include <string.h>
 
 #if PPPOE_SUPPORT
-#include "netif/ppp_oe.h"
+#include <lwip/src/include/netif/ppp_oe.h>
 #else
 #define PPPOE_MAXMTU PPP_MAXMRU
 #endif

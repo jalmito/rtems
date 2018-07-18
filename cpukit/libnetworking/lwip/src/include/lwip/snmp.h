@@ -33,13 +33,13 @@
 #ifndef __LWIP_SNMP_H__
 #define __LWIP_SNMP_H__
 
-#include "lwip/opt.h"
+#include <lwip/src/include/lwip/opt.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "lwip/ip_addr.h"
+#include <lwip/src/include/lwip/ip_addr.h>
 
 struct udp_pcb;
 struct netif;

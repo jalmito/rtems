@@ -38,23 +38,23 @@
  *
  */
 
-#include "lwip/opt.h"
-#include "lwip/ip.h"
-#include "lwip/def.h"
-#include "lwip/mem.h"
-#include "lwip/ip_frag.h"
-#include "lwip/inet_chksum.h"
-#include "lwip/netif.h"
-#include "lwip/icmp.h"
-#include "lwip/igmp.h"
-#include "lwip/raw.h"
-#include "lwip/udp.h"
-#include "lwip/tcp_impl.h"
-#include "lwip/snmp.h"
-#include "lwip/dhcp.h"
-#include "lwip/autoip.h"
-#include "lwip/stats.h"
-#include "arch/perf.h"
+#include <lwip/src/include/lwip/opt.h>
+#include <lwip/src/include/lwip/ip.h>
+#include <lwip/src/include/lwip/def.h>
+#include <lwip/src/include/lwip/mem.h>
+#include <lwip/src/include/lwip/ip_frag.h>
+#include <lwip/src/include/lwip/inet_chksum.h>
+#include <lwip/src/include/lwip/netif.h>
+#include <lwip/src/include/lwip/icmp.h>
+#include <lwip/src/include/lwip/igmp.h>
+#include <lwip/src/include/lwip/raw.h>
+#include <lwip/src/include/lwip/udp.h>
+#include <lwip/src/include/lwip/tcp_impl.h>
+#include <lwip/src/include/lwip/snmp.h>
+#include <lwip/src/include/lwip/dhcp.h>
+#include <lwip/src/include/lwip/autoip.h>
+#include <lwip/src/include/lwip/stats.h>
+#include <lwip/ports/hdk/include/arch/perf.h>
 
 #include <string.h>
 

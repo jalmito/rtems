@@ -41,6 +41,31 @@ include_arpa_HEADERS += arpa/inet.h
 include_arpa_HEADERS += arpa/nameser.h
 include_arpa_HEADERS += arpa/nameser_compat.h
 
+# lwip
+
+include_lwipdir = $(includedir)/lwip/src/include/lwip
+include_archdir = $(includedir)/lwip/ports/hdk/include/arch
+
+include_lwip_HEADERS = lwip/src/include/lwip/dhcp.h
+include_lwip_HEADERS += lwip/src/include/lwip/timers.h
+include_lwip_HEADERS += lwip/src/include/lwip/sockets.h
+include_lwip_HEADERS += lwip/src/include/ipv4/lwip/ip.h
+include_lwip_HEADERS += lwip/src/include/lwip/api.h
+
+libnetworking_a_SOURCES += lwip/src/core/timers.c lwip/src/core/def.c lwip/src/core/pbuf.c lwip/src/core/dhcp.c
+	lwip/src/core/dns.c lwip/src/core/init.c lwip/src/core/mem.c lwip/src/core/memp.c
+	lwip/src/core/netif.c lwip/src/core/pbuf.c lwip/src/core/raw.c lwip/src/core/stats.c
+	lwip/src/core/sys.c lwip/src/core/tpc_in.c lwip/src/core/tpc_out.c lwip/src/core/tpc.c
+	lwip/src/core/udp.c lwip/src/include/lwip/opt.h lwip/src/include/lwip/stats.h lwip/src/include/lwip/mem.h lwip/src/include/lwip/memp.h
+	 lwip/src/include/lwip/pbuf.h lwip/src/include/lwip/sys.h lwip/src/include/lwip/perf.h lwip/src/include/lwip/tcp_impl.h
+	 lwip/src/include/ipv4/lwip/inet_chksum.h lwip/src/include/lwip/timers.h lwip/src/include/lwip/def.h lwip/src/include/lwip/tcpip.h
+	 lwip/src/include/ipv4/lwip/ip_frag.h lwip/src/include/netif/etharp.h lwip/src/include/lwip/dhcp.h lwip/src/include/ipv4/lwip/autoip.h
+	 lwip/src/include/ipv4/lwip/igmp.h lwip/src/include/lwip/dns.h lwip/src/include/lwip/udp.h lwip/src/include/lwip/netif.h
+	 lwip/src/include/lwip/init.h lwip/src/include/lwip/sockets.h lwip/src/include/ipv4/lwip/ip.h lwip/src/include/lwip/raw.h
+	 lwip/src/include/lwip/snmp_msg.h lwip/src/include/lwip/api.h lwip/src/include/lwip/err.h lwip/src/include/lwip/api_msg.h
+	 lwip/src/include/lwip/snmp_structs.h lwip/src/include/netif/ppp_oe.h
+
+
 ## kern
 
 libnetworking_a_SOURCES += kern/kern_mib.c kern/kern_subr.c \

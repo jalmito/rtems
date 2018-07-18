@@ -39,8 +39,8 @@
 /* Copyright (c) 2010 Texas Instruments Incorporated */
 
 /* lwIP includes. */
-#include "lwip/opt.h"
-#include "lwip/sys.h"
+#include <lwip/src/include/lwip/opt.h>
+#include <lwip/src/include/lwip/sys.h>
 
 #if SYS_LIGHTWEIGHT_PROT
 

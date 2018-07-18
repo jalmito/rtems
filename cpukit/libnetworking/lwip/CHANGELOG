@@ -2230,7 +2230,7 @@ HISTORY
   * mem.c: Fixed bug #21077 (inaccuracy in calculation of lwip_stat.mem.used)
 
   2007-09-06 Frédéric Bernon
-  * several-files: replace some #include "arch/cc.h" by "lwip/arch.h", or simply remove
+  * several-files: replace some #include <lwip/ports/hdk/include/arch/cc.h> by "lwip/arch.h", or simply remove
     it as long as "lwip/opt.h" is included before (this one include "lwip/debug.h" which
     already include "lwip/arch.h"). Like that, default defines are provided by "lwip/arch.h"
     if they are not defined in cc.h, in the same spirit than "lwip/opt.h" for lwipopts.h.
