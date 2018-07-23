@@ -48,6 +48,7 @@ include_archdir = $(includedir)/lwip/ports/hdk/include/arch
 
 include_lwip_HEADERS = lwip/src/include/lwip/dhcp.h
 include_lwip_HEADERS += lwip/src/include/lwip/timers.h
+include_lwip_HEADERS += lwip/ports/hdk/include/lwiplib.h
 include_lwip_HEADERS += lwip/src/include/lwip/sockets.h
 include_lwip_HEADERS += lwip/src/include/ipv4/lwip/ip.h
 include_lwip_HEADERS += lwip/src/include/lwip/api.h

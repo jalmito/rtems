@@ -1014,22 +1014,6 @@ rtems_tms_driver_attach (struct rtems_bsdnet_ifconfig *config, int attaching)
                 memcpy (hdkif->mac_addr, config->hardware_address, ETHER_ADDR_LEN);
 	}
     
- /************************Zync board
-         Copy MAC address 
-        
-                 memcpy(
-            self->arpcom.ac_enaddr,
-            bsd_config->hardware_address,
-            ETHER_ADDR_LEN
-        );
-         
-
-       
-	
-	if (config->mtu)
-		mtu = config->mtu;
-	else
-		mtu = ETHERMTU;*/
 											/*
 											 *Here rxBdCount represents the number of receive
 											 *buffers to be allocated, normally indicated in
