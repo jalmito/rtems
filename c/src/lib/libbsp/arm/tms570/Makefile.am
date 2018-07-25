@@ -42,6 +42,7 @@ include_bsp_HEADERS += include/tms570-pom.h
 include_bsp_HEADERS += include/tms570-sci-driver.h
 include_bsp_HEADERS += include/system-clocks.h
 include_bsp_HEADERS += include/tms570-pinmux.h
+include_bsp_HEADERS += include/tms570-pins.h
 
 include_bsp_ti_hercules_HEADERS = include/ti_herc/reg_adc.h
 include_bsp_ti_hercules_HEADERS += include/ti_herc/reg_ccmsr.h
@@ -171,7 +172,7 @@ libbsp_a_CPPFLAGS += -I$(srcdir)/../../../libcpu/arm/shared/include
 network_CPPFLAGS = -D__INSIDE_RTEMS_BSD_TCPIP_STACK__
 noinst_PROGRAMS = network.rel
 network_rel_SOURCES = network/include/HL_emac.h
-network_rel_SOURCES += network/source/network.c network/source/HL_emac.c network/source/HL_mdio.c  network/source/HL_phy_dp83640.c
+network_rel_SOURCES += network/source/network.c network/source/HL_emac.c network/source/HL_mdio.c  network/source/HL_phy_dp83640.c network/source/tms570_netif.c network/source/tms570_netif.h
 network_rel_CPPFLAGS = $(AM_CPPFLAGS) $(network_CPPFLAGS)
 #network_rel_CPPFLAGS += -I network/include 
 network_rel_LDFLAGS = $(RTEMS_RELLDFLAGS)
