@@ -32,17 +32,17 @@
  */
 
 /* lwIP headers */
-#include "lwip/init.h"
+#include <lwip/src/include/lwip/init.h>
 #if LWIP_VERSION_MAJOR >= 2
-#include "lwip/timeouts.h"
+#include <lwip/src/include/lwip/timeouts.h>
 #else /*LWIP_VERSION_MAJOR*/
-#include "lwip/timers.h" /* for DHCP binding in NO_SYS mode */
+#include <lwip/src/include/lwip/timers.h> /* for DHCP binding in NO_SYS mode */
 #endif /*LWIP_VERSION_MAJOR*/
-#include "lwip/sys.h" /* includes - lwip/opt.h, lwip/err.h, arch/sys_arch.h */
-#include "lwip/tcpip.h" /* includes - lwip/opt.h, lwip/api_msg.h, lwip/netifapi.h, lwip/pbuf.h, lwip/api.h, lwip/sys.h, lwip/timers.h, lwip/netif.h */
-#include "lwip/stats.h" /* includes - lwip/mem.h, lwip/memp.h, lwip/opt.h */
-#include "lwip/snmp.h"
-#include "netif/etharp.h" /* includes - lwip/ip.h, lwip/netif.h, lwip/ip_addr.h, lwip/pbuf.h */
+#include <lwip/src/include/lwip/sys.h> /* includes - lwip/opt.h, lwip/err.h, arch/sys_arch.h */
+#include <lwip/src/include/lwip/tcpip.h> /* includes - lwip/opt.h, lwip/api_msg.h, lwip/netifapi.h, lwip/pbuf.h, lwip/api.h, lwip/sys.h, lwip/timers.h, lwip/netif.h */
+#include <lwip/src/include/lwip/stats.h> /* includes - lwip/mem.h, lwip/memp.h, lwip/opt.h */
+#include <lwip/src/include/lwip/snmp.h>
+#include <lwip/src/include/netif/etharp.h> /* includes - lwip/ip.h, lwip/netif.h, lwip/ip_addr.h, lwip/pbuf.h */
 /* end - lwIP headers */
 
 //--------moje
@@ -51,9 +51,9 @@
 #include <stdlib.h>
 #include <bsp/tms570.h>
 #include <bsp/tms570-pinmux.h>
-#include "arch/cc.h"
-#include "arch/eth_lwip.h"
-#include "arch/tms570_netif.h"
+#include <lwip/ports/hdk/include/arch/cc.h>
+#include "eth_lwip.h"
+#include "tms570_netif.h"
 #include "ti_drv_emac.h"
 #include "ti_drv_mdio.h"
 #include "../include/HL_phy_dp83640.h"

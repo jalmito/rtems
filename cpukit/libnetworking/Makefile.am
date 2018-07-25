@@ -43,16 +43,6 @@ include_arpa_HEADERS += arpa/nameser_compat.h
 
 # lwip
 
-include_lwipdir = $(includedir)/lwip/src/include/lwip
-include_archdir = $(includedir)/lwip/ports/hdk/include/arch
-
-include_lwip_HEADERS = lwip/src/include/lwip/dhcp.h
-include_lwip_HEADERS += lwip/src/include/lwip/timers.h
-include_lwip_HEADERS += lwip/ports/hdk/include/lwiplib.h
-include_lwip_HEADERS += lwip/src/include/lwip/sockets.h
-include_lwip_HEADERS += lwip/src/include/ipv4/lwip/ip.h
-include_lwip_HEADERS += lwip/src/include/lwip/api.h
-
 libnetworking_a_SOURCES += lwip/src/core/timers.c lwip/src/core/def.c lwip/src/core/pbuf.c lwip/src/core/dhcp.c
 	lwip/src/core/dns.c lwip/src/core/init.c lwip/src/core/mem.c lwip/src/core/memp.c
 	lwip/src/core/netif.c lwip/src/core/pbuf.c lwip/src/core/raw.c lwip/src/core/stats.c
