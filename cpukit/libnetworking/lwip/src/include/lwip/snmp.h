@@ -39,7 +39,7 @@
 extern "C" {
 #endif
 
-#include <lwip/src/include/lwip/ip_addr.h>
+#include <lwip/src/include/ipv4/lwip/ip_addr.h>
 
 struct udp_pcb;
 struct netif;

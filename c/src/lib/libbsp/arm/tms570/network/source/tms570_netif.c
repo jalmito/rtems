@@ -61,6 +61,7 @@
 
 #define LINK_SPEED_OF_YOUR_NETIF_IN_BPS 10000000
 
+#define TMS_EMAC_RMII
 /* Number of EMAC Instances */
 
 #define DEFAULT_PHY_ADDR            0x1

@@ -73,6 +73,42 @@ if LIBNETWORKING
 include_rtems_bsdnetdir = $(includedir)/rtems/bsdnet
 include_rtems_bsdnet_HEADERS = libnetworking/rtems/bsdnet/servers.h
 include_rtems_bsdnet_HEADERS += libnetworking/rtems/bsdnet/_types.h
+include_lwipdir = $(includedir)/lwip/src/include/lwip
+include_lwip_HEADERS = libnetworking/lwip/src/include/lwip/dhcp.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/init.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/tcpip.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/sys.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/arch.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/opt.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/lwipopts.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/debug.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/timers.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/sockets.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/api.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/err.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/api_msg.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/netifapi.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/netbuf.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/pbuf.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/netif.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/def.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/mem.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/memp.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/memp_std.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/stats.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/snmp.h
+include_lwip_portdir = $(includedir)/lwip/ports/hdk/include
+include_lwip_port_HEADERS = libnetworking/lwip/ports/hdk/include/lwiplib.h
+include_lwip_netifdir = $(includedir)/lwip/src/include/netif
+include_lwip_netif_HEADERS = libnetworking/lwip/src/include/netif/etharp.h
+include_lwip_archdir = $(includedir)/lwip/ports/hdk/include/arch
+include_lwip_arch_HEADERS = libnetworking/lwip/ports/hdk/include/arch/cc.h
+include_lwip_arch_HEADERS += libnetworking/lwip/ports/hdk/include/arch/sys_arch.h
+include_lwip_ipv4dir = $(includedir)/lwip/src/include/ipv4/lwip
+include_lwip_ipv4_HEADERS = libnetworking/lwip/src/include/ipv4/lwip/ip.h
+include_lwip_ipv4_HEADERS += libnetworking/lwip/src/include/ipv4/lwip/ip_addr.h
+include_lwip_ipv4_HEADERS += libnetworking/lwip/src/include/ipv4/lwip/igmp.h
+include_lwip_ipv4_HEADERS += libnetworking/lwip/src/include/ipv4/lwip/autoip.h
 endif
 
 if LIBDL
