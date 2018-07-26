@@ -172,8 +172,8 @@ libbsp_a_CPPFLAGS += -I$(srcdir)/../../../libcpu/arm/shared/include
 
 network_CPPFLAGS = -D__INSIDE_RTEMS_BSD_TCPIP_STACK__
 noinst_PROGRAMS = network.rel
-network_rel_SOURCES = network/include/HL_emac.h
-network_rel_SOURCES += network/source/network.c network/source/HL_emac.c network/source/HL_mdio.c  network/source/HL_phy_dp83640.c network/source/tms570_netif.c network/source/tms570_netif.h
+network_rel_SOURCES = network/source/tms570_netif.c
+network_rel_SOURCES += network/source/tms570_emac.h network/source/eth_lwip.c network/source/phy_dp83848h.h network/source/eth_lwip.h network/source/eth_lwip_default.h network/source/ti_drv_mdio.h network/source/ti_drv_emac.h   network/source/HL_phy_dp83640.c  network/source/tms570_netif.h
 network_rel_CPPFLAGS = $(AM_CPPFLAGS) $(network_CPPFLAGS)
 #network_rel_CPPFLAGS += -I network/include 
 network_rel_LDFLAGS = $(RTEMS_RELLDFLAGS)

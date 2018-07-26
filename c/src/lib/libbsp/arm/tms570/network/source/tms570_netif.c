@@ -56,8 +56,9 @@
 #include "tms570_netif.h"
 #include "ti_drv_emac.h"
 #include "ti_drv_mdio.h"
-#include "../include/HL_phy_dp83640.h"
-#include "../include/HL_hw_emac.h"
+//#include "../include/HL_phy_dp83640.h"
+#include "phy_dp83848h.h"
+#include "tms570_emac.h"
 
 #define LINK_SPEED_OF_YOUR_NETIF_IN_BPS 10000000
 
@@ -752,7 +753,7 @@ error_out_of_descriptors:
   #define EMAC_NUM_TX_FRAG    2
 #endif
 
-#include <lwip/netifapi.h>
+#include <lwip/src/include/lwip/netifapi.h>
 
 static void
 tms570_eth_process_irq_rx(void *arg)
