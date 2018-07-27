@@ -59,7 +59,7 @@
 **                    Platform specific locking 
 *****************************************************************************/
 #define SYS_LIGHTWEIGHT_PROT            1          
-#define NO_SYS                          1
+#define NO_SYS                          0
 
 /*****************************************************************************
 **                          Memory Options

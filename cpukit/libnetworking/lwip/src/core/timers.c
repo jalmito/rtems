@@ -49,6 +49,7 @@
 #include <lwip/src/include/lwip/def.h>
 #include <lwip/src/include/lwip/memp.h>
 #include <lwip/src/include/lwip/tcpip.h>
+//#include <lwip/ports/hdk/include/arch/cc.h>
 
 #include <lwip/src/include/ipv4/lwip/ip_frag.h>
 #include <lwip/src/include/netif/etharp.h>

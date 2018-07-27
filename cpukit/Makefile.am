@@ -104,6 +104,7 @@ include_lwip_netif_HEADERS = libnetworking/lwip/src/include/netif/etharp.h
 include_lwip_archdir = $(includedir)/lwip/ports/hdk/include/arch
 include_lwip_arch_HEADERS = libnetworking/lwip/ports/hdk/include/arch/cc.h
 include_lwip_arch_HEADERS += libnetworking/lwip/ports/hdk/include/arch/sys_arch.h
+include_lwip_arch_HEADERS += libnetworking/lwip/ports/hdk/include/arch/eth_lwip_default.h
 include_lwip_ipv4dir = $(includedir)/lwip/src/include/ipv4/lwip
 include_lwip_ipv4_HEADERS = libnetworking/lwip/src/include/ipv4/lwip/ip.h
 include_lwip_ipv4_HEADERS += libnetworking/lwip/src/include/ipv4/lwip/ip_addr.h

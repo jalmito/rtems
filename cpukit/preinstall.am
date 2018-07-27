@@ -261,6 +261,10 @@ $(PROJECT_INCLUDE)/lwip/ports/hdk/include/arch/sys_arch.h: libnetworking/lwip/po
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/ports/hdk/include/arch/sys_arch.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/ports/hdk/include/arch/sys_arch.h
 
+$(PROJECT_INCLUDE)/lwip/ports/hdk/include/arch/eth_lwip_default.h: libnetworking/lwip/ports/hdk/include/arch/eth_lwip_default.h $(PROJECT_INCLUDE)/lwip/ports/hdk/include/arch/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/ports/hdk/include/arch/eth_lwip_default.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/ports/hdk/include/arch/eth_lwip_default.h
+
 $(PROJECT_INCLUDE)/lwip/src/include/ipv4/lwip/$(dirstamp):
 	@$(MKDIR_P) $(PROJECT_INCLUDE)/lwip/src/include/ipv4/lwip
 	@: > $(PROJECT_INCLUDE)/lwip/src/include/ipv4/lwip/$(dirstamp)

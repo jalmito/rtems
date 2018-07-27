@@ -39,6 +39,7 @@
 #include <lwip/src/include/lwip/timers.h> /* for DHCP binding in NO_SYS mode */
 #endif /*LWIP_VERSION_MAJOR*/
 #include <lwip/src/include/lwip/sys.h> /* includes - lwip/opt.h, lwip/err.h, arch/sys_arch.h */
+#include <lwip/ports/hdk/include/arch/sys_arch.h> /* includes - lwip/opt.h, lwip/err.h, arch/sys_arch.h */
 #include <lwip/src/include/lwip/tcpip.h> /* includes - lwip/opt.h, lwip/api_msg.h, lwip/netifapi.h, lwip/pbuf.h, lwip/api.h, lwip/sys.h, lwip/timers.h, lwip/netif.h */
 #include <lwip/src/include/lwip/stats.h> /* includes - lwip/mem.h, lwip/memp.h, lwip/opt.h */
 #include <lwip/src/include/lwip/snmp.h>
@@ -50,6 +51,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <bsp/tms570.h>
+#include <bsp/irq.h>
 #include <bsp/tms570-pinmux.h>
 #include <lwip/ports/hdk/include/arch/cc.h>
 #include "eth_lwip.h"
@@ -79,9 +81,9 @@
 /* take in account oversized frames */
 #define MAX_TRANSFER_UNIT           1500
 
-#ifndef TMS570_MMR_SELECT_GMII_SEL
-  #define TMS570_MMR_SELECT_GMII_SEL TMS570_BALL_XX_GMII_SEL
-#endif
+//#ifndef TMS570_MMR_SELECT_GMII_SEL
+//  #define TMS570_MMR_SELECT_GMII_SEL TMS570_BALL_XX_GMII_SEL
+//#endif
 
 #ifndef TMS570_BALL_K19_MII_RXCLK
   #define TMS570_BALL_K19_MII_RXCLK TMS570_BALL_K19_MII_RX_CLK
@@ -363,7 +365,7 @@ tms570_eth_init_set_pinmux(void)
   tms570_bsp_pin_set_function(TMS570_BALL_B4_MII_CRS, TMS570_PIN_FNC_AUTO);
   tms570_bsp_pin_set_function(TMS570_BALL_F3_MII_COL, TMS570_PIN_FNC_AUTO);
 	#endif
-  tms570_bsp_pin_clear_function(TMS570_MMR_SELECT_GMII_SEL, TMS570_PIN_FNC_AUTO);
+  //tms570_bsp_pin_clear_function(TMS570_MMR_SELECT_GMII_SEL, TMS570_PIN_FNC_AUTO);
 
   TMS570_IOMM.KICK_REG0 = 0;
   TMS570_IOMM.KICK_REG1 = 0;

@@ -1,14 +1,8 @@
-/**
- * @file - sys_arch.c
- * System Architecture support routines for HDK devices.
- *
- */
-
 /*
  * Copyright (c) 2001-2003 Swedish Institute of Computer Science.
- * All rights reserved. 
- * 
- * Redistribution and use in source and binary forms, with or without modification, 
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice,
@@ -17,81 +11,347 @@
  *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
  * 3. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission. 
+ *    derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED 
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT 
- * SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, 
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT 
- * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING 
- * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY 
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
+ * SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
+ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * This file is part of the lwIP TCP/IP stack.
- * 
- * Author: Adam Dunkels <adam@sics.se>
+ * This file is system adaptation of the lwIP TCP/IP stack
+ * by Adam Dunkels <adam@sics.se> for RTEMS system.
+ *
+ * Author: Premysl Houdek <houdepre@fel.cvut.cz>
+ * Mentor: Pavel Pisa <pisa@cmp.felk.cvut.cz>
+ * Industrial Informatics Group, FEE, Czech Technical University in Prague
  *
  */
-
-/* Copyright (c) 2010 Texas Instruments Incorporated */
-
-/* lwIP includes. */
-#include <lwip/src/include/lwip/opt.h>
-#include <lwip/src/include/lwip/sys.h>
-
-#if SYS_LIGHTWEIGHT_PROT
-
-/* Functions to be defined at integration level */
-extern unsigned int 	IntMasterStatusGet	(void);
-extern void 			IntMasterIRQDisable	(void);
-extern void 			IntMasterIRQEnable	(void);
-/**
- * This function is used to lock access to critical sections when lwipopt.h
- * defines SYS_LIGHTWEIGHT_PROT. It disables interrupts and returns a value
- * indicating the interrupt enable state when the function entered. This
- * value must be passed back on the matching call to sys_arch_unprotect().
- *
- * @return the interrupt level when the function was entered.
+/*
+ * mapping of lwIP system dependencies to RTEMS system services and types.
+ * DETAILS: ./lwip/doc/sys_arch.txt
  */
-sys_prot_t
-sys_arch_protect(void)
+
+#include <stdint.h>
+#include <lwip/ports/hdk/include/arch/cc.h>
+#include <rtems/rtems/clock.h>
+#include <rtems/rtems/sem.h>
+#include <rtems.h>
+#include <lwip/ports/hdk/include/arch/sys_arch.h>
+#include <lwip/src/include/lwip/err.h>
+#include <lwip/src/include/lwip/tcpip.h>
+#include <lwip/src/include/lwip/lwipopts.h>
+
+#define SYS_LWIP_MBOX_SIZE (sizeof(void *))
+
+uint32_t
+sys_now()
 {
-  sys_prot_t status;
-  status = (IntMasterStatusGet() & 0xFF);
+  uint64_t temp = rtems_clock_get_uptime_nanoseconds() / (1000 * 1000);
 
-  IntMasterIRQDisable();
-  return status;
+  return temp;
 }
 
-/**
- * This function is used to unlock access to critical sections when lwipopt.h
- * defines SYS_LIGHTWEIGHT_PROT. It enables interrupts if the value of the lev
- * parameter indicates that they were enabled when the matching call to
- * sys_arch_protect() was made.
- *
- * @param lev is the interrupt level when the matching protect function was
- * called
- */
 void
-sys_arch_unprotect(sys_prot_t lev)
+sys_init(void)
 {
-  /* Only turn interrupts back on if they were originally on when the matching
-     sys_arch_protect() call was made. */
-  if((lev & 0x80) == 0) {
-    IntMasterIRQEnable();
-  } 
+  //  Is called to initialize the sys_arch layer.
+  return;
+}
+
+err_t
+sys_sem_new(sys_sem_t *sem, u8_t count)
+{
+  rtems_status_code ret = rtems_semaphore_create(
+    rtems_build_name('L', 'W', 'I', 'P'),
+    count,
+    RTEMS_COUNTING_SEMAPHORE,
+    0,
+    &sem->semaphore
+    );
+
+  if (ret != RTEMS_SUCCESSFUL) {
+    sem->semaphore = RTEMS_ID_NONE;
+    return ret;
+  }
+  return ERR_OK;
+}
+
+
+void
+sys_sem_free(sys_sem_t *sem)
+{
+  rtems_semaphore_delete(
+    sem->semaphore
+    );
+  sem->semaphore = RTEMS_ID_NONE;
+}
+
+void
+sys_sem_signal(sys_sem_t *sem)
+{
+  rtems_semaphore_release(sem->semaphore);
+}
+
+void
+sys_sem_signal_from_ISR(sys_sem_t *sem)
+{
+  rtems_semaphore_release(sem->semaphore);
+}
+
+
+u32_t
+sys_arch_sem_wait(sys_sem_t *sem, u32_t timeout)
+{
+  rtems_status_code status;
+  rtems_interval tps = rtems_clock_get_ticks_per_second();
+  rtems_interval tick_timeout;
+  uint64_t       start_time;
+  uint64_t       wait_time;
+
+  start_time = rtems_clock_get_uptime_nanoseconds();
+  if (timeout == 0) {
+    tick_timeout = RTEMS_NO_TIMEOUT;
+  } else {
+    tick_timeout = (timeout * tps + 999) / 1000;
+  }
+  status = rtems_semaphore_obtain(sem->semaphore, RTEMS_WAIT, tick_timeout);
+  if (status == RTEMS_TIMEOUT) {
+    return SYS_ARCH_TIMEOUT;
+  }
+  if (status != RTEMS_SUCCESSFUL) {
+    return SYS_ARCH_TIMEOUT;
+  }
+  wait_time = rtems_clock_get_uptime_nanoseconds() - start_time;
+  return wait_time / (1000 * 1000);
+}
+
+int
+sys_sem_valid(sys_sem_t *sem)
+{
+  return sem->semaphore == RTEMS_ID_NONE ? 0 : 1;
+}
+
+void
+sys_sem_set_invalid(sys_sem_t *sem)
+{
+  sem->semaphore = RTEMS_ID_NONE;
+}
+
+err_t
+sys_mbox_new(sys_mbox_t *mbox, int size)
+{
+  rtems_status_code ret;
+
+  ret = rtems_message_queue_create(
+    rtems_build_name('L', 'W', 'I', 'P'),
+    size,
+    SYS_LWIP_MBOX_SIZE,
+    0,
+    &mbox->mailbox
+    );
+  ret |= rtems_semaphore_create(
+    rtems_build_name('L', 'W', 'I', 'P'),
+    size,
+    RTEMS_COUNTING_SEMAPHORE,
+    0,
+    &mbox->sem
+    );
+  if (ret != RTEMS_SUCCESSFUL) {
+    mbox->mailbox = RTEMS_ID_NONE;
+    mbox->sem = RTEMS_ID_NONE;
+    return ret;
+  }
+  return ERR_OK;
+}
+
+void
+sys_mbox_free(sys_mbox_t *mbox)
+{
+  rtems_message_queue_delete(mbox->mailbox);
+  rtems_semaphore_delete(mbox->sem);
+  sys_mbox_set_invalid(mbox);
+}
+
+void
+sys_mbox_post(sys_mbox_t *mbox, void *msg)
+{
+  rtems_semaphore_obtain(mbox->sem, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
+  rtems_message_queue_send(mbox->mailbox, &msg, SYS_LWIP_MBOX_SIZE);
+}
+err_t
+sys_mbox_trypost(sys_mbox_t *mbox, void *msg)
+{
+  rtems_status_code status = rtems_semaphore_obtain(mbox->sem,
+						    RTEMS_NO_WAIT, 0);
+
+  if (status != RTEMS_SUCCESSFUL) {
+    return ERR_MEM;
+  } else {
+    rtems_message_queue_send(mbox->mailbox, &msg, SYS_LWIP_MBOX_SIZE);
+    return ERR_OK;
+  }
 }
 
 u32_t
-sys_now(void)
+sys_arch_mbox_fetch(sys_mbox_t *mbox, void **msg, u32_t timeout)
 {
-	u32_t time = 0;
-	/* Define function here */
-	return time;
+  rtems_status_code status;
+  rtems_interval tps = rtems_clock_get_ticks_per_second();
+  rtems_interval tick_timeout;
+  uint64_t       start_time;
+  uint64_t       wait_time;
+  size_t         dummy;
+
+  start_time = rtems_clock_get_uptime_nanoseconds();
+  if (timeout == 0) {
+    tick_timeout = RTEMS_NO_TIMEOUT;
+  } else {
+    tick_timeout = (timeout * tps + 999) / 1000;
+  }
+  status = rtems_message_queue_receive(mbox->mailbox,
+				       msg,
+				       &dummy,
+				       RTEMS_WAIT,
+				       tick_timeout
+				       );
+  if (status == RTEMS_TIMEOUT) {
+    return SYS_ARCH_TIMEOUT;
+  }
+  if (status != RTEMS_SUCCESSFUL) {
+    return SYS_ARCH_TIMEOUT;
+  }
+  wait_time = rtems_clock_get_uptime_nanoseconds() - start_time;
+  rtems_semaphore_release(mbox->sem);
+  return wait_time / (1000 * 1000);
 }
 
+u32_t
+sys_arch_mbox_tryfetch(sys_mbox_t *mbox, void **msg)
+{
+  rtems_status_code status;
+  size_t         dummy;
 
-#endif /* SYS_LIGHTWEIGHT_PROT */
+  status = rtems_message_queue_receive(mbox->mailbox, msg,
+				       &dummy,
+				       RTEMS_NO_WAIT,
+				       0
+				       );
+
+  if (status != RTEMS_SUCCESSFUL) {
+    return SYS_MBOX_EMPTY;
+  } else {
+    rtems_semaphore_release(mbox->sem);
+    return 0;
+  }
+}
+int
+sys_mbox_valid(sys_mbox_t *mbox)
+{
+  return mbox->mailbox == RTEMS_ID_NONE ? 0 : 1;
+}
+void
+sys_mbox_set_invalid(sys_mbox_t *mbox)
+{
+  mbox->sem = RTEMS_ID_NONE;
+  mbox->mailbox = RTEMS_ID_NONE;
+}
+
+sys_thread_t
+sys_thread_new(const char *name, lwip_thread_fn function, void *arg, int stack_size, int prio)
+{
+  rtems_id id;
+  rtems_status_code res;
+
+  res = rtems_task_create(
+    rtems_build_name('L', 'W', 'I', 'P'),
+    prio,
+    stack_size,
+    RTEMS_PREEMPT,
+    0,
+    &id
+    );
+
+  if (res != RTEMS_SUCCESSFUL) {
+    return 0;
+  }
+
+  res = rtems_task_start(id, (rtems_task_entry)function, (rtems_task_argument)arg);
+
+  if (res != RTEMS_SUCCESSFUL) {
+    rtems_task_delete(id);
+    return 0;
+  }
+  return id;
+}
+
+err_t
+sys_mutex_new(sys_mutex_t *mutex)
+{
+  rtems_status_code ret = rtems_semaphore_create(
+    rtems_build_name('L', 'W', 'I', 'P'),
+    1,
+    RTEMS_PRIORITY|RTEMS_BINARY_SEMAPHORE|RTEMS_INHERIT_PRIORITY|RTEMS_LOCAL,
+    0,
+    &mutex->mutex
+    );
+
+  if (ret != RTEMS_SUCCESSFUL) {
+    mutex->mutex = RTEMS_ID_NONE;
+    return ret;
+  }
+  return ERR_OK;
+}
+/** Lock a mutex
+ * @param mutex the mutex to lock */
+void
+sys_mutex_lock(sys_mutex_t *mutex)
+{
+  rtems_semaphore_obtain(mutex->mutex, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
+}
+/** Unlock a mutex
+ * @param mutex the mutex to unlock */
+void
+sys_mutex_unlock(sys_mutex_t *mutex)
+{
+  rtems_semaphore_release(mutex->mutex);
+}
+/** Delete a semaphore
+ * @param mutex the mutex to delete */
+void
+sys_mutex_free(sys_mutex_t *mutex)
+{
+  rtems_semaphore_delete(mutex->mutex);
+}
+
+void
+sys_arch_delay(unsigned int timeout)
+{
+  rtems_interval tps = rtems_clock_get_ticks_per_second();
+  rtems_interval tick_timeout = (timeout * tps + 999) / 1000;
+
+  rtems_task_wake_after(tick_timeout);
+}
+
+/** Ticks/jiffies since power up. */
+uint32_t
+sys_jiffies(void)
+{
+  return rtems_clock_get_ticks_since_boot();
+}
+
+int
+sys_request_irq(unsigned int irqnum, sys_irq_handler_t handler,
+		unsigned long flags, const char *name, void *context)
+{
+  rtems_status_code res;
+
+  res = rtems_interrupt_handler_install(irqnum,  name, flags,
+					handler, context);
+  return (res != RTEMS_SUCCESSFUL) ? -1 : 0;
+}
