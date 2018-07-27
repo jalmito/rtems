@@ -76,6 +76,7 @@ include_rtems_bsdnet_HEADERS += libnetworking/rtems/bsdnet/_types.h
 include_lwipdir = $(includedir)/lwip/src/include/lwip
 include_lwip_HEADERS = libnetworking/lwip/src/include/lwip/dhcp.h
 include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/init.h
+include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/udp.h
 include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/tcpip.h
 include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/sys.h
 include_lwip_HEADERS += libnetworking/lwip/src/include/lwip/arch.h
