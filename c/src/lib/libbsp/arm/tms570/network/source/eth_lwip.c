@@ -37,7 +37,7 @@
 #include <lwip/src/include/lwip/dhcp.h>
 #include <lwip/src/include/lwip/netifapi.h>
 #include <lwip/src/include/netif/etharp.h> /* includes - lwip/ip.h, lwip/netif.h, lwip/ip_addr.h, lwip/pbuf.h */
-#include "eth_lwip_default.h"
+#include <lwip/ports/hdk/include/arch/eth_lwip_default.h>
 #include "eth_lwip.h"
 #include "tms570_netif.h"
 #include <stdio.h>
@@ -49,6 +49,8 @@
 
 #define SUCCESS ERR_OK
 #define FAILURE ERR_IF
+
+#define ip4_addr_t ip_addr_t
 
 static struct netif eth_lwip_netifs[MAX_EMAC_INSTANCE];
 static void eth_lwip_conv_IP_decimal_Str(ip_addr_t ip, uint8_t *ipStr);

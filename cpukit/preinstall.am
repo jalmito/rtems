@@ -146,6 +146,10 @@ $(PROJECT_INCLUDE)/lwip/src/include/lwip/init.h: libnetworking/lwip/src/include/
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/src/include/lwip/init.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/src/include/lwip/init.h
 
+$(PROJECT_INCLUDE)/lwip/src/include/lwip/udp.h: libnetworking/lwip/src/include/lwip/udp.h $(PROJECT_INCLUDE)/lwip/src/include/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/src/include/lwip/udp.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/src/include/lwip/udp.h
+
 $(PROJECT_INCLUDE)/lwip/src/include/lwip/tcpip.h: libnetworking/lwip/src/include/lwip/tcpip.h $(PROJECT_INCLUDE)/lwip/src/include/lwip/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/src/include/lwip/tcpip.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/src/include/lwip/tcpip.h
