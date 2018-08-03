@@ -32,11 +32,11 @@ struct devq;
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_buf_pool_alloc(struct devq *dev_q, size_t numbuf, size_t size,
+rtems_status_code net_buf_pool_alloc(struct devq *dev_q, size_t numbuf, size_t size,
                             struct net_buf_pool **retbp);
 
 
-errval_t net_buf_pool_free(struct net_buf_pool *retbp);
+rtems_status_code net_buf_pool_free(struct net_buf_pool *retbp);
 
 
 /**
@@ -48,7 +48,7 @@ errval_t net_buf_pool_free(struct net_buf_pool *retbp);
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_buf_grow(struct net_buf_pool *bp, size_t numbuf,
+rtems_status_code net_buf_grow(struct net_buf_pool *bp, size_t numbuf,
                                 size_t size);
 
 /**
@@ -60,7 +60,7 @@ errval_t net_buf_grow(struct net_buf_pool *bp, size_t numbuf,
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_buf_add(struct net_buf_pool *bp,
+rtems_status_code net_buf_add(struct net_buf_pool *bp,
                                struct capref frame, size_t buffersize);
 
 struct pbuf *net_buf_alloc(struct net_buf_pool *bp);

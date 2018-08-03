@@ -29,15 +29,15 @@ struct net_socket * net_tcp_socket(void);
 void net_set_user_state(struct net_socket *socket, void *user_state);
 void net_close(struct net_socket *socket);
 
-errval_t net_bind(struct net_socket *socket, struct in_addr ip_address, uint16_t port);
-errval_t net_listen(struct net_socket *socket, uint8_t backlog);
-errval_t net_print_log(void);
+rtems_status_code net_bind(struct net_socket *socket, struct in_addr ip_address, uint16_t port);
+rtems_status_code net_listen(struct net_socket *socket, uint8_t backlog);
+rtems_status_code net_print_log(void);
 
 // data must be allocated using net_alloc, it can be freed, when on_sent is called (i.e. actually sent)
-errval_t net_send(struct net_socket *socket, void *data, size_t size);
-errval_t net_send_to(struct net_socket *socket, void *data, size_t size, struct in_addr ip_address, uint16_t port);
+rtems_status_code net_send(struct net_socket *socket, void *data, size_t size);
+rtems_status_code net_send_to(struct net_socket *socket, void *data, size_t size, struct in_addr ip_address, uint16_t port);
 
-errval_t net_connect(struct net_socket *socket, struct in_addr ip_address, uint16_t port, net_connected_callback_t cb);
+rtems_status_code net_connect(struct net_socket *socket, struct in_addr ip_address, uint16_t port, net_connected_callback_t cb);
 
 void net_set_on_received(struct net_socket *socket, net_received_callback_t cb);
 void net_set_on_sent(struct net_socket *socket, net_sent_callback_t cb);
@@ -45,7 +45,7 @@ void net_set_on_accepted(struct net_socket *socket, net_accepted_callback_t cb);
 void net_set_on_closed(struct net_socket *socket, net_closed_callback_t cb);
 
 
-errval_t net_sockets_init(void);
-errval_t net_sockets_init_with_card(char* cardname);
+rtems_status_code net_sockets_init(void);
+rtems_status_code net_sockets_init_with_card(char* cardname);
 
 #endif

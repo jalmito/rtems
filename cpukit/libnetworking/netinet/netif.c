@@ -78,11 +78,11 @@ static size_t bench_devq_deq_count_tx = 0;
 
 #define net_if_get_net_state(netif) ((struct net_state*)netif->state)
 
-errval_t net_if_get_hwaddr(struct netif *netif);
+rtems_status_code net_if_get_hwaddr(struct netif *netif);
 
 static err_t net_if_linkoutput(struct netif *netif, struct pbuf *p)
 {
-    errval_t err;
+    rtems_status_code err;
     err = net_if_add_tx_buf(netif, p);
     if (err_is_fail(err)) {
         return ERR_IF;
@@ -108,7 +108,7 @@ static void net_if_status_cb(struct netif *netif)
         NETDEBUG("setting system ip config record to IP: %s\n",
                 ip4addr_ntoa(netif_ip4_addr(netif)));
         /* register IP with octopus */
-        errval_t err;
+        rtems_status_code err;
         err = oct_set(NET_CONFIG_CURRENT_IP_RECORD_FORMAT, netif_ip4_addr(netif)->addr,
                       netif_ip4_gw(netif)->addr,
                       netif_ip4_netmask(netif)->addr);
@@ -121,7 +121,7 @@ static void net_if_status_cb(struct netif *netif)
 
 static err_t netif_init_cb(struct netif *netif)
 {
-    errval_t err;
+    rtems_status_code err;
 
     netif->hwaddr_len = ETHARP_HWADDR_LEN;
     netif->flags      = NETWORING_NETIF_FLAGS;
@@ -155,7 +155,7 @@ static err_t netif_init_cb(struct netif *netif)
  *
  * @return SYS_ERR_OK on success, errva on failure
  */
-errval_t net_if_init_devq(struct netif *netif, struct devq *devq)
+rtems_status_code net_if_init_devq(struct netif *netif, struct devq *devq)
 {
     NETDEBUG("netif=%p, devq=%p\n", netif, devq);
 
@@ -180,7 +180,7 @@ errval_t net_if_init_devq(struct netif *netif, struct devq *devq)
  *
  * @return
  */
-errval_t net_if_add(struct netif *netif, void *st)
+rtems_status_code net_if_add(struct netif *netif, void *st)
 {
     NETDEBUG("netif=%p, state=%p\n", netif, st);
 
@@ -198,7 +198,7 @@ errval_t net_if_add(struct netif *netif, void *st)
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_if_remove(struct netif *netif)
+rtems_status_code net_if_remove(struct netif *netif)
 {
     NETDEBUG("netif=%p\n", netif);
 
@@ -215,9 +215,9 @@ errval_t net_if_remove(struct netif *netif)
 
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_if_get_hwaddr(struct netif *netif)
+rtems_status_code net_if_get_hwaddr(struct netif *netif)
 {
-    errval_t err;
+    rtems_status_code err;
 
     struct devq *q = net_if_get_net_state(netif)->queue;
 
@@ -248,7 +248,7 @@ errval_t net_if_get_hwaddr(struct netif *netif)
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_if_add_rx_buf(struct netif *netif, struct pbuf *pbuf)
+rtems_status_code net_if_add_rx_buf(struct netif *netif, struct pbuf *pbuf)
 {
     struct net_state *st = netif->state;
     struct net_buf_p *nb = (struct net_buf_p *)pbuf;
@@ -269,7 +269,7 @@ errval_t net_if_add_rx_buf(struct netif *netif, struct pbuf *pbuf)
 #if BENCH_DEVQ_ENQUEUE
     cycles_t tsc_start = rdtsc();
 #endif
-    errval_t err;
+    rtems_status_code err;
     err =  devq_enqueue(st->queue, nb->region->regionid, nb->offset,
                         nb->region->buffer_size, 0, nb->region->buffer_size,
                         NETIF_RXFLAG);
@@ -298,9 +298,9 @@ errval_t net_if_add_rx_buf(struct netif *netif, struct pbuf *pbuf)
  *
  * @return  SYS_ERR_OK on success, errval on failure
  */
-errval_t net_if_add_tx_buf(struct netif *netif, struct pbuf *pbuf)
+rtems_status_code net_if_add_tx_buf(struct netif *netif, struct pbuf *pbuf)
 {
-    errval_t err;
+    rtems_status_code err;
 
     struct net_state *st = netif->state;
 
@@ -393,11 +393,11 @@ errval_t net_if_add_tx_buf(struct netif *netif, struct pbuf *pbuf)
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_if_poll(struct netif *netif)
+rtems_status_code net_if_poll(struct netif *netif)
 {
     //NETDEBUG("netif=%p\n", netif);
 
-    errval_t err;
+    rtems_status_code err;
 
     struct net_state *st = netif->state;
     if (st == NULL) {
@@ -530,11 +530,11 @@ errval_t net_if_poll(struct netif *netif)
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_if_poll_all(void)
+rtems_status_code net_if_poll_all(void)
 {
     NETDEBUG("polling all interfaces\n");
 
-    errval_t err;
+    rtems_status_code err;
     struct netif *netif = netif_list;
     while (netif) {
         err = net_if_poll(netif);

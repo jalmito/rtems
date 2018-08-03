@@ -60,18 +60,18 @@ struct net_filter_state {
     volatile bool bound;
 };
 
-errval_t net_filter_init(struct net_filter_state** st, 
+rtems_status_code net_filter_init(struct net_filter_state** st, 
                          const char* cardname);
 
-errval_t net_filter_ip_install(struct net_filter_state* st,
+rtems_status_code net_filter_ip_install(struct net_filter_state* st,
                                struct net_filter_ip* filt);
 
-errval_t net_filter_mac_install(struct net_filter_state* st,
+rtems_status_code net_filter_mac_install(struct net_filter_state* st,
                                 struct net_filter_mac* filt);
 
-errval_t net_filter_ip_remove(struct net_filter_state* st,
+rtems_status_code net_filter_ip_remove(struct net_filter_state* st,
                               struct net_filter_ip* filt);
-errval_t net_filter_mac_remove(struct net_filter_state* st,
+rtems_status_code net_filter_mac_remove(struct net_filter_state* st,
                                struct net_filter_mac* filt);
 
 #endif /* LIB_NET_INCLUDE_NETWORKING_FILTER_H_ */

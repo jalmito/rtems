@@ -31,13 +31,13 @@
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t dhcpd_start(net_flags_t flags);
+rtems_status_code dhcpd_start(net_flags_t flags);
 
 
 /**
  * @brief stops the dhcpd service
  */
-errval_t dhcpd_stop(void);
+rtems_status_code dhcpd_stop(void);
 
 
 /* functions for querying the current settings */
@@ -50,7 +50,7 @@ errval_t dhcpd_stop(void);
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_config_current_ip_query(net_flags_t flags, uint32_t* ip_address);
+rtems_status_code net_config_current_ip_query(net_flags_t flags, uint32_t* ip_address);
 
 
 /**
@@ -60,7 +60,7 @@ errval_t net_config_current_ip_query(net_flags_t flags, uint32_t* ip_address);
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_config_static_ip_query(net_flags_t flags);
+rtems_status_code net_config_static_ip_query(net_flags_t flags);
 
 
 /**
@@ -72,7 +72,7 @@ errval_t net_config_static_ip_query(net_flags_t flags);
  *
  * @return
  */
-errval_t netif_get_ipconfig(struct in_addr *ip, struct in_addr *gw, struct in_addr *nm);
+rtems_status_code netif_get_ipconfig(struct in_addr *ip, struct in_addr *gw, struct in_addr *nm);
 
 /**
  * @brief sets the IP configuration
@@ -83,6 +83,6 @@ errval_t netif_get_ipconfig(struct in_addr *ip, struct in_addr *gw, struct in_ad
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t netif_set_ipconfig(struct in_addr *ip, struct in_addr *gw, struct in_addr *nm);
+rtems_status_code netif_set_ipconfig(struct in_addr *ip, struct in_addr *gw, struct in_addr *nm);
 
 #endif /* LIB_NET_INCLUDE_NETWORKING_DHCP_H_ */

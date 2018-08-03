@@ -36,7 +36,7 @@ struct devq;
  *
  * @return SYS_ERR_OK on success, errva on failure
  */
-errval_t net_if_init_devq(struct netif *netif, struct devq *devq);
+rtems_status_code net_if_init_devq(struct netif *netif, struct devq *devq);
 
 
 /**
@@ -47,7 +47,7 @@ errval_t net_if_init_devq(struct netif *netif, struct devq *devq);
  *
  * @return
  */
-errval_t net_if_add(struct netif *netif, void *state);
+rtems_status_code net_if_add(struct netif *netif, void *state);
 
 
 /**
@@ -57,7 +57,7 @@ errval_t net_if_add(struct netif *netif, void *state);
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_if_remove(struct netif *netif);
+rtems_status_code net_if_remove(struct netif *netif);
 
 /*
  * ===============================================================================
@@ -74,7 +74,7 @@ errval_t net_if_remove(struct netif *netif);
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_if_add_rx_buf(struct netif *netif, struct pbuf *pbuf);
+rtems_status_code net_if_add_rx_buf(struct netif *netif, struct pbuf *pbuf);
 
 /**
  * @brief adds a new transmit buffer to the interface
@@ -84,7 +84,7 @@ errval_t net_if_add_rx_buf(struct netif *netif, struct pbuf *pbuf);
  *
  * @return  SYS_ERR_OK on success, errval on failure
  */
-errval_t net_if_add_tx_buf(struct netif *netif, struct pbuf *pbuf);
+rtems_status_code net_if_add_tx_buf(struct netif *netif, struct pbuf *pbuf);
 
 
 /*
@@ -101,13 +101,13 @@ errval_t net_if_add_tx_buf(struct netif *netif, struct pbuf *pbuf);
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_if_poll(struct netif *netif);
+rtems_status_code net_if_poll(struct netif *netif);
 
 /**
  * @brief polls all added network interfaces
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_if_poll_all(void);
+rtems_status_code net_if_poll_all(void);
 
 #endif /* LIB_NET_INCLUDE_NET_NETIF_H_ */

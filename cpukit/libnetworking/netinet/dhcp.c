@@ -67,9 +67,9 @@ static bool dhcpd_has_ip(void)
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t dhcpd_start(net_flags_t flags)
+rtems_status_code dhcpd_start(net_flags_t flags)
 {
-    errval_t err;
+    rtems_status_code err;
 
     struct net_state *st = get_default_net_state();
 
@@ -120,7 +120,7 @@ errval_t dhcpd_start(net_flags_t flags)
 /**
  * @brief stops the dhcpd service
  */
-errval_t dhcpd_stop(void)
+rtems_status_code dhcpd_stop(void)
 {
     struct net_state *st = get_default_net_state();
 
@@ -140,9 +140,9 @@ errval_t dhcpd_stop(void)
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_config_current_ip_query(net_flags_t flags, uint32_t* ip_address)
+rtems_status_code net_config_current_ip_query(net_flags_t flags, uint32_t* ip_address)
 {
-    errval_t err;
+    rtems_status_code err;
 
     NETDEBUG("query current IP...\n");
 
@@ -193,9 +193,9 @@ errval_t net_config_current_ip_query(net_flags_t flags, uint32_t* ip_address)
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_config_static_ip_query(net_flags_t flags)
+rtems_status_code net_config_static_ip_query(net_flags_t flags)
 {
-    errval_t err;
+    rtems_status_code err;
 
     NETDEBUG("query static IP...\n");
 
@@ -252,7 +252,7 @@ errval_t net_config_static_ip_query(net_flags_t flags)
  *
  * @return
  */
-errval_t netif_get_ipconfig(struct in_addr *ip, struct in_addr *gw, struct in_addr *nm)
+rtems_status_code netif_get_ipconfig(struct in_addr *ip, struct in_addr *gw, struct in_addr *nm)
 {
     struct net_state *st = get_default_net_state();
     if (ip) {
@@ -279,9 +279,9 @@ errval_t netif_get_ipconfig(struct in_addr *ip, struct in_addr *gw, struct in_ad
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t netif_set_ipconfig(struct in_addr *ip, struct in_addr *gw, struct in_addr *nm)
+rtems_status_code netif_set_ipconfig(struct in_addr *ip, struct in_addr *gw, struct in_addr *nm)
 {
-    errval_t err;
+    rtems_status_code err;
     struct net_state *st = get_default_net_state();
 
     if (st->dhcp_running == 1) { // stop dhcp, if it's running

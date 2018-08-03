@@ -50,7 +50,7 @@ struct arp_request {
 
 static void arp_timer_callback(void *data)
 {
-    errval_t err;
+    rtems_status_code err;
     char* record;
     char query[128];
 
@@ -93,7 +93,7 @@ static void arp_request_free(void *data)
 static void arp_force_lookup(struct net_ARP_binding *b,
                              uint32_t ip)
 {
-    errval_t err;
+    rtems_status_code err;
     struct net_state *sta = (struct net_state*) b->st;
 
     if (sta->outstanding_arp == NULL) {
@@ -124,7 +124,7 @@ static struct net_ARP_rx_vtbl rx_arp_vtbl = {
 /*****************************************************************
 * Dealing with new connections
 *****************************************************************/
-static errval_t connect_ARP_cb(void *st, struct net_ARP_binding *b)
+static rtems_status_code connect_ARP_cb(void *st, struct net_ARP_binding *b)
 {   
     b->st = st;
     b->rx_vtbl = rx_arp_vtbl;
@@ -135,7 +135,7 @@ static errval_t connect_ARP_cb(void *st, struct net_ARP_binding *b)
 * exporting service
 *****************************************************************/
 
-static void export_ARP_cb(void *st, errval_t err, iref_t iref)
+static void export_ARP_cb(void *st, rtems_status_code err, iref_t iref)
 {
     struct net_state *sta = st;
 
@@ -214,9 +214,9 @@ struct netif *arp_filter_netif(struct pbuf *p, struct netif *netif, uint16_t typ
     return netif;
 }
 
-static errval_t arp_service_start_st(struct net_state *st)
+static rtems_status_code arp_service_start_st(struct net_state *st)
 {
-    errval_t err;
+    rtems_status_code err;
 
     err = oct_init();
     if (err_is_fail(err)) {
@@ -234,14 +234,14 @@ static errval_t arp_service_start_st(struct net_state *st)
     return SYS_ERR_OK;
 }
 
-errval_t arp_service_start(void)
+rtems_status_code arp_service_start(void)
 {
     return arp_service_start_st(get_default_net_state());
 }
 
 static  void arp_change_event(octopus_mode_t mode, const char* record, void* st)
 {
-    errval_t err;
+    rtems_status_code err;
 
     uint64_t ip, hwaddr;
     err = oct_read(record, "_" ARP_ENTRY_FIELDS, &hwaddr, &ip);
@@ -268,11 +268,11 @@ static  void arp_change_event(octopus_mode_t mode, const char* record, void* st)
 
 
 
-static errval_t arp_service_subscribe_st(struct net_state *st)
+static rtems_status_code arp_service_subscribe_st(struct net_state *st)
 {
     NETDEBUG("subscribing to ARP updates..\n");
 
-    errval_t err;
+    rtems_status_code err;
     err = oct_init();
     if (err_is_fail(err)) {
         return err;
@@ -284,7 +284,7 @@ static errval_t arp_service_subscribe_st(struct net_state *st)
                                              st, &st->arp_triggerid);
 }
 
-errval_t arp_service_subscribe(void)
+rtems_status_code arp_service_subscribe(void)
 {
     struct net_state *st = get_default_net_state();
     return arp_service_subscribe_st(st);
@@ -292,7 +292,7 @@ errval_t arp_service_subscribe(void)
 
 
 
-static void bind_cb(void *st, errval_t err, struct net_ARP_binding *b)
+static void bind_cb(void *st, rtems_status_code err, struct net_ARP_binding *b)
 {
     assert(err_is_ok(err));
     struct net_state* sta = (struct net_state*) st;
@@ -301,9 +301,9 @@ static void bind_cb(void *st, errval_t err, struct net_ARP_binding *b)
     sta->arp_connected = true;
 }
 
-static errval_t arp_connect(struct net_state* st)
+static rtems_status_code arp_connect(struct net_state* st)
 {
-    errval_t err;
+    rtems_status_code err;
     if (!st->arp_connected) {
         iref_t iref;
         err = nameservice_blocking_lookup("libnet_arp", &iref);
@@ -324,9 +324,9 @@ static errval_t arp_connect(struct net_state* st)
     return SYS_ERR_OK;
 }
 
-errval_t arp_service_get_mac(uint32_t ip, uint64_t* mac)
+rtems_status_code arp_service_get_mac(uint32_t ip, uint64_t* mac)
 {
-    errval_t err;
+    rtems_status_code err;
 
     err = oct_init();
     if (err_is_fail(err)) {

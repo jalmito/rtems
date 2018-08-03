@@ -80,7 +80,7 @@ struct rpc_call {
 };
 
 /// Utility function to prepare an outgoing packet buffer with the RPC call header
-static errval_t rpc_call_init(XDR *xdr, uint32_t xid, uint32_t prog, uint32_t vers,
+static rtems_status_code rpc_call_init(XDR *xdr, uint32_t xid, uint32_t prog, uint32_t vers,
                            uint32_t proc)
 {
     int32_t *buf;
@@ -135,7 +135,7 @@ static errval_t rpc_call_init(XDR *xdr, uint32_t xid, uint32_t prog, uint32_t ve
 }
 
 /// Utility function to skip over variable-sized authentication data in a reply
-static errval_t xdr_skip_auth(XDR *xdr)
+static rtems_status_code xdr_skip_auth(XDR *xdr)
 {
     int32_t *buf;
 
@@ -167,7 +167,7 @@ static void rpc_recv_handler(void *user_state, struct net_socket *socket,
 //    uint64_t ts = rdtsc();
     uint32_t replystat, acceptstat;
     XDR xdr;
-    errval_t r;
+    rtems_status_code r;
     bool rb;
     struct rpc_client *client = user_state;
     struct rpc_call *call = NULL;
@@ -285,7 +285,7 @@ static void traverse_hash_bucket(int hid, struct rpc_client *client)
                 //                       -UDP_HLEN - IP_HLEN - PBUF_LINK_HLEN);
                 // assert(e == SYS_ERR_OK);
 
-                errval_t e = net_send_to(client->socket, call->data, call->size, client->connected_address, client->connected_port);
+                rtems_status_code e = net_send_to(client->socket, call->data, call->size, client->connected_address, client->connected_port);
                 if (e != SYS_ERR_OK) {
                     /* XXX: assume that this is a transient condition, retry */
                     fprintf(stderr, "RPC: retransmit failed! will retry...\n");
@@ -322,9 +322,9 @@ static void rpc_timer(void *arg)
  *
  * \returns Error code (SYS_ERR_OK on success)
  */
-errval_t rpc_init(struct rpc_client *client, struct in_addr server)
+rtems_status_code rpc_init(struct rpc_client *client, struct in_addr server)
 {
-    errval_t err;
+    rtems_status_code err;
     
     client->socket = net_udp_socket();
     assert(client->socket);
@@ -377,14 +377,14 @@ errval_t rpc_init(struct rpc_client *client, struct in_addr server)
  *
  * \returns Error code (SYS_ERR_OK on success)
  */
-errval_t rpc_call(struct rpc_client *client, uint16_t port, uint32_t prog,
+rtems_status_code rpc_call(struct rpc_client *client, uint16_t port, uint32_t prog,
                uint32_t vers, uint32_t proc, xdrproc_t args_xdrproc, void *args,
                size_t args_size, rpc_callback_t callback, void *cbarg1,
                void *cbarg2)
 {
 
     XDR xdr;
-    errval_t r;
+    rtems_status_code r;
     bool rb;
     uint32_t xid;
 

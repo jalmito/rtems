@@ -194,32 +194,32 @@ typedef void (*nfs_remove_callback_t)(void *arg, struct nfs_client *client,
 
 struct nfs_client *nfs_mount(struct in_addr server, const char *path,
                              nfs_mount_callback_t callback, void *cbarg);
-errval_t nfs_getattr(struct nfs_client *client, struct nfs_fh3 fh,
+rtems_status_code nfs_getattr(struct nfs_client *client, struct nfs_fh3 fh,
                   nfs_getattr_callback_t callback, void *cbarg);
-errval_t nfs_setattr(struct nfs_client *client, struct nfs_fh3 fh,
+rtems_status_code nfs_setattr(struct nfs_client *client, struct nfs_fh3 fh,
                   sattr3 new_attributes, bool guarded,
                   nfs_setattr_callback_t callback, void *cbarg);
-errval_t nfs_readdir(struct nfs_client *client, struct nfs_fh3 fh,
+rtems_status_code nfs_readdir(struct nfs_client *client, struct nfs_fh3 fh,
                   cookie3 cookie, cookieverf3 cookieverf,
                   nfs_readdir_callback_t callback, void *cbarg);
-errval_t nfs_readdirplus(struct nfs_client *client, struct nfs_fh3 fh,
+rtems_status_code nfs_readdirplus(struct nfs_client *client, struct nfs_fh3 fh,
                       cookie3 cookie, cookieverf3 cookieverf,
                       nfs_readdirplus_callback_t callback, void *cbarg);
-errval_t nfs_lookup(struct nfs_client *client, struct nfs_fh3 dirfh,
+rtems_status_code nfs_lookup(struct nfs_client *client, struct nfs_fh3 dirfh,
                  const char *name, nfs_lookup_callback_t callback, void *cbarg);
-errval_t nfs_access(struct nfs_client *client, struct nfs_fh3 fh, uint32_t access,
+rtems_status_code nfs_access(struct nfs_client *client, struct nfs_fh3 fh, uint32_t access,
                  nfs_access_callback_t callback, void *cbarg);
-errval_t nfs_read(struct nfs_client *client, struct nfs_fh3 fh, offset3 offset,
+rtems_status_code nfs_read(struct nfs_client *client, struct nfs_fh3 fh, offset3 offset,
                count3 count, nfs_read_callback_t callback, void *cbarg);
-errval_t nfs_write(struct nfs_client *client, struct nfs_fh3 fh, offset3 offset,
+rtems_status_code nfs_write(struct nfs_client *client, struct nfs_fh3 fh, offset3 offset,
                 const void *data, count3 count, stable_how stable,
                 nfs_write_callback_t callback, void *cbarg);
-errval_t nfs_create(struct nfs_client *client, struct nfs_fh3 dir,
+rtems_status_code nfs_create(struct nfs_client *client, struct nfs_fh3 dir,
                  const char *name, bool guarded, sattr3 attributes,
                  nfs_create_callback_t callback, void *cbarg);
-errval_t nfs_mkdir(struct nfs_client *client, struct nfs_fh3 dir, const char *name,
+rtems_status_code nfs_mkdir(struct nfs_client *client, struct nfs_fh3 dir, const char *name,
                 sattr3 attributes, nfs_mkdir_callback_t callback, void *cbarg);
-errval_t nfs_remove(struct nfs_client *client, struct nfs_fh3 dir,
+rtems_status_code nfs_remove(struct nfs_client *client, struct nfs_fh3 dir,
                  const char *name, nfs_remove_callback_t callback,
                  void *cbarg);
 void nfs_destroy(struct nfs_client *client);
@@ -228,8 +228,8 @@ void nfs_copyfh(struct nfs_fh3 *dest, struct nfs_fh3 src);
 void nfs_freefh(struct nfs_fh3 fh);
 
 
-errval_t nfsstat_to_errval(enum nfsstat3 s);
-errval_t mountstat_to_errval(enum mountstat3 s);
+rtems_status_code nfsstat_to_errval(enum nfsstat3 s);
+rtems_status_code mountstat_to_errval(enum mountstat3 s);
 
 __END_DECLS
 

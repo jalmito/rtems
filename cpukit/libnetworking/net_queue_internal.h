@@ -34,7 +34,7 @@ typedef void (*inthandler_t)(void*);
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_queue_internal_create(inthandler_t interrupt, const char *cardname,
+rtems_status_code net_queue_internal_create(inthandler_t interrupt, const char *cardname,
                                    uint64_t* queueid, bool default_q, bool poll,
                                    struct devq **retqueue);
 #endif /* LIB_NETQUEUE_INTERNAL_INCLUDE_NETWORKING_H_ */

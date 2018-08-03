@@ -136,7 +136,7 @@ static void net_udp_receive(void *arg, struct udp_pcb *pcb, struct pbuf *p, cons
 {
     struct socket_connection *connection = arg;
     struct network_connection *nc = connection->connection;
-    errval_t err;
+    rtems_status_code err;
 
     assert(p->tot_len + sizeof(struct net_buffer) <= BUFFER_SIZE);
 
@@ -189,7 +189,7 @@ static err_t net_tcp_receive(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err
 {
     struct socket_connection *socket = arg;
     struct network_connection *nc = socket->connection;
-    errval_t err;
+    rtems_status_code err;
     uint32_t length = 0;
     void *buffer = nc->buffers[nc->next_free];
     struct net_buffer *nb = buffer;
@@ -252,7 +252,7 @@ static void net_tcp_error(void *arg, err_t tcp_err)
 {
     struct socket_connection *socket = arg;
     struct network_connection *nc = socket->connection;
-    errval_t err;
+    rtems_status_code err;
 
     // debug_printf("%s(%d): error %d\n", __func__, socket->descriptor, tcp_err);
     // debug_printf_to_log("%s(%d): error %d", __func__, socket->descriptor, tcp_err);
@@ -308,7 +308,7 @@ static err_t net_tcp_sent(void *arg, struct tcp_pcb *pcb, uint16_t len)
     struct socket_connection *socket = arg;
     struct network_connection *nc = socket->connection;
     bool notify = false;
-    errval_t err;
+    rtems_status_code err;
 
     while (len > 0) {
         // debug_printf_to_log("%s(%d): %d  %lx:%ld:%ld  %lx:%ld:%ld", __func__, socket->descriptor, len,
@@ -364,10 +364,10 @@ static err_t net_tcp_accepted(void *arg, struct tcp_pcb *newpcb, err_t error)
     tcp_sent(accepted_socket->tcp_socket, net_tcp_sent);
 
     // debug_printf("%s(%d): -> %d\n", __func__, socket->descriptor, accepted_socket->descriptor);
-    // errval_t err = nc->binding->tx_vtbl.accepted(nc->binding, BLOCKING_CONT, socket->descriptor, accepted_socket->descriptor, 0, 0, SYS_ERR_OK);
+    // rtems_status_code err = nc->binding->tx_vtbl.accepted(nc->binding, BLOCKING_CONT, socket->descriptor, accepted_socket->descriptor, 0, 0, SYS_ERR_OK);
     // assert(err_is_ok(err));
 
-    errval_t err;
+    rtems_status_code err;
     uint32_t length = 0;
     void *buffer = nc->buffers[nc->next_free];
     struct net_buffer *nb = buffer;
@@ -394,7 +394,7 @@ static err_t net_tcp_accepted(void *arg, struct tcp_pcb *newpcb, err_t error)
 }
 
 
-static errval_t net_register_queue(struct net_sockets_binding *binding, uint64_t queue_id)
+static rtems_status_code net_register_queue(struct net_sockets_binding *binding, uint64_t queue_id)
 {
     struct network_connection *nc;
 
@@ -413,7 +413,7 @@ static errval_t net_register_queue(struct net_sockets_binding *binding, uint64_t
     return SYS_ERR_OK;
 }
 
-static errval_t net_udp_socket(struct net_sockets_binding *binding, uint32_t *descriptor)
+static rtems_status_code net_udp_socket(struct net_sockets_binding *binding, uint32_t *descriptor)
 {
     struct network_connection *nc;
     struct socket_connection *socket;
@@ -430,7 +430,7 @@ static errval_t net_udp_socket(struct net_sockets_binding *binding, uint32_t *de
     return SYS_ERR_OK;
 }
 
-static errval_t net_tcp_socket(struct net_sockets_binding *binding, uint32_t *descriptor)
+static rtems_status_code net_tcp_socket(struct net_sockets_binding *binding, uint32_t *descriptor)
 {
     struct network_connection *nc;
     struct socket_connection *socket;
@@ -449,7 +449,7 @@ static errval_t net_tcp_socket(struct net_sockets_binding *binding, uint32_t *de
     return SYS_ERR_OK;
 }
 
-static errval_t net_bind(struct net_sockets_binding *binding, uint32_t descriptor, uint32_t ip_address, uint16_t port, errval_t *error, uint16_t *bound_port)
+static rtems_status_code net_bind(struct net_sockets_binding *binding, uint32_t descriptor, uint32_t ip_address, uint16_t port, rtems_status_code *error, uint16_t *bound_port)
 {
     struct network_connection *nc;
     struct socket_connection *socket;
@@ -479,7 +479,7 @@ static errval_t net_bind(struct net_sockets_binding *binding, uint32_t descripto
     return SYS_ERR_OK;
 }
 
-static errval_t net_listen(struct net_sockets_binding *binding, uint32_t descriptor, uint8_t backlog, errval_t *error)
+static rtems_status_code net_listen(struct net_sockets_binding *binding, uint32_t descriptor, uint8_t backlog, rtems_status_code *error)
 {
     struct network_connection *nc;
     struct socket_connection *socket;
@@ -508,13 +508,13 @@ static err_t net_tcp_connected(void *arg, struct tcp_pcb *tpcb, err_t error)
     struct socket_connection *socket = arg;
     struct network_connection *nc = socket->connection;
 
-    errval_t err = nc->binding->tx_vtbl.connected(nc->binding, BLOCKING_CONT, socket->descriptor, SYS_ERR_OK, tpcb->remote_ip.addr, tpcb->remote_port);
+    rtems_status_code err = nc->binding->tx_vtbl.connected(nc->binding, BLOCKING_CONT, socket->descriptor, SYS_ERR_OK, tpcb->remote_ip.addr, tpcb->remote_port);
     assert(err_is_ok(err));
 
     return SYS_ERR_OK;
 }
 
-static errval_t net_connect(struct net_sockets_binding *binding, uint32_t descriptor, uint32_t ip_address, uint16_t port, errval_t *error)
+static rtems_status_code net_connect(struct net_sockets_binding *binding, uint32_t descriptor, uint32_t ip_address, uint16_t port, rtems_status_code *error)
 {
     struct network_connection *nc;
     struct socket_connection *socket;
@@ -547,7 +547,7 @@ static errval_t net_connect(struct net_sockets_binding *binding, uint32_t descri
 static void net_delete_socket(struct network_connection *nc, uint32_t descriptor)
 {
     struct socket_connection *socket, *last;
-    errval_t err;
+    rtems_status_code err;
 
     // debug_printf_to_log("%s(%d): tcp_close", __func__, descriptor);
     socket = nc->sockets;
@@ -605,7 +605,7 @@ static void net_delete_socket(struct network_connection *nc, uint32_t descriptor
     free(socket);
 }
 
-static errval_t q_create(struct descq* q, bool notifications, uint8_t role,
+static rtems_status_code q_create(struct descq* q, bool notifications, uint8_t role,
                        uint64_t* queue_id)
 {
     struct network_connection *nc;
@@ -627,17 +627,17 @@ static errval_t q_create(struct descq* q, bool notifications, uint8_t role,
     return SYS_ERR_OK;
 }
 
-static errval_t q_destroy(struct descq* q)
+static rtems_status_code q_destroy(struct descq* q)
 {
     return SYS_ERR_OK;
 }
 
 
-static errval_t q_notify(struct descq* q)
+static rtems_status_code q_notify(struct descq* q)
 {
     struct devq* queue = (struct devq *)q;
-    errval_t err = SYS_ERR_OK;
-    //errval_t err2 = SYS_ERR_OK;
+    rtems_status_code err = SYS_ERR_OK;
+    //rtems_status_code err2 = SYS_ERR_OK;
     regionid_t rid;
     genoffset_t offset;
     genoffset_t length;
@@ -771,7 +771,7 @@ static errval_t q_notify(struct descq* q)
     return SYS_ERR_OK;
 }
 
-static errval_t q_reg(struct descq* q, struct capref cap,
+static rtems_status_code q_reg(struct descq* q, struct capref cap,
                     regionid_t rid)
 {
     struct frame_identity pa;
@@ -779,7 +779,7 @@ static errval_t q_reg(struct descq* q, struct capref cap,
 
     nc = devq_get_state((struct devq *)q);
 
-    errval_t err = frame_identify(cap, &pa);
+    rtems_status_code err = frame_identify(cap, &pa);
     assert(err_is_ok(err));
     nc->buffer_cap = cap;
     nc->region_id = rid;
@@ -792,13 +792,13 @@ static errval_t q_reg(struct descq* q, struct capref cap,
 }
 
 
-static errval_t q_dereg(struct descq* q, regionid_t rid)
+static rtems_status_code q_dereg(struct descq* q, regionid_t rid)
 {
     return SYS_ERR_OK;
 }
     
 
-static errval_t q_control(struct descq* q, uint64_t cmd, uint64_t value, uint64_t* res)
+static rtems_status_code q_control(struct descq* q, uint64_t cmd, uint64_t value, uint64_t* res)
 {
     return SYS_ERR_OK;
 }
@@ -814,14 +814,14 @@ static struct net_sockets_rpc_rx_vtbl rpc_rx_vtbl = {
 };
 
 
-static errval_t connect_cb(void *st, struct net_sockets_binding *binding)
+static rtems_status_code connect_cb(void *st, struct net_sockets_binding *binding)
 {
     binding->rpc_rx_vtbl = rpc_rx_vtbl;
     return SYS_ERR_OK;
 }
 
 
-static void export_cb(void *st, errval_t err, iref_t iref)
+static void export_cb(void *st, rtems_status_code err, iref_t iref)
 {
     char* service_name = (char* ) st;
     assert(err_is_ok(err));
@@ -831,7 +831,7 @@ static void export_cb(void *st, errval_t err, iref_t iref)
 
 int main(int argc, char *argv[])
 {
-    errval_t err;
+    rtems_status_code err;
     
     if (argc < 4) {
         printf("%s: missing arguments! \n", argv[0]);

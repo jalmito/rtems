@@ -85,9 +85,9 @@ typedef void (*rpc_callback_t)(struct rpc_client *rpc_client, void *arg1,
                                void *arg2, uint32_t replystat,
                                uint32_t acceptstat, XDR *reply_xdr);
 
-errval_t rpc_init(struct rpc_client *client, struct in_addr server);
+rtems_status_code rpc_init(struct rpc_client *client, struct in_addr server);
 void rpc_destroy(struct rpc_client *client);
-errval_t rpc_call(struct rpc_client *client, uint16_t port, uint32_t prog,
+rtems_status_code rpc_call(struct rpc_client *client, uint16_t port, uint32_t prog,
                uint32_t vers, uint32_t proc, xdrproc_t args_xdrproc, void *args,
                size_t args_size, rpc_callback_t callback, void *cbarg1,
                void *cbarg2);

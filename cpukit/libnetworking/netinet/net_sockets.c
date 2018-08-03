@@ -82,7 +82,7 @@ static struct net_socket * allocate_socket(uint32_t descriptor)
 
 struct net_socket * net_udp_socket(void)
 {
-    errval_t err;
+    rtems_status_code err;
     struct net_socket *socket;
     uint32_t descriptor;
 
@@ -95,7 +95,7 @@ struct net_socket * net_udp_socket(void)
 
 struct net_socket * net_tcp_socket(void)
 {
-    errval_t err;
+    rtems_status_code err;
     struct net_socket *socket;
     uint32_t descriptor;
 
@@ -132,7 +132,7 @@ void net_set_on_closed(struct net_socket *socket, net_closed_callback_t cb)
 
 void net_close(struct net_socket *socket)
 {
-    errval_t err;
+    rtems_status_code err;
 
 // debug_printf_to_log("%s(%d): %ld:%p  %ld:%p", __func__, socket->descriptor, next_free, buffers[next_free], next_used, buffers[next_used]);
 // debug_printf("%s(%d): %d\n", __func__, socket->descriptor, socket->is_closing);
@@ -151,9 +151,9 @@ void net_close(struct net_socket *socket)
     assert(err_is_ok(err));
 }
 
-errval_t net_bind(struct net_socket *socket, struct in_addr ip_address, uint16_t port)
+rtems_status_code net_bind(struct net_socket *socket, struct in_addr ip_address, uint16_t port)
 {
-    errval_t err, error;
+    rtems_status_code err, error;
     uint16_t bound_port;
 
     err = binding->rpc_tx_vtbl.bind(binding, socket->descriptor, ip_address.s_addr, port, &error, &bound_port);
@@ -164,9 +164,9 @@ errval_t net_bind(struct net_socket *socket, struct in_addr ip_address, uint16_t
     return error;
 }
 
-errval_t net_listen(struct net_socket *socket, uint8_t backlog)
+rtems_status_code net_listen(struct net_socket *socket, uint8_t backlog)
 {
-    errval_t err, error;
+    rtems_status_code err, error;
 
     err = binding->rpc_tx_vtbl.listen(binding, socket->descriptor, backlog, &error);
     assert(err_is_ok(err));
@@ -174,9 +174,9 @@ errval_t net_listen(struct net_socket *socket, uint8_t backlog)
     return error;
 }
 
-errval_t net_print_log(void)
+rtems_status_code net_print_log(void)
 {
-    errval_t err, error;
+    rtems_status_code err, error;
 
     err = binding->rpc_tx_vtbl.listen(binding, -1, 0, &error);
     assert(err_is_ok(err));
@@ -190,7 +190,7 @@ void * net_alloc(size_t size)
     void *buffer = buffers[next_free];
     if (!buffer) {
         // debug_printf_to_log("%s: %ld:%p  %ld:%p", __func__, next_free, buffers[next_free], next_used, buffers[next_used]);
-        errval_t err, error;
+        rtems_status_code err, error;
         err = binding->rpc_tx_vtbl.listen(binding, -1, 0, &error);
         debug_print_log();
         assert(0);
@@ -210,9 +210,9 @@ void net_free(void *buffer)
     // debug_printf("%s: %p  %ld:%p  %ld:%p  %p\n", __func__, buffer, next_free, buffers[next_free], next_used, buffers[next_used], __builtin_return_address(0));
 }
 
-errval_t net_send(struct net_socket *socket, void *data, size_t size)
+rtems_status_code net_send(struct net_socket *socket, void *data, size_t size)
 {
-    errval_t err, error;
+    rtems_status_code err, error;
 
     void *buffer = data - sizeof(struct net_buffer);
     struct net_buffer *nb = buffer;
@@ -236,9 +236,9 @@ errval_t net_send(struct net_socket *socket, void *data, size_t size)
     return error;
 }
 
-errval_t net_send_to(struct net_socket *socket, void *data, size_t size, struct in_addr ip_address, uint16_t port)
+rtems_status_code net_send_to(struct net_socket *socket, void *data, size_t size, struct in_addr ip_address, uint16_t port)
 {
-    errval_t err, error;
+    rtems_status_code err, error;
 
     void *buffer = data - sizeof(struct net_buffer);
     struct net_buffer *nb = buffer;
@@ -259,9 +259,9 @@ errval_t net_send_to(struct net_socket *socket, void *data, size_t size, struct 
     return error;
 }
 
-errval_t net_connect(struct net_socket *socket, struct in_addr ip_address, uint16_t port, net_connected_callback_t cb)
+rtems_status_code net_connect(struct net_socket *socket, struct in_addr ip_address, uint16_t port, net_connected_callback_t cb)
 {
-    errval_t err, error;
+    rtems_status_code err, error;
 
     socket->connected = cb;
     err = binding->rpc_tx_vtbl.connect(binding, socket->descriptor, ip_address.s_addr, port, &error);
@@ -271,7 +271,7 @@ errval_t net_connect(struct net_socket *socket, struct in_addr ip_address, uint1
     return error;
 }
 
-static void net_connected(struct net_sockets_binding *b, uint32_t descriptor, errval_t error, uint32_t connected_address, uint16_t connected_port)
+static void net_connected(struct net_sockets_binding *b, uint32_t descriptor, rtems_status_code error, uint32_t connected_address, uint16_t connected_port)
 {
     struct net_socket *socket = get_socket(descriptor);
     if (!socket) {
@@ -322,7 +322,7 @@ void net_set_on_sent(struct net_socket *socket, net_sent_callback_t cb)
     socket->sent = cb;
 }
 
-static void bind_cb(void *st, errval_t err, struct net_sockets_binding *b)
+static void bind_cb(void *st, rtems_status_code err, struct net_sockets_binding *b)
 {
     binding = b;
     net_sockets_rpc_client_init(binding);
@@ -331,7 +331,7 @@ static void bind_cb(void *st, errval_t err, struct net_sockets_binding *b)
 
 static void alloc_mem(struct capref *frame, void** virt, size_t size)
 {
-    errval_t r;
+    rtems_status_code r;
     vregion_flags_t flags;
 
     r = frame_alloc(frame, size, NULL);
@@ -343,11 +343,11 @@ static void alloc_mem(struct capref *frame, void** virt, size_t size)
     memset(*virt, 0, size);
 }
 
-static errval_t q_notify(struct descq* q)
+static rtems_status_code q_notify(struct descq* q)
 {
     assert(descq_queue == q);
-    errval_t err = SYS_ERR_OK;
-    //errval_t err2 = SYS_ERR_OK;
+    rtems_status_code err = SYS_ERR_OK;
+    //rtems_status_code err2 = SYS_ERR_OK;
     regionid_t rid;
     genoffset_t offset;
     genoffset_t length;
@@ -436,9 +436,9 @@ static errval_t q_notify(struct descq* q)
 
 
 
-errval_t net_sockets_init_with_card(char* cardname) 
+rtems_status_code net_sockets_init_with_card(char* cardname) 
 {
-    errval_t err;
+    rtems_status_code err;
     iref_t iref;
 
     memset(buffers, 0, sizeof(buffers));
@@ -500,9 +500,9 @@ errval_t net_sockets_init_with_card(char* cardname)
 #define NAMESERVICE_ENTRY "r'net\\_sockets\\_service\\_.*' { iref: _ }"
 #define OFFSET 20
 
-errval_t net_sockets_init(void)
+rtems_status_code net_sockets_init(void)
 {   
-    errval_t err;
+    rtems_status_code err;
     char* record;
     // lookup cards that are available
     err = oct_init();

@@ -40,10 +40,10 @@
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_buf_pool_alloc(struct devq *dev_q, size_t numbuf, size_t size,
+rtems_status_code net_buf_pool_alloc(struct devq *dev_q, size_t numbuf, size_t size,
                             struct net_buf_pool **retbp)
 {
-    errval_t err;
+    rtems_status_code err;
 
     assert(retbp);
 
@@ -67,7 +67,7 @@ errval_t net_buf_pool_alloc(struct devq *dev_q, size_t numbuf, size_t size,
     return SYS_ERR_OK;
 }
 
-errval_t net_buf_pool_free(struct net_buf_pool *retbp)
+rtems_status_code net_buf_pool_free(struct net_buf_pool *retbp)
 {
     return SYS_ERR_OK;
 }
@@ -81,9 +81,9 @@ errval_t net_buf_pool_free(struct net_buf_pool *retbp)
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_buf_add(struct net_buf_pool *bp, struct capref frame, size_t buffersize)
+rtems_status_code net_buf_add(struct net_buf_pool *bp, struct capref frame, size_t buffersize)
 {
-    errval_t err;
+    rtems_status_code err;
 
 
     struct net_buf_region *reg = calloc(1, sizeof(struct net_buf_region));
@@ -185,10 +185,10 @@ errval_t net_buf_add(struct net_buf_pool *bp, struct capref frame, size_t buffer
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t net_buf_grow(struct net_buf_pool *bp, size_t numbuf,
+rtems_status_code net_buf_grow(struct net_buf_pool *bp, size_t numbuf,
                                 size_t size)
 {
-    errval_t err;
+    rtems_status_code err;
 
     NETDEBUG("bp=%p, numbuf=%zu, size=%zu\n", bp, numbuf, size);
 

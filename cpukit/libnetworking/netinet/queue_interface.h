@@ -55,7 +55,7 @@ struct devq_buf{
  * @returns error on failure or SYS_ERR_OK on success
  *
  */
-errval_t devq_enqueue(struct devq *q,
+rtems_status_code devq_enqueue(struct devq *q,
                       regionid_t region_id,
                       genoffset_t offset,
                       genoffset_t lenght,
@@ -81,7 +81,7 @@ errval_t devq_enqueue(struct devq *q,
  * @returns error on failure or SYS_ERR_OK on success
  *
  */
-errval_t devq_dequeue(struct devq *q,
+rtems_status_code devq_dequeue(struct devq *q,
                       regionid_t* region_id,
                       genoffset_t* offset,
                       genoffset_t* langht,
@@ -107,7 +107,7 @@ errval_t devq_dequeue(struct devq *q,
  * @returns error on failure or SYS_ERR_OK on success
  *
  */
-errval_t devq_register(struct devq *q,
+rtems_status_code devq_register(struct devq *q,
                        struct capref cap,
                        regionid_t* region_id);
 
@@ -122,7 +122,7 @@ errval_t devq_register(struct devq *q,
  * @returns error on failure or SYS_ERR_OK on success
  *
  */
-errval_t devq_deregister(struct devq *q,
+rtems_status_code devq_deregister(struct devq *q,
                          regionid_t region_id,
                          struct capref* cap);
 
@@ -134,7 +134,7 @@ errval_t devq_deregister(struct devq *q,
  * @returns error on failure or SYS_ERR_OK on success
  *
  */
-errval_t devq_notify(struct devq *q);
+rtems_status_code devq_notify(struct devq *q);
 
 /**
  * @brief Enforce coherency between of the buffers in the queue
@@ -145,7 +145,7 @@ errval_t devq_notify(struct devq *q);
  * @returns error on failure or SYS_ERR_OK on success
  *
  */
-errval_t devq_prepare(struct devq *q);
+rtems_status_code devq_prepare(struct devq *q);
 
 /**
  * @brief Send a control message to the device queue
@@ -157,7 +157,7 @@ errval_t devq_prepare(struct devq *q);
  * @returns error on failure or SYS_ERR_OK on success
  *
  */
-errval_t devq_control(struct devq *q,
+rtems_status_code devq_control(struct devq *q,
                       uint64_t request,
                       uint64_t value,
                       uint64_t *result);
@@ -171,7 +171,7 @@ errval_t devq_control(struct devq *q,
   *
   * @returns error on failure or SYS_ERR_OK on success
   */
-errval_t devq_destroy(struct devq *q);
+rtems_status_code devq_destroy(struct devq *q);
 
 void devq_set_state(struct devq *q, void *state);
 void * devq_get_state(struct devq *q);

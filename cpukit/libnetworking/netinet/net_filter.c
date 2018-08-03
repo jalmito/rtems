@@ -28,7 +28,7 @@
  ******************************************************************************/
 
 // Callback for bind
-static void bind_cb(void *st, errval_t err, struct net_filter_binding *b)
+static void bind_cb(void *st, rtems_status_code err, struct net_filter_binding *b)
 {
     struct net_filter_state* filt = (struct net_filter_state*) st;
     assert(err_is_ok(err));
@@ -42,10 +42,10 @@ static void bind_cb(void *st, errval_t err, struct net_filter_binding *b)
 
 
 /** Open connection to management interface */
-static errval_t connect_to_net_filter(struct net_filter_state* st,
+static rtems_status_code connect_to_net_filter(struct net_filter_state* st,
                                       const char *dev_name)
 {
-    errval_t r;
+    rtems_status_code r;
     iref_t iref;
     const char* prefix = "net_filter_";
     char name[strlen(dev_name) + strlen(prefix) + 1];
@@ -132,10 +132,10 @@ static bool is_reachable(struct net_filter_ip* filt)
  *
  * @return SYS_ERR_OK on success, error on failure
  */
-errval_t net_filter_init(struct net_filter_state** st,
+rtems_status_code net_filter_init(struct net_filter_state** st,
                          const char* cardname)
 {
-    errval_t err;
+    rtems_status_code err;
 
     struct net_filter_state* tmp = calloc(1, sizeof(struct net_filter_state));
     assert(tmp != NULL);
@@ -173,12 +173,12 @@ errval_t net_filter_init(struct net_filter_state** st,
  *
  * @return SYS_ERR_OK on success, error on failure
  */
-errval_t net_filter_ip_install(struct net_filter_state* st,
+rtems_status_code net_filter_ip_install(struct net_filter_state* st,
                                struct net_filter_ip* filt)
 {
 
     assert(st->bound);
-    errval_t err;
+    rtems_status_code err;
     uint64_t filter_id;
 
     struct net_filter_ele* cur = st->filters_ip.start;
@@ -244,12 +244,12 @@ errval_t net_filter_ip_install(struct net_filter_state* st,
  *
  * @return SYS_ERR_OK on success, error on failure
  */
-errval_t net_filter_ip_remove(struct net_filter_state* st,
+rtems_status_code net_filter_ip_remove(struct net_filter_state* st,
                               struct net_filter_ip* filt)
 {
 
     assert(st->bound);
-    errval_t err, err2;
+    rtems_status_code err, err2;
     uint64_t filter_id = (uint64_t)-1;
 
     struct net_filter_ele* cur = st->filters_ip.start;
@@ -302,14 +302,14 @@ errval_t net_filter_ip_remove(struct net_filter_state* st,
     return SYS_ERR_OK;
 }
 
-errval_t net_filter_mac_install(struct net_filter_state* st,
+rtems_status_code net_filter_mac_install(struct net_filter_state* st,
                                 struct net_filter_mac* filt)
 {
    USER_PANIC("NYI \n");
 }
 
 
-errval_t net_filter_mac_remove(struct net_filter_state* st,
+rtems_status_code net_filter_mac_remove(struct net_filter_state* st,
                                struct net_filter_mac* filt)
 {
    USER_PANIC("NYI \n");

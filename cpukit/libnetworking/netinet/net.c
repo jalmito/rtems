@@ -44,7 +44,7 @@ struct deferred_event net_lwip_timer;
  *
  * @return SYS_ERR_OK on success, SKB_ERR_* on failure
  */
-errval_t networking_get_defaults(uint64_t *queue, const char **cardname, uint32_t *flags)
+rtems_status_code networking_get_defaults(uint64_t *queue, const char **cardname, uint32_t *flags)
 {
     /* TODO: get the values from the SKB */
 
@@ -76,7 +76,7 @@ static void net_loopback_poll(void *arg)
 
 void net_if_trigger_loopback(void)
 {
-    errval_t err;
+    rtems_status_code err;
     
     err = waitset_chan_trigger(&net_loopback_poll_channel);
     assert(err_is_ok(err));
@@ -84,7 +84,7 @@ void net_if_trigger_loopback(void)
 
 void net_lwip_timeout(void)
 {
-    errval_t err;
+    rtems_status_code err;
 
     sys_check_timeouts();
     deferred_event_cancel(&net_lwip_timer);
@@ -105,7 +105,7 @@ void net_lwip_timeout(void)
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t networking_create_queue(const char *cardname, uint64_t* queueid,
+rtems_status_code networking_create_queue(const char *cardname, uint64_t* queueid,
                                  struct devq **retqueue)
 {
     struct net_state *st = get_default_net_state();
@@ -116,7 +116,7 @@ errval_t networking_create_queue(const char *cardname, uint64_t* queueid,
 }
 
 
-static errval_t networking_poll_st(struct net_state *st)
+static rtems_status_code networking_poll_st(struct net_state *st)
 {
     event_dispatch_non_block(get_default_waitset());
     if (st->flags & NET_FLAGS_POLLING) {
@@ -135,10 +135,10 @@ static errval_t networking_poll_st(struct net_state *st)
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-static errval_t networking_init_with_queue_st(struct net_state *st, struct devq *q,
+static rtems_status_code networking_init_with_queue_st(struct net_state *st, struct devq *q,
                                               net_flags_t flags)
 {
-    errval_t err;
+    rtems_status_code err;
 
     NETDEBUG("initializing networking with devq=%p, flags=%" PRIx32 "...\n", q,
              flags);
@@ -255,10 +255,10 @@ static errval_t networking_init_with_queue_st(struct net_state *st, struct devq 
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-static errval_t networking_init_st(struct net_state *st, const char *nic,
+static rtems_status_code networking_init_st(struct net_state *st, const char *nic,
                                    net_flags_t flags)
 {
-    errval_t err;
+    rtems_status_code err;
 
     NETDEBUG("initializing networking with nic=%s, flags=%" PRIx32 "...\n", nic,
              flags);
@@ -296,9 +296,9 @@ static errval_t networking_init_st(struct net_state *st, const char *nic,
  *
  * @return SYS_ERR_OK on sucess, errval on failure
  */
-static errval_t networking_init_default_st(struct net_state *st)
+static rtems_status_code networking_init_default_st(struct net_state *st)
 {
-    errval_t err;
+    rtems_status_code err;
 
     NETDEBUG("initializing networking with default options...\n");
 
@@ -332,7 +332,7 @@ static errval_t networking_init_default_st(struct net_state *st)
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t networking_init_with_queue(struct devq *q, net_flags_t flags)
+rtems_status_code networking_init_with_queue(struct devq *q, net_flags_t flags)
 {
     struct net_state *st = get_default_net_state();
     return networking_init_with_queue_st(st, q, flags);
@@ -346,7 +346,7 @@ errval_t networking_init_with_queue(struct devq *q, net_flags_t flags)
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t networking_init(const char *nic, net_flags_t flags)
+rtems_status_code networking_init(const char *nic, net_flags_t flags)
 {
     struct net_state *st = get_default_net_state();
     return networking_init_st(st, nic, flags);
@@ -358,7 +358,7 @@ errval_t networking_init(const char *nic, net_flags_t flags)
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t networking_init_default(void)
+rtems_status_code networking_init_default(void)
 {
     struct net_state *st = get_default_net_state();
     return networking_init_default_st(st);
@@ -370,7 +370,7 @@ errval_t networking_init_default(void)
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t networking_poll(void)
+rtems_status_code networking_poll(void)
 {
     struct net_state *st = &state;
     return networking_poll_st(st);
@@ -387,10 +387,10 @@ errval_t networking_poll(void)
  *
  * @return SYS_ERR_OK on success, NET_FILTER_ERR_* on failure
  */
-errval_t networking_install_ip_filter(bool tcp, struct in_addr *src,
+rtems_status_code networking_install_ip_filter(bool tcp, struct in_addr *src,
                                       uint16_t src_port, uint16_t dst_port)
 {
-    errval_t err;
+    rtems_status_code err;
     if (state.filter == NULL) {
         return NET_FILTER_ERR_NOT_INITIALIZED;
     }
@@ -431,11 +431,11 @@ errval_t networking_install_ip_filter(bool tcp, struct in_addr *src,
  *
  * @return SYS_ERR_OK on success, NET_FILTER_ERR_* on failure
  */
-errval_t networking_remove_ip_filter(bool tcp, struct in_addr *src,
+rtems_status_code networking_remove_ip_filter(bool tcp, struct in_addr *src,
                                      uint16_t src_port, uint16_t dst_port)
 {
 
-    errval_t err;
+    rtems_status_code err;
     if (state.filter == NULL) {
         return NET_FILTER_ERR_NOT_INITIALIZED;
     }

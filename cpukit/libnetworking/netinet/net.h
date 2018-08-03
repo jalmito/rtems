@@ -69,7 +69,7 @@ typedef uint32_t net_flags_t;
  *
  * @return SYS_ERR_OK on sucess, errval on failure
  */
-errval_t networking_init_default(void);
+rtems_status_code networking_init_default(void);
 
 
 /**
@@ -80,7 +80,7 @@ errval_t networking_init_default(void);
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t networking_init(const char *nic, net_flags_t flags);
+rtems_status_code networking_init(const char *nic, net_flags_t flags);
 
 /**
  * @brief initializes the networking library with a given device queue
@@ -90,7 +90,7 @@ errval_t networking_init(const char *nic, net_flags_t flags);
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t networking_init_with_queue(struct devq *q, net_flags_t flags);
+rtems_status_code networking_init_with_queue(struct devq *q, net_flags_t flags);
 
 
 /**
@@ -98,7 +98,7 @@ errval_t networking_init_with_queue(struct devq *q, net_flags_t flags);
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t networking_poll(void);
+rtems_status_code networking_poll(void);
 
 
 
@@ -112,7 +112,7 @@ errval_t networking_poll(void);
  *
  * @return SYS_ERR_OK on success, errval on failure
  */
-errval_t networking_create_queue(const char *cardname, uint64_t* queueid,
+rtems_status_code networking_create_queue(const char *cardname, uint64_t* queueid,
                                  struct devq **retqueue);
 
 /**
@@ -123,7 +123,7 @@ errval_t networking_create_queue(const char *cardname, uint64_t* queueid,
  *
  * @return SYS_ERR_OK on success, SKB_ERR_* on failure
  */
-errval_t networking_get_defaults(uint64_t *queue, const char **cardname, uint32_t *flags);
+rtems_status_code networking_get_defaults(uint64_t *queue, const char **cardname, uint32_t *flags);
 
 /*
  * ==============================================================================
@@ -141,7 +141,7 @@ errval_t networking_get_defaults(uint64_t *queue, const char **cardname, uint32_
  *
  * @return SYS_ERR_OK on success, NET_FILTER_ERR_* on failure
  */
-errval_t networking_install_ip_filter(bool tcp, struct in_addr *src,
+rtems_status_code networking_install_ip_filter(bool tcp, struct in_addr *src,
                                       uint16_t src_port, uint16_t dst_port);
 
 /**
@@ -154,7 +154,7 @@ errval_t networking_install_ip_filter(bool tcp, struct in_addr *src,
  *
  * @return SYS_ERR_OK on success, NET_FILTER_ERR_* on failure
  */
-errval_t networking_remove_ip_filter(bool tcp, struct in_addr *src,
+rtems_status_code networking_remove_ip_filter(bool tcp, struct in_addr *src,
                                      uint16_t src_port, uint16_t dst_port);
 
 
