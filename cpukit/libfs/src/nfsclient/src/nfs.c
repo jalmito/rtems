@@ -28,7 +28,7 @@
 
 /*NFS*/
 
-#include <nfs/nfs.h>
+#include "nfs.h"
 #include "nfs_debug.h"
 #include "rpc.h"
 #include "portmap_rpc.h"
