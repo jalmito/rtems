@@ -58,7 +58,76 @@ struct fid {
  */
 #define	MFSNAMELEN	16		/* length of type name including null */
 #define	MNAMELEN	88		/* size of on/from name bufs */
+#define STATFS_VERSION  0x20030518      /* current version number */
+struct statfs {
+        uint32_t f_version;             /* structure version number */
+        uint32_t f_type;                /* type of filesystem */
+        uint64_t f_flags;               /* copy of mount exported flags */
+        uint64_t f_bsize;               /* filesystem fragment size */
+        uint64_t f_iosize;              /* optimal transfer block size */
+        uint64_t f_blocks;              /* total data blocks in filesystem */
+        uint64_t f_bfree;               /* free blocks in filesystem */
+        int64_t  f_bavail;              /* free blocks avail to non-superuser */
+        uint64_t f_files;               /* total file nodes in filesystem */
+        int64_t  f_ffree;               /* free nodes avail to non-superuser */
+        uint64_t f_syncwrites;          /* count of sync writes since mount */
+        uint64_t f_asyncwrites;         /* count of async writes since mount */
+        uint64_t f_syncreads;           /* count of sync reads since mount */
+        uint64_t f_asyncreads;          /* count of async reads since mount */
+        uint64_t f_spare[10];           /* unused spare */
+        uint32_t f_namemax;             /* maximum filename length */
+        uid_t     f_owner;              /* user that mounted the filesystem */
+        fsid_t    f_fsid;               /* filesystem id */
+        char      f_charspare[80];          /* spare string space */
+        char      f_fstypename[MFSNAMELEN]; /* filesystem type name */
+        char      f_mntfromname[MNAMELEN];  /* mounted filesystem */
+        char      f_mntonname[MNAMELEN];    /* directory on which mounted */
+};
 
+/*
+ * User specifiable flags, stored in mnt_flag.
+ */
+#define MNT_RDONLY      0x0000000000000001ULL /* read only filesystem */
+#define MNT_SYNCHRONOUS 0x0000000000000002ULL /* fs written synchronously */
+#define MNT_NOEXEC      0x0000000000000004ULL /* can't exec from filesystem */
+#define MNT_NOSUID      0x0000000000000008ULL /* don't honor setuid fs bits */
+#define MNT_NFS4ACLS    0x0000000000000010ULL /* enable NFS version 4 ACLs */
+#define MNT_UNION       0x0000000000000020ULL /* union with underlying fs */
+#define MNT_ASYNC       0x0000000000000040ULL /* fs written asynchronously */
+#define MNT_SUIDDIR     0x0000000000100000ULL /* special SUID dir handling */
+#define MNT_SOFTDEP     0x0000000000200000ULL /* using soft updates */
+#define MNT_NOSYMFOLLOW 0x0000000000400000ULL /* do not follow symlinks */
+#define MNT_GJOURNAL    0x0000000002000000ULL /* GEOM journal support enabled */
+#define MNT_MULTILABEL  0x0000000004000000ULL /* MAC support for objects */
+#define MNT_ACLS        0x0000000008000000ULL /* ACL support enabled */
+#define MNT_NOATIME     0x0000000010000000ULL /* dont update file access time */
+#define MNT_NOCLUSTERR  0x0000000040000000ULL /* disable cluster read */
+#define MNT_NOCLUSTERW  0x0000000080000000ULL /* disable cluster write */
+#define MNT_SUJ         0x0000000100000000ULL /* using journaled soft updates */
+#define MNT_AUTOMOUNTED 0x0000000200000000ULL /* mounted by automountd(8) */
+
+/*
+ * NFS export related mount flags.
+ */
+#define MNT_EXRDONLY    0x0000000000000080ULL   /* exported read only */
+#define MNT_EXPORTED    0x0000000000000100ULL   /* filesystem is exported */
+#define MNT_DEFEXPORTED 0x0000000000000200ULL   /* exported to the world */
+#define MNT_EXPORTANON  0x0000000000000400ULL   /* anon uid mapping for all */
+#define MNT_EXKERB      0x0000000000000800ULL   /* exported with Kerberos */
+#define MNT_EXPUBLIC    0x0000000020000000ULL   /* public export (WebNFS) */
+
+/*
+ * Flags set by internal operations,
+ * but visible to the user.
+ * XXX some of these are not quite right.. (I've never seen the root flag set)
+ */
+#define MNT_LOCAL       0x0000000000001000ULL /* filesystem is stored locally */
+#define MNT_QUOTA       0x0000000000002000ULL /* quotas are enabled on fs */
+#define MNT_ROOTFS      0x0000000000004000ULL /* identifies the root fs */
+#define MNT_USER        0x0000000000008000ULL /* mounted by a user */
+#define MNT_IGNORE      0x0000000000800000ULL /* do not show entry in df */
+
+#if 0
 /*
  * User specifiable flags.
  */
@@ -99,7 +168,7 @@ struct fid {
 #define	MNT_DELEXPORT	0x00020000	/* delete export host lists */
 #define	MNT_RELOAD	0x00040000	/* reload filesystem data */
 #define	MNT_FORCE	0x00080000	/* force unmount or readonly change */
-
+#endif
 /*
  * Generic file handle
  */
