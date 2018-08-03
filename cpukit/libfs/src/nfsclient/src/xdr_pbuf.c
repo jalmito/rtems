@@ -18,9 +18,9 @@
  */
 
 #include <assert.h>
-#include <nfs/xdr.h>
+#include "xdr.h"
 #include "xdr_pbuf.h"
-#include <net_sockets/net_sockets.h>
+#include <netinet/net_sockets.h>
 
 /* make space within the buffer, returns NULL if it won't fit */
 static inline int32_t *make_space(XDR *xdr, size_t size)
