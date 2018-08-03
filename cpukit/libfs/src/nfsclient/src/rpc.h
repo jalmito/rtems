@@ -15,9 +15,8 @@
 #ifndef _RPC_H
 #define _RPC_H
 
-#include <nfs/xdr.h>
-#include <barrelfish/deferred.h>
-#include <net_sockets/net_sockets.h>
+#include "xdr.h"
+#include <netinet/net_sockets.h>
 
 /**
  * A reply to a call message can take on two forms: The message was
