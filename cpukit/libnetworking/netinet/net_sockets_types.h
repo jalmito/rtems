@@ -1,7 +1,7 @@
 #ifndef NET_SOCKETS_TYPES_H
 #define NET_SOCKETS_TYPES_H
 
-#include <barrelfish/barrelfish.h>
+#include <rtems.h>
 #include <netinet/in.h>
 
 struct net_socket;
