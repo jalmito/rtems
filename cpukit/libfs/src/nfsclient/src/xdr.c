@@ -44,7 +44,7 @@
 #include <stdlib.h>
 #include <limits.h>
 
-#include <nfs/xdr.h>
+#include "xdr.h"
 
 #define mem_alloc(size)     malloc(size)
 #define mem_free(p, size)   free(p)
