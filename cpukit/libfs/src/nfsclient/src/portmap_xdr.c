@@ -3,7 +3,7 @@
  * It was generated using rpcgen, and then hacked to fix compilation problems.
  */
 
-#include <nfs/nfs.h>
+#include "nfs.h"
 #include "portmap_rpc.h"
 
 bool_t
