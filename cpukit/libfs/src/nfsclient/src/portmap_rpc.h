@@ -6,7 +6,7 @@
 #ifndef _PORTMAP_H_RPCGEN
 #define _PORTMAP_H_RPCGEN
 
-// #include "rpc.h"
+#include "rpc.h"
 
 #ifdef __cplusplus
 extern "C" {
