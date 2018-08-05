@@ -364,7 +364,7 @@ static err_t net_tcp_accepted(void *arg, struct tcp_pcb *newpcb, err_t error)
     tcp_sent(accepted_socket->tcp_socket, net_tcp_sent);
 
     // debug_printf("%s(%d): -> %d\n", __func__, socket->descriptor, accepted_socket->descriptor);
-    // rtems_status_code err = nc->binding->tx_vtbl.accepted(nc->binding, BLOCKING_CONT, socket->descriptor, accepted_socket->descriptor, 0, 0, SYS_ERR_OK);
+    // rtems_status_code err = nc->binding->tx_vtbl.accepted(nc->binding, BLOCKING_CONT, socket->descriptor, accepted_socket->descriptor, 0, 0, RTEMS_SUCCESSFUL);
     // assert(err_is_ok(err));
 
     rtems_status_code err;
@@ -410,7 +410,7 @@ static rtems_status_code net_register_queue(struct net_sockets_binding *binding,
     nc->binding = binding;
     devq_set_state((struct devq *)nc->queue, nc);
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 static rtems_status_code net_udp_socket(struct net_sockets_binding *binding, uint32_t *descriptor)
@@ -427,7 +427,7 @@ static rtems_status_code net_udp_socket(struct net_sockets_binding *binding, uin
     socket->udp_socket = pcb;
     udp_recv(socket->udp_socket, net_udp_receive, socket);
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 static rtems_status_code net_tcp_socket(struct net_sockets_binding *binding, uint32_t *descriptor)
@@ -446,7 +446,7 @@ static rtems_status_code net_tcp_socket(struct net_sockets_binding *binding, uin
     tcp_arg(pcb, socket);
     tcp_recv(socket->tcp_socket, net_tcp_receive);
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 static rtems_status_code net_bind(struct net_sockets_binding *binding, uint32_t descriptor, uint32_t ip_address, uint16_t port, rtems_status_code *error, uint16_t *bound_port)
@@ -465,7 +465,7 @@ static rtems_status_code net_bind(struct net_sockets_binding *binding, uint32_t 
         *error = udp_bind(socket->udp_socket, &ip, port);
         assert(err_is_ok(*error));
         *bound_port = socket->udp_socket->local_port;
-        *error = SYS_ERR_OK;
+        *error = RTEMS_SUCCESSFUL;
     } else if (socket->tcp_socket) {
         ip_addr_t ip;
 
@@ -474,9 +474,9 @@ static rtems_status_code net_bind(struct net_sockets_binding *binding, uint32_t 
         *error = tcp_bind(socket->tcp_socket, &ip, port);
         assert(err_is_ok(*error));
         *bound_port = socket->tcp_socket->local_port;
-        *error = SYS_ERR_OK;
+        *error = RTEMS_SUCCESSFUL;
     }
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 static rtems_status_code net_listen(struct net_sockets_binding *binding, uint32_t descriptor, uint8_t backlog, rtems_status_code *error)
@@ -486,7 +486,7 @@ static rtems_status_code net_listen(struct net_sockets_binding *binding, uint32_
 
     if (descriptor == -1) {
         debug_print_log();
-        return SYS_ERR_OK;
+        return RTEMS_SUCCESSFUL;
     }
     nc = binding->st;
     socket = find_socket_connection(nc, descriptor);
@@ -499,8 +499,8 @@ static rtems_status_code net_listen(struct net_sockets_binding *binding, uint32_
     // socket->tcp_socket = tcp_listen_with_backlog(socket->tcp_socket, backlog);
     assert(socket->tcp_socket);
 
-    *error = SYS_ERR_OK;
-    return SYS_ERR_OK;
+    *error = RTEMS_SUCCESSFUL;
+    return RTEMS_SUCCESSFUL;
 }
 
 static err_t net_tcp_connected(void *arg, struct tcp_pcb *tpcb, err_t error)
@@ -508,10 +508,10 @@ static err_t net_tcp_connected(void *arg, struct tcp_pcb *tpcb, err_t error)
     struct socket_connection *socket = arg;
     struct network_connection *nc = socket->connection;
 
-    rtems_status_code err = nc->binding->tx_vtbl.connected(nc->binding, BLOCKING_CONT, socket->descriptor, SYS_ERR_OK, tpcb->remote_ip.addr, tpcb->remote_port);
+    rtems_status_code err = nc->binding->tx_vtbl.connected(nc->binding, BLOCKING_CONT, socket->descriptor, RTEMS_SUCCESSFUL, tpcb->remote_ip.addr, tpcb->remote_port);
     assert(err_is_ok(err));
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 static rtems_status_code net_connect(struct net_sockets_binding *binding, uint32_t descriptor, uint32_t ip_address, uint16_t port, rtems_status_code *error)
@@ -530,7 +530,7 @@ static rtems_status_code net_connect(struct net_sockets_binding *binding, uint32
         addr.addr = ip_address;
         e = udp_connect(socket->udp_socket, &addr, port);
         assert(e == ERR_OK);
-        *error = SYS_ERR_OK;
+        *error = RTEMS_SUCCESSFUL;
     } else if (socket->tcp_socket) {
         ip_addr_t addr;
         err_t e;
@@ -538,10 +538,10 @@ static rtems_status_code net_connect(struct net_sockets_binding *binding, uint32
         addr.addr = ip_address;
         e = tcp_connect(socket->tcp_socket, &addr, port, net_tcp_connected);
         assert(e == ERR_OK);
-        *error = SYS_ERR_OK;
+        *error = RTEMS_SUCCESSFUL;
     }
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 static void net_delete_socket(struct network_connection *nc, uint32_t descriptor)
@@ -624,20 +624,20 @@ static rtems_status_code q_create(struct descq* q, bool notifications, uint8_t r
     memset(nc->buffers, 0, sizeof(nc->buffers));
     nc->next_free = 0;
     nc->next_used = 0;
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 static rtems_status_code q_destroy(struct descq* q)
 {
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 
 static rtems_status_code q_notify(struct descq* q)
 {
     struct devq* queue = (struct devq *)q;
-    rtems_status_code err = SYS_ERR_OK;
-    //rtems_status_code err2 = SYS_ERR_OK;
+    rtems_status_code err = RTEMS_SUCCESSFUL;
+    //rtems_status_code err2 = RTEMS_SUCCESSFUL;
     regionid_t rid;
     genoffset_t offset;
     genoffset_t length;
@@ -768,7 +768,7 @@ static rtems_status_code q_notify(struct descq* q)
         assert(err_is_ok(err));
     }
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 static rtems_status_code q_reg(struct descq* q, struct capref cap,
@@ -788,19 +788,19 @@ static rtems_status_code q_reg(struct descq* q, struct capref cap,
     err = vspace_map_one_frame(&nc->buffer_start, pa.bytes, cap, NULL, NULL);
     assert(err_is_ok(err));
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 
 static rtems_status_code q_dereg(struct descq* q, regionid_t rid)
 {
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
     
 
 static rtems_status_code q_control(struct descq* q, uint64_t cmd, uint64_t value, uint64_t* res)
 {
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 
@@ -817,7 +817,7 @@ static struct net_sockets_rpc_rx_vtbl rpc_rx_vtbl = {
 static rtems_status_code connect_cb(void *st, struct net_sockets_binding *binding)
 {
     binding->rpc_rx_vtbl = rpc_rx_vtbl;
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 

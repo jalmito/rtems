@@ -38,7 +38,7 @@
  * @param size      size of the networking buffer
  * @param retbp     buffer pool to initialize
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_buf_pool_alloc(struct devq *dev_q, size_t numbuf, size_t size,
                             struct net_buf_pool **retbp)
@@ -64,12 +64,12 @@ rtems_status_code net_buf_pool_alloc(struct devq *dev_q, size_t numbuf, size_t s
 
     *retbp = netbp;
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 rtems_status_code net_buf_pool_free(struct net_buf_pool *retbp)
 {
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 /**
@@ -79,7 +79,7 @@ rtems_status_code net_buf_pool_free(struct net_buf_pool *retbp)
  * @param frame         frame capability
  * @param buffersize    size of a buffer
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_buf_add(struct net_buf_pool *bp, struct capref frame, size_t buffersize)
 {
@@ -166,7 +166,7 @@ rtems_status_code net_buf_add(struct net_buf_pool *bp, struct capref frame, size
     NETDEBUG("new region added to pool. free count: %zu / %zu\n",
              bp->buffer_free, bp->buffer_count);
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 
     out_err2:
     free(reg->netbufs);
@@ -183,7 +183,7 @@ rtems_status_code net_buf_add(struct net_buf_pool *bp, struct capref frame, size
  * @param numbuf    number of buffers to create
  * @param size      size of a buffer
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_buf_grow(struct net_buf_pool *bp, size_t numbuf,
                                 size_t size)

@@ -34,7 +34,7 @@ struct devq;
  * @param netif     the netif to be initialized
  * @param devq      the device queue to be used
  *
- * @return SYS_ERR_OK on success, errva on failure
+ * @return RTEMS_SUCCESSFUL on success, errva on failure
  */
 rtems_status_code net_if_init_devq(struct netif *netif, struct devq *devq);
 
@@ -55,7 +55,7 @@ rtems_status_code net_if_add(struct netif *netif, void *state);
  *
  * @param netif     the LWIP netif
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_if_remove(struct netif *netif);
 
@@ -72,7 +72,7 @@ rtems_status_code net_if_remove(struct netif *netif);
  * @param netif     the LWIP netif
  * @param pbuf      packet buffer to be added
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_if_add_rx_buf(struct netif *netif, struct pbuf *pbuf);
 
@@ -82,7 +82,7 @@ rtems_status_code net_if_add_rx_buf(struct netif *netif, struct pbuf *pbuf);
  * @param netif     the LWIP netif
  * @param pbuf      packt boffer to be transmitted
  *
- * @return  SYS_ERR_OK on success, errval on failure
+ * @return  RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_if_add_tx_buf(struct netif *netif, struct pbuf *pbuf);
 
@@ -99,14 +99,14 @@ rtems_status_code net_if_add_tx_buf(struct netif *netif, struct pbuf *pbuf);
  *
  * @param netif     the LWIP netif to be polled
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_if_poll(struct netif *netif);
 
 /**
  * @brief polls all added network interfaces
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_if_poll_all(void);
 

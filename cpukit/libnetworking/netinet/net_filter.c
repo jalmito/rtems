@@ -73,7 +73,7 @@ static rtems_status_code connect_to_net_filter(struct net_filter_state* st,
     }
     
     NETDEBUG("finished connecting\n");
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 /******************************************************************************
@@ -130,7 +130,7 @@ static bool is_reachable(struct net_filter_ip* filt)
  * @param st        returned net filter state;
  * @param cardname  the card name to be used
  *
- * @return SYS_ERR_OK on success, error on failure
+ * @return RTEMS_SUCCESSFUL on success, error on failure
  */
 rtems_status_code net_filter_init(struct net_filter_state** st,
                          const char* cardname)
@@ -171,7 +171,7 @@ rtems_status_code net_filter_init(struct net_filter_state** st,
  * @param st    net filter state
  * @param filt  filter struct
  *
- * @return SYS_ERR_OK on success, error on failure
+ * @return RTEMS_SUCCESSFUL on success, error on failure
  */
 rtems_status_code net_filter_ip_install(struct net_filter_state* st,
                                struct net_filter_ip* filt)
@@ -231,7 +231,7 @@ rtems_status_code net_filter_ip_install(struct net_filter_state* st,
     }
 
     cur->filter_id = filter_id;
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 
@@ -242,7 +242,7 @@ rtems_status_code net_filter_ip_install(struct net_filter_state* st,
  * @param st    net filter state
  * @param filt  filter struct
  *
- * @return SYS_ERR_OK on success, error on failure
+ * @return RTEMS_SUCCESSFUL on success, error on failure
  */
 rtems_status_code net_filter_ip_remove(struct net_filter_state* st,
                               struct net_filter_ip* filt)
@@ -299,7 +299,7 @@ rtems_status_code net_filter_ip_remove(struct net_filter_state* st,
 
     st->filters_ip.num_ele--;
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 rtems_status_code net_filter_mac_install(struct net_filter_state* st,

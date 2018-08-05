@@ -67,7 +67,7 @@ typedef uint32_t net_flags_t;
 /**
  * @brief initializes the networking with the defaults
  *
- * @return SYS_ERR_OK on sucess, errval on failure
+ * @return RTEMS_SUCCESSFUL on sucess, errval on failure
  */
 rtems_status_code networking_init_default(void);
 
@@ -78,7 +78,7 @@ rtems_status_code networking_init_default(void);
  * @param nic       the nic to use with the networking library
  * @param flags     flags to use to initialize the networking library
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code networking_init(const char *nic, net_flags_t flags);
 
@@ -88,7 +88,7 @@ rtems_status_code networking_init(const char *nic, net_flags_t flags);
  * @param q         the device queue to initialize the networking on
  * @param flags     supplied initialization flags
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code networking_init_with_queue(struct devq *q, net_flags_t flags);
 
@@ -96,7 +96,7 @@ rtems_status_code networking_init_with_queue(struct devq *q, net_flags_t flags);
 /**
  * @brief polls the network for new packets
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code networking_poll(void);
 
@@ -110,7 +110,7 @@ rtems_status_code networking_poll(void);
  * @param queueid   queueid of the network card
  * @param retqueue  returns the pointer to the queue
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code networking_create_queue(const char *cardname, uint64_t* queueid,
                                  struct devq **retqueue);
@@ -121,7 +121,7 @@ rtems_status_code networking_create_queue(const char *cardname, uint64_t* queuei
  * @param queue     returns the queue to be used
  * @param cardname  returns the card name to be used
  *
- * @return SYS_ERR_OK on success, SKB_ERR_* on failure
+ * @return RTEMS_SUCCESSFUL on success, SKB_ERR_* on failure
  */
 rtems_status_code networking_get_defaults(uint64_t *queue, const char **cardname, uint32_t *flags);
 
@@ -139,7 +139,7 @@ rtems_status_code networking_get_defaults(uint64_t *queue, const char **cardname
  * @param src_port  source port of the filter, 0 for wildcard
  * @param dst_port  destination port fo the filter
  *
- * @return SYS_ERR_OK on success, NET_FILTER_ERR_* on failure
+ * @return RTEMS_SUCCESSFUL on success, NET_FILTER_ERR_* on failure
  */
 rtems_status_code networking_install_ip_filter(bool tcp, struct in_addr *src,
                                       uint16_t src_port, uint16_t dst_port);
@@ -152,7 +152,7 @@ rtems_status_code networking_install_ip_filter(bool tcp, struct in_addr *src,
  * @param src_port  source port of the filter, 0 for wildcard
  * @param dst_port  destination port fo the filter
  *
- * @return SYS_ERR_OK on success, NET_FILTER_ERR_* on failure
+ * @return RTEMS_SUCCESSFUL on success, NET_FILTER_ERR_* on failure
  */
 rtems_status_code networking_remove_ip_filter(bool tcp, struct in_addr *src,
                                      uint16_t src_port, uint16_t dst_port);

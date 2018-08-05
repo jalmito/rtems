@@ -131,7 +131,7 @@ static rtems_status_code rpc_call_init(XDR *xdr, uint32_t xid, uint32_t prog, ui
     IXDR_PUT_UINT32(buf, RPC_AUTH_NULL);
     IXDR_PUT_UINT32(buf, 0);
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 /// Utility function to skip over variable-sized authentication data in a reply
@@ -155,7 +155,7 @@ static rtems_status_code xdr_skip_auth(XDR *xdr)
         }
     }
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 /// Generic handler for all incoming RPC messages. Finds the appropriate call
@@ -213,7 +213,7 @@ static void rpc_recv_handler(void *user_state, struct net_socket *socket,
     replystat = IXDR_GET_UINT32(buf);
     if (replystat == RPC_MSG_ACCEPTED) {
         r = xdr_skip_auth(&xdr);
-        if (r != SYS_ERR_OK) {
+        if (r != RTEMS_SUCCESSFUL) {
             fprintf(stderr, "RPC: Error in incoming auth data, dropped\n");
             goto out;
         }
@@ -283,10 +283,10 @@ static void traverse_hash_bucket(int hid, struct rpc_client *client)
                 // throw away (hide) UDP/IP/ARP headers from previous transmission
                 // err_t e = pbuf_header(call->pbuf,
                 //                       -UDP_HLEN - IP_HLEN - PBUF_LINK_HLEN);
-                // assert(e == SYS_ERR_OK);
+                // assert(e == RTEMS_SUCCESSFUL);
 
                 rtems_status_code e = net_send_to(client->socket, call->data, call->size, client->connected_address, client->connected_port);
-                if (e != SYS_ERR_OK) {
+                if (e != RTEMS_SUCCESSFUL) {
                     /* XXX: assume that this is a transient condition, retry */
                     fprintf(stderr, "RPC: retransmit failed! will retry...\n");
                     call->timers--;
@@ -320,7 +320,7 @@ static void rpc_timer(void *arg)
  * \param client Pointer to memory for RPC client data, to be initialised
  * \param server IP address of server to be called
  *
- * \returns Error code (SYS_ERR_OK on success)
+ * \returns Error code (RTEMS_SUCCESSFUL on success)
  */
 rtems_status_code rpc_init(struct rpc_client *client, struct in_addr server)
 {
@@ -356,7 +356,7 @@ rtems_status_code rpc_init(struct rpc_client *client, struct in_addr server)
     }
     RPC_DEBUGP("rpc timer created\n");
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 
@@ -375,7 +375,7 @@ rtems_status_code rpc_init(struct rpc_client *client, struct in_addr server)
  * \param callback Callback function to be invoked when call either completes or fails
  * \param cbarg1,cbarg2 Opaque arguments to be passed to callback function
  *
- * \returns Error code (SYS_ERR_OK on success)
+ * \returns Error code (RTEMS_SUCCESSFUL on success)
  */
 rtems_status_code rpc_call(struct rpc_client *client, uint16_t port, uint32_t prog,
                uint32_t vers, uint32_t proc, xdrproc_t args_xdrproc, void *args,
@@ -398,7 +398,7 @@ rtems_status_code rpc_call(struct rpc_client *client, uint16_t port, uint32_t pr
 
     RPC_DEBUGP("rpc_call: calling rpc_call_init\n");
     r = rpc_call_init(&xdr, xid, prog, vers, proc);
-    if (r != SYS_ERR_OK) {
+    if (r != RTEMS_SUCCESSFUL) {
         XDR_DESTROY(&xdr);
         return r;
     }
@@ -436,7 +436,7 @@ rtems_status_code rpc_call(struct rpc_client *client, uint16_t port, uint32_t pr
 
     RPC_DEBUGP("rpc_call: calling UPD_send\n");
     r = net_send_to(client->socket, call->data, call->size, client->connected_address, client->connected_port);
-    if (r != SYS_ERR_OK) {
+    if (r != RTEMS_SUCCESSFUL) {
         /* dequeue */
         assert(client->call_hash[hid] == call);
         client->call_hash[hid] = call->next;

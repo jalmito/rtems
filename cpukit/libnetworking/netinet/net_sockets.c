@@ -232,7 +232,7 @@ rtems_status_code net_send(struct net_socket *socket, void *data, size_t size)
     err = devq_notify((struct devq *)descq_queue);
     assert(err_is_ok(err));
 
-    error = SYS_ERR_OK;
+    error = RTEMS_SUCCESSFUL;
     return error;
 }
 
@@ -255,7 +255,7 @@ rtems_status_code net_send_to(struct net_socket *socket, void *data, size_t size
     err = devq_notify((struct devq *)descq_queue);
     assert(err_is_ok(err));
 
-    error = SYS_ERR_OK;
+    error = RTEMS_SUCCESSFUL;
     return error;
 }
 
@@ -346,8 +346,8 @@ static void alloc_mem(struct capref *frame, void** virt, size_t size)
 static rtems_status_code q_notify(struct descq* q)
 {
     assert(descq_queue == q);
-    rtems_status_code err = SYS_ERR_OK;
-    //rtems_status_code err2 = SYS_ERR_OK;
+    rtems_status_code err = RTEMS_SUCCESSFUL;
+    //rtems_status_code err2 = RTEMS_SUCCESSFUL;
     regionid_t rid;
     genoffset_t offset;
     genoffset_t length;
@@ -431,7 +431,7 @@ static rtems_status_code q_notify(struct descq* q)
         // debug_printf("notify<\n");
     }
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 
@@ -492,7 +492,7 @@ rtems_status_code net_sockets_init_with_card(char* cardname)
     err = devq_notify((struct devq *)descq_queue);
     assert(err_is_ok(err));
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 
 }
 

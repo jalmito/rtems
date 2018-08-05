@@ -153,7 +153,7 @@ static err_t netif_init_cb(struct netif *netif)
  * @param netif     the netif to be initialized
  * @param devq      the device queue to be used
  *
- * @return SYS_ERR_OK on success, errva on failure
+ * @return RTEMS_SUCCESSFUL on success, errva on failure
  */
 rtems_status_code net_if_init_devq(struct netif *netif, struct devq *devq)
 {
@@ -167,7 +167,7 @@ rtems_status_code net_if_init_devq(struct netif *netif, struct devq *devq)
     netif->name[0] = NET_IF__NAME0;
     netif->name[1] = NET_IF__NAME1;
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 
@@ -187,7 +187,7 @@ rtems_status_code net_if_add(struct netif *netif, void *st)
     netif_add(netif, IP_ADDR_ANY, IP_ADDR_ANY, IP_ADDR_ANY, st,
               netif_init_cb, netif_input);
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 
@@ -196,7 +196,7 @@ rtems_status_code net_if_add(struct netif *netif, void *st)
  *
  * @param netif     the LWIP netif
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_if_remove(struct netif *netif)
 {
@@ -205,7 +205,7 @@ rtems_status_code net_if_remove(struct netif *netif)
     /* TODO: need other things to do here ? */
     netif_remove(netif);
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 /**
@@ -213,7 +213,7 @@ rtems_status_code net_if_remove(struct netif *netif)
  *
  * @param netif      the networking interface
 
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_if_get_hwaddr(struct netif *netif)
 {
@@ -229,7 +229,7 @@ rtems_status_code net_if_get_hwaddr(struct netif *netif)
 
     SMEMCPY(netif->hwaddr, &card_mac, netif->hwaddr_len);
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 /*
@@ -246,7 +246,7 @@ rtems_status_code net_if_get_hwaddr(struct netif *netif)
  * @param netif     the LWIP netif
  * @param pbuf      packet buffer to be added
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_if_add_rx_buf(struct netif *netif, struct pbuf *pbuf)
 {
@@ -296,7 +296,7 @@ rtems_status_code net_if_add_rx_buf(struct netif *netif, struct pbuf *pbuf)
  * @param netif     the LWIP netif
  * @param pbuf      packt boffer to be transmitted
  *
- * @return  SYS_ERR_OK on success, errval on failure
+ * @return  RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_if_add_tx_buf(struct netif *netif, struct pbuf *pbuf)
 {
@@ -373,7 +373,7 @@ rtems_status_code net_if_add_tx_buf(struct netif *netif, struct pbuf *pbuf)
         }
     }
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 
@@ -391,7 +391,7 @@ rtems_status_code net_if_add_tx_buf(struct netif *netif, struct pbuf *pbuf)
  *
  * @param netif     the LWIP netif to be polled
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_if_poll(struct netif *netif)
 {
@@ -403,7 +403,7 @@ rtems_status_code net_if_poll(struct netif *netif)
     if (st == NULL) {
         /* XXX: return an error code ?? */
         debug_printf("FOOBAR\n");
-        return SYS_ERR_OK;
+        return RTEMS_SUCCESSFUL;
     }
 
     //for (int i = 0; i < NET_IF_POLL_MAX; i++) {
@@ -417,7 +417,7 @@ rtems_status_code net_if_poll(struct netif *netif)
 
 
 #if BENCH_DEVQ_DEQUEUE
-        if (err == SYS_ERR_OK) {
+        if (err == RTEMS_SUCCESSFUL) {
             cycles_t end = rdtsc();
             if (buf.flags & NETIF_TXFLAG) {
                 bench_devq_deq_tx += end - tsc_start;
@@ -443,7 +443,7 @@ rtems_status_code net_if_poll(struct netif *netif)
 #endif
         if (err_is_fail(err)) {
             if (err_no(err) == DEVQ_ERR_QUEUE_EMPTY) {
-                return SYS_ERR_OK;
+                return RTEMS_SUCCESSFUL;
             }
             return err;
         }
@@ -522,13 +522,13 @@ rtems_status_code net_if_poll(struct netif *netif)
             debug_printf("WARNING: got buffer without a flag\n");
         }
     }
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 /**
  * @brief polls all added network interfaces
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_if_poll_all(void)
 {
@@ -544,5 +544,5 @@ rtems_status_code net_if_poll_all(void)
     }
     netif_poll_all();
     net_lwip_timeout();
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }

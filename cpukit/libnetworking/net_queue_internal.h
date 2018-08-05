@@ -32,7 +32,7 @@ typedef void (*inthandler_t)(void*);
  * @param poll      Is the queue polled or are interrupts used
  * @param retqueue  returns the pointer to the queue
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_queue_internal_create(inthandler_t interrupt, const char *cardname,
                                    uint64_t* queueid, bool default_q, bool poll,

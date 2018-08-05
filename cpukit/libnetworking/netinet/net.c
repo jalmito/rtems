@@ -42,7 +42,7 @@ struct deferred_event net_lwip_timer;
  * @param queue     returns the queue to be used
  * @param cardname  returns the card name to be used
  *
- * @return SYS_ERR_OK on success, SKB_ERR_* on failure
+ * @return RTEMS_SUCCESSFUL on success, SKB_ERR_* on failure
  */
 rtems_status_code networking_get_defaults(uint64_t *queue, const char **cardname, uint32_t *flags)
 {
@@ -54,7 +54,7 @@ rtems_status_code networking_get_defaults(uint64_t *queue, const char **cardname
     *flags = NET_FLAGS_POLLING | NET_FLAGS_BLOCKING_INIT;
     //*flags = NET_FLAGS_POLLING;
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 static void int_handler(void* args)
@@ -103,7 +103,7 @@ void net_lwip_timeout(void)
  * @param queueid   queueid of the network card
  * @param retqueue  returns the pointer to the queue
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code networking_create_queue(const char *cardname, uint64_t* queueid,
                                  struct devq **retqueue)
@@ -133,7 +133,7 @@ static rtems_status_code networking_poll_st(struct net_state *st)
  * @param q         the device queue to initialize the networking on
  * @param flags     supplied initialization flags
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 static rtems_status_code networking_init_with_queue_st(struct net_state *st, struct devq *q,
                                               net_flags_t flags)
@@ -145,7 +145,7 @@ static rtems_status_code networking_init_with_queue_st(struct net_state *st, str
 
     if (st->initialized) {
         debug_printf("WARNING. initialize called twice. Ignoring\n");
-        return SYS_ERR_OK;
+        return RTEMS_SUCCESSFUL;
     }
 
     /* set the variables */
@@ -237,7 +237,7 @@ static rtems_status_code networking_init_with_queue_st(struct net_state *st, str
 
     NETDEBUG("initialization complete.\n");
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 
     out_err1:
     st->initialized = false;
@@ -253,7 +253,7 @@ static rtems_status_code networking_init_with_queue_st(struct net_state *st, str
  * @param nic       the nic to use with the networking library
  * @param flags     flags to use to initialize the networking library
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 static rtems_status_code networking_init_st(struct net_state *st, const char *nic,
                                    net_flags_t flags)
@@ -265,7 +265,7 @@ static rtems_status_code networking_init_st(struct net_state *st, const char *ni
 
     if(st->initialized) {
         NETDEBUG("WARNING. initialize called twice. Ignoring\n");
-        return SYS_ERR_OK;
+        return RTEMS_SUCCESSFUL;
     }
 
     st->cardname = nic;
@@ -294,7 +294,7 @@ static rtems_status_code networking_init_st(struct net_state *st, const char *ni
  *
  * @param st    the networking state to be initialized
  *
- * @return SYS_ERR_OK on sucess, errval on failure
+ * @return RTEMS_SUCCESSFUL on sucess, errval on failure
  */
 static rtems_status_code networking_init_default_st(struct net_state *st)
 {
@@ -304,7 +304,7 @@ static rtems_status_code networking_init_default_st(struct net_state *st)
 
     if(st->initialized) {
         NETDEBUG("WARNING. initialize called twice. Ignoring\n");
-        return SYS_ERR_OK;
+        return RTEMS_SUCCESSFUL;
     }
 
     // obtain the settings to create the queue
@@ -330,7 +330,7 @@ static rtems_status_code networking_init_default_st(struct net_state *st)
  * @param q         the device queue to initialize the networking on
  * @param flags     supplied initialization flags
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code networking_init_with_queue(struct devq *q, net_flags_t flags)
 {
@@ -344,7 +344,7 @@ rtems_status_code networking_init_with_queue(struct devq *q, net_flags_t flags)
  * @param nic       the nic to use with the networking library
  * @param flags     flags to use to initialize the networking library
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code networking_init(const char *nic, net_flags_t flags)
 {
@@ -356,7 +356,7 @@ rtems_status_code networking_init(const char *nic, net_flags_t flags)
 /**
  * @brief initializes the networking with the defaults
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code networking_init_default(void)
 {
@@ -368,7 +368,7 @@ rtems_status_code networking_init_default(void)
 /**
  * @brief polls the network for new packets
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code networking_poll(void)
 {
@@ -385,7 +385,7 @@ rtems_status_code networking_poll(void)
  * @param src_port  source port of the filter, 0 for wildcard
  * @param dst_port  destination port fo the filter
  *
- * @return SYS_ERR_OK on success, NET_FILTER_ERR_* on failure
+ * @return RTEMS_SUCCESSFUL on success, NET_FILTER_ERR_* on failure
  */
 rtems_status_code networking_install_ip_filter(bool tcp, struct in_addr *src,
                                       uint16_t src_port, uint16_t dst_port)
@@ -429,7 +429,7 @@ rtems_status_code networking_install_ip_filter(bool tcp, struct in_addr *src,
  * @param src_port  source port of the filter, 0 for wildcard
  * @param dst_port  destination port fo the filter
  *
- * @return SYS_ERR_OK on success, NET_FILTER_ERR_* on failure
+ * @return RTEMS_SUCCESSFUL on success, NET_FILTER_ERR_* on failure
  */
 rtems_status_code networking_remove_ip_filter(bool tcp, struct in_addr *src,
                                      uint16_t src_port, uint16_t dst_port)

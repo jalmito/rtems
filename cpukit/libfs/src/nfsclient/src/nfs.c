@@ -86,8 +86,8 @@ static void mount_reply_handler(struct rpc_client *rpc_client, void *arg1,
 
         // lookup NFS port
         r = portmap_lookup(client, NFS_PROGRAM, NFS_V3);
-        assert(r == SYS_ERR_OK);
-        if (r != SYS_ERR_OK) {
+        assert(r == RTEMS_SUCCESSFUL);
+        if (r != RTEMS_SUCCESSFUL) {
             goto error;
         }
         client->mount_state = NFS_INIT_GETPORT_NFS;
@@ -104,8 +104,8 @@ static void mount_reply_handler(struct rpc_client *rpc_client, void *arg1,
                     (void *)&client->mount_path,
                     RNDUP(strlen(client->mount_path)) + BYTES_PER_XDR_UNIT,
                     mount_reply_handler, NULL, NULL);
-        assert(r == SYS_ERR_OK);
-        if (r != SYS_ERR_OK) {
+        assert(r == RTEMS_SUCCESSFUL);
+        if (r != RTEMS_SUCCESSFUL) {
             goto error;
         }
         client->mount_state = NFS_INIT_MOUNT;
@@ -185,7 +185,7 @@ struct nfs_client *nfs_mount(struct in_addr server, const char *path,
     }
     NFSDEBUGPRINT("nfs_mount: calling rpc_init\n");
     rtems_status_code r = rpc_init(&client->rpc_client, server);
-    if (r != SYS_ERR_OK) {
+    if (r != RTEMS_SUCCESSFUL) {
         free(client);
         return NULL;
     }
@@ -199,7 +199,7 @@ struct nfs_client *nfs_mount(struct in_addr server, const char *path,
     NFSDEBUGPRINT("nfs_mount: calling portmap_lookup\n");
     r = portmap_lookup(client, MOUNT_PROGRAM, MOUNT_V3);
     NFSDEBUGPRINT("nfs_mount: portmap_lookup done \n");
-    if (r != SYS_ERR_OK) {
+    if (r != RTEMS_SUCCESSFUL) {
         nfs_destroy(client);
         return NULL;
     }
@@ -254,7 +254,7 @@ static void getattr_reply_handler(struct rpc_client *rpc_client, void *arg1,
  * \param callback Callback function to call when operation returns
  * \param cbarg Opaque argument word passed to callback function
  *
- * \returns SYS_ERR_OK on success, error code on failure
+ * \returns RTEMS_SUCCESSFUL on success, error code on failure
  */
 rtems_status_code nfs_getattr(struct nfs_client *client, struct nfs_fh3 fh,
                   nfs_getattr_callback_t callback, void *cbarg)
@@ -309,7 +309,7 @@ static void setattr_reply_handler(struct rpc_client *rpc_client, void *arg1,
  * \param callback Callback function to call when operation returns
  * \param cbarg Opaque argument word passed to callback function
  *
- * \returns SYS_ERR_OK on success, error code on failure
+ * \returns RTEMS_SUCCESSFUL on success, error code on failure
  */
 rtems_status_code nfs_setattr(struct nfs_client *client, struct nfs_fh3 fh,
                   sattr3 new_attributes, bool guarded,
@@ -370,7 +370,7 @@ static void readdir_reply_handler(struct rpc_client *rpc_client, void *arg1,
  * \param callback Callback function to call when operation returns
  * \param cbarg Opaque argument word passed to callback function
  *
- * \returns SYS_ERR_OK on success, error code on failure
+ * \returns RTEMS_SUCCESSFUL on success, error code on failure
  */
 rtems_status_code nfs_readdir(struct nfs_client *client, struct nfs_fh3 fh,
                   cookie3 cookie, cookieverf3 cookieverf,
@@ -431,7 +431,7 @@ static void readdirplus_reply_handler(struct rpc_client *rpc_client, void *arg1,
  * \param callback Callback function to call when operation returns
  * \param cbarg Opaque argument word passed to callback function
  *
- * \returns SYS_ERR_OK on success, error code on failure
+ * \returns RTEMS_SUCCESSFUL on success, error code on failure
  */
 rtems_status_code nfs_readdirplus(struct nfs_client *client, struct nfs_fh3 fh,
                       cookie3 cookie, cookieverf3 cookieverf,
@@ -494,7 +494,7 @@ static void lookup_reply_handler(struct rpc_client *rpc_client, void *arg1,
  * \param callback Callback function to call when operation returns
  * \param cbarg Opaque argument word passed to callback function
  *
- * \returns SYS_ERR_OK on success, error code on failure
+ * \returns RTEMS_SUCCESSFUL on success, error code on failure
  */
 rtems_status_code nfs_lookup(struct nfs_client *client, struct nfs_fh3 dirfh,
                  const char *name, nfs_lookup_callback_t callback, void *cbarg)
@@ -551,7 +551,7 @@ static void access_reply_handler(struct rpc_client *rpc_client, void *arg1,
  * \param callback Callback function to call when operation returns
  * \param cbarg Opaque argument word passed to callback function
  *
- * \returns SYS_ERR_OK on success, error code on failure
+ * \returns RTEMS_SUCCESSFUL on success, error code on failure
  */
 rtems_status_code nfs_access(struct nfs_client *client, struct nfs_fh3 fh, uint32_t access,
                  nfs_access_callback_t callback, void *cbarg)
@@ -606,7 +606,7 @@ static void read_reply_handler(struct rpc_client *rpc_client, void *arg1,
  * \param callback Callback function to call when operation returns
  * \param cbarg Opaque argument word passed to callback function
  *
- * \returns SYS_ERR_OK on success, error code on failure
+ * \returns RTEMS_SUCCESSFUL on success, error code on failure
  */
 rtems_status_code nfs_read(struct nfs_client *client, struct nfs_fh3 fh, offset3 offset,
                count3 count, nfs_read_callback_t callback, void *cbarg)
@@ -668,7 +668,7 @@ static void write_reply_handler(struct rpc_client *rpc_client, void *arg1,
  * \param callback Callback function to call when operation returns
  * \param cbarg Opaque argument word passed to callback function
  *
- * \returns SYS_ERR_OK on success, error code on failure
+ * \returns RTEMS_SUCCESSFUL on success, error code on failure
  */
 rtems_status_code nfs_write(struct nfs_client *client, struct nfs_fh3 fh, offset3 offset,
                 const void *data, count3 count, stable_how stable,
@@ -733,7 +733,7 @@ static void create_reply_handler(struct rpc_client *rpc_client, void *arg1,
  *
  * \todo Exclusive create will be implemented by a different call.
  *
- * \returns SYS_ERR_OK on success, error code on failure
+ * \returns RTEMS_SUCCESSFUL on success, error code on failure
  */
 rtems_status_code nfs_create(struct nfs_client *client, struct nfs_fh3 dir,
                  const char *name, bool guarded, sattr3 attributes,
@@ -795,7 +795,7 @@ static void mkdir_reply_handler(struct rpc_client *rpc_client, void *arg1,
  * \param callback Callback function to call when operation returns
  * \param cbarg Opaque argument word passed to callback function
  *
- * \returns SYS_ERR_OK on success, error code on failure
+ * \returns RTEMS_SUCCESSFUL on success, error code on failure
  */
 rtems_status_code nfs_mkdir(struct nfs_client *client, struct nfs_fh3 dir, const char *name,
                 sattr3 attributes, nfs_mkdir_callback_t callback, void *cbarg)
@@ -852,7 +852,7 @@ static void remove_reply_handler(struct rpc_client *rpc_client, void *arg1,
  * \param callback Callback function to call when operation returns
  * \param cbarg Opaque argument word passed to callback function
  *
- * \returns SYS_ERR_OK on success, error code on failure
+ * \returns RTEMS_SUCCESSFUL on success, error code on failure
  */
 rtems_status_code nfs_remove(struct nfs_client *client, struct nfs_fh3 dir,
                  const char *name, nfs_remove_callback_t callback,
@@ -887,7 +887,7 @@ void nfs_destroy(struct nfs_client *client)
 rtems_status_code nfsstat_to_errval(enum nfsstat3 s)
 {
     switch(s) {
-    case NFS3_OK: return SYS_ERR_OK;
+    case NFS3_OK: return RTEMS_SUCCESSFUL;
     case NFS3ERR_PERM: return NFS_ERR_PERM;
     case NFS3ERR_NOENT: return NFS_ERR_NOENT;
     case NFS3ERR_IO: return NFS_ERR_IO;
@@ -923,7 +923,7 @@ rtems_status_code nfsstat_to_errval(enum nfsstat3 s)
 rtems_status_code mountstat_to_errval(enum mountstat3 s)
 {
     switch(s) {
-    case MNT3_OK: return SYS_ERR_OK;
+    case MNT3_OK: return RTEMS_SUCCESSFUL;
     case MNT3ERR_PERM: return NFS_ERR_MNT_PERM;
     case MNT3ERR_NOENT: return NFS_ERR_MNT_NOENT;
     case MNT3ERR_IO: return NFS_ERR_MNT_IO;

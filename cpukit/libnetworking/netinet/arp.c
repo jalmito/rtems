@@ -128,7 +128,7 @@ static rtems_status_code connect_ARP_cb(void *st, struct net_ARP_binding *b)
 {   
     b->st = st;
     b->rx_vtbl = rx_arp_vtbl;
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 } 
 
 /*****************************************************************
@@ -231,7 +231,7 @@ static rtems_status_code arp_service_start_st(struct net_state *st)
 
     st->arp_running = true;
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 rtems_status_code arp_service_start(void)
@@ -321,7 +321,7 @@ static rtems_status_code arp_connect(struct net_state* st)
             event_dispatch(get_default_waitset());
         }
     }
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 rtems_status_code arp_service_get_mac(uint32_t ip, uint64_t* mac)
@@ -365,6 +365,6 @@ rtems_status_code arp_service_get_mac(uint32_t ip, uint64_t* mac)
         DEBUG_ERR(err, "failed to read the entrie\n");
     }
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 

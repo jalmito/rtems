@@ -29,7 +29,7 @@
  *
  * @param flags flags to provide
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code dhcpd_start(net_flags_t flags);
 
@@ -48,7 +48,7 @@ rtems_status_code dhcpd_stop(void);
  * @param flags         flags to provide
  * @param ip_address    Current Ip address
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_config_current_ip_query(net_flags_t flags, uint32_t* ip_address);
 
@@ -58,7 +58,7 @@ rtems_status_code net_config_current_ip_query(net_flags_t flags, uint32_t* ip_ad
  *
  * @param flags flags to provide
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_config_static_ip_query(net_flags_t flags);
 
@@ -81,7 +81,7 @@ rtems_status_code netif_get_ipconfig(struct in_addr *ip, struct in_addr *gw, str
  * @param gw    the Gateway
  * @param nm    the Netmask
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code netif_set_ipconfig(struct in_addr *ip, struct in_addr *gw, struct in_addr *nm);
 

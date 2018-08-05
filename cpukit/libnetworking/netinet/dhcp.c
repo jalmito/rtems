@@ -65,7 +65,7 @@ static bool dhcpd_has_ip(void)
  *
  * @param flags flags to provide
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code dhcpd_start(net_flags_t flags)
 {
@@ -113,7 +113,7 @@ rtems_status_code dhcpd_start(net_flags_t flags)
         printf("OK\nDHCP completed.\n");
     }
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 
@@ -131,14 +131,14 @@ rtems_status_code dhcpd_stop(void)
     st->dhcp_ticks = 0;
     st->dhcp_running = 0;
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 
 /**
  * @brief queries the current ip setting of the machine
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_config_current_ip_query(net_flags_t flags, uint32_t* ip_address)
 {
@@ -184,14 +184,14 @@ rtems_status_code net_config_current_ip_query(net_flags_t flags, uint32_t* ip_ad
     debug_printf("Got current GW set: %s\n", inet_ntoa(gateway));
     debug_printf("Got current NM set: %s\n", inet_ntoa(netmask));
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 
 /**
  * @brief queries the static ip setting of the machine and sets it
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code net_config_static_ip_query(net_flags_t flags)
 {
@@ -239,7 +239,7 @@ rtems_status_code net_config_static_ip_query(net_flags_t flags)
         return err;
     }
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 
@@ -267,7 +267,7 @@ rtems_status_code netif_get_ipconfig(struct in_addr *ip, struct in_addr *gw, str
         nm->s_addr = netif_ip4_netmask(&st->netif)->addr;
     }
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }
 
 /**
@@ -277,7 +277,7 @@ rtems_status_code netif_get_ipconfig(struct in_addr *ip, struct in_addr *gw, str
  * @param gw    the Gateway
  * @param nm    the Netmask
  *
- * @return SYS_ERR_OK on success, errval on failure
+ * @return RTEMS_SUCCESSFUL on success, errval on failure
  */
 rtems_status_code netif_set_ipconfig(struct in_addr *ip, struct in_addr *gw, struct in_addr *nm)
 {
@@ -298,5 +298,5 @@ rtems_status_code netif_set_ipconfig(struct in_addr *ip, struct in_addr *gw, str
     netif_set_addr(&st->netif, &_ipaddr, &_netmask, &_gateway);
     netif_set_up(&st->netif);
 
-    return SYS_ERR_OK;
+    return RTEMS_SUCCESSFUL;
 }

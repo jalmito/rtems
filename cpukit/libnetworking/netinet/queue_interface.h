@@ -52,7 +52,7 @@ struct devq_buf{
  * @param valid_length  Length of the valid data of this buffer
  * @param misc_flags    Any other argument that makes sense to the device queue
  *
- * @returns error on failure or SYS_ERR_OK on success
+ * @returns error on failure or RTEMS_SUCCESSFUL on success
  *
  */
 rtems_status_code devq_enqueue(struct devq *q,
@@ -78,7 +78,7 @@ rtems_status_code devq_enqueue(struct devq *q,
  *                      this buffer
  * @param misc_flags    Return value from other endpoint
  *
- * @returns error on failure or SYS_ERR_OK on success
+ * @returns error on failure or RTEMS_SUCCESSFUL on success
  *
  */
 rtems_status_code devq_dequeue(struct devq *q,
@@ -104,7 +104,7 @@ rtems_status_code devq_dequeue(struct devq *q,
  * @param region_id      Return pointer to a region id that is assigned
  *                       to the memory
  *
- * @returns error on failure or SYS_ERR_OK on success
+ * @returns error on failure or RTEMS_SUCCESSFUL on success
  *
  */
 rtems_status_code devq_register(struct devq *q,
@@ -119,7 +119,7 @@ rtems_status_code devq_register(struct devq *q,
  *                       queues memory
  * @param cap            The capability to the removed memory
  *
- * @returns error on failure or SYS_ERR_OK on success
+ * @returns error on failure or RTEMS_SUCCESSFUL on success
  *
  */
 rtems_status_code devq_deregister(struct devq *q,
@@ -131,7 +131,7 @@ rtems_status_code devq_deregister(struct devq *q,
  *
  * @param q      The device queue to call the operation on
  *
- * @returns error on failure or SYS_ERR_OK on success
+ * @returns error on failure or RTEMS_SUCCESSFUL on success
  *
  */
 rtems_status_code devq_notify(struct devq *q);
@@ -142,7 +142,7 @@ rtems_status_code devq_notify(struct devq *q);
  *
  * @param q      The device queue to call the operation on
  *
- * @returns error on failure or SYS_ERR_OK on success
+ * @returns error on failure or RTEMS_SUCCESSFUL on success
  *
  */
 rtems_status_code devq_prepare(struct devq *q);
@@ -154,7 +154,7 @@ rtems_status_code devq_prepare(struct devq *q);
  * @param request    The type of the control message*
  * @param value      The value for the request
  *
- * @returns error on failure or SYS_ERR_OK on success
+ * @returns error on failure or RTEMS_SUCCESSFUL on success
  *
  */
 rtems_status_code devq_control(struct devq *q,
@@ -169,7 +169,7 @@ rtems_status_code devq_control(struct devq *q,
   * @param q           The queue state to free (and the device queue to be 
                        shut down)
   *
-  * @returns error on failure or SYS_ERR_OK on success
+  * @returns error on failure or RTEMS_SUCCESSFUL on success
   */
 rtems_status_code devq_destroy(struct devq *q);
 
