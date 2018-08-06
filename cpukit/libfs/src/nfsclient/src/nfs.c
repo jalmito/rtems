@@ -925,6 +925,7 @@ return s;
 
 rtems_status_code mountstat_to_errval(enum mountstat3 s)
 {
+#if 0
     switch(s) {
     case MNT3_OK: return RTEMS_SUCCESSFUL;
     case MNT3ERR_PERM: return NFS_ERR_MNT_PERM;
@@ -938,4 +939,6 @@ rtems_status_code mountstat_to_errval(enum mountstat3 s)
     case MNT3ERR_SERVERFAULT: return NFS_ERR_MNT_SERVERFAULT;
     default: return NFS_ERR_TRANSPORT; // XXX: unknown
     }
+#endif
+return s;
 }
