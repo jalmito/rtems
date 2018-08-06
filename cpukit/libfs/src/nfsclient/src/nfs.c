@@ -886,6 +886,7 @@ void nfs_destroy(struct nfs_client *client)
 
 rtems_status_code nfsstat_to_errval(enum nfsstat3 s)
 {
+#if 0
     switch(s) {
     case NFS3_OK: return RTEMS_SUCCESSFUL;
     case NFS3ERR_PERM: return NFS_ERR_PERM;
@@ -918,6 +919,8 @@ rtems_status_code nfsstat_to_errval(enum nfsstat3 s)
     case NFS3ERR_JUKEBOX: return NFS_ERR_JUKEBOX;
     default: return NFS_ERR_TRANSPORT; // XXX: unknown
     }
+#endif
+return s;
 }
 
 rtems_status_code mountstat_to_errval(enum mountstat3 s)
