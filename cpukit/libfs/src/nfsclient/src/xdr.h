@@ -45,7 +45,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <arpa/inet.h> /* for ntohl/htonl */
+#include <lwip/inet.h> /* for ntohl/htonl */
 #include <sys/types.h>
 #include <sys/cdefs.h>
 
