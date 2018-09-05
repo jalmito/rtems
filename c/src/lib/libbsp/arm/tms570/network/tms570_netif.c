@@ -32,18 +32,17 @@
  */
 
 /* lwIP headers */
-#include <lwip/init.h>
+#include "lwip/init.h"
 #if LWIP_VERSION_MAJOR >= 2
-#include <lwip/timeouts.h>
+#include "lwip/timeouts.h"
 #else /*LWIP_VERSION_MAJOR*/
-#include <lwip/timers.h> /* for DHCP binding in NO_SYS mode */
+#include "lwip/timers.h" /* for DHCP binding in NO_SYS mode */
 #endif /*LWIP_VERSION_MAJOR*/
-#include <lwip/sys.h> /* includes - lwip/opt.h, lwip/err.h, arch/sys_arch.h */
-#include <arch/sys_arch.h> /* includes - lwip/opt.h, lwip/err.h, arch/sys_arch.h */
-#include <lwip/tcpip.h> /* includes - lwip/opt.h, lwip/api_msg.h, lwip/netifapi.h, lwip/pbuf.h, lwip/api.h, lwip/sys.h, lwip/timers.h, lwip/netif.h */
-#include <lwip/stats.h> /* includes - lwip/mem.h, lwip/memp.h, lwip/opt.h */
-#include <lwip/snmp.h>
-#include <netif/etharp.h> /* includes - lwip/ip.h, lwip/netif.h, lwip/ip_addr.h, lwip/pbuf.h */
+#include "lwip/sys.h" /* includes - lwip/opt.h, lwip/err.h, arch/sys_arch.h */
+#include "lwip/tcpip.h" /* includes - lwip/opt.h, lwip/api_msg.h, lwip/netifapi.h, lwip/pbuf.h, lwip/api.h, lwip/sys.h, lwip/timers.h, lwip/netif.h */
+#include "lwip/stats.h" /* includes - lwip/mem.h, lwip/memp.h, lwip/opt.h */
+#include "lwip/snmp.h"
+#include "netif/etharp.h" /* includes - lwip/ip.h, lwip/netif.h, lwip/ip_addr.h, lwip/pbuf.h */
 /* end - lwIP headers */
 
 //--------moje
@@ -51,20 +50,17 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <bsp/tms570.h>
-#include <bsp/irq.h>
 #include <bsp/tms570-pinmux.h>
-#include <arch/cc.h>
-#include "eth_lwip.h"
-#include "tms570_netif.h"
+#include "arch/cc.h"
+#include "arch/eth_lwip.h"
+#include "arch/tms570_netif.h"
 #include "ti_drv_emac.h"
 #include "ti_drv_mdio.h"
-//#include "../include/HL_phy_dp83640.h"
 #include "phy_dp83848h.h"
 #include "tms570_emac.h"
 
 #define LINK_SPEED_OF_YOUR_NETIF_IN_BPS 10000000
 
-#define TMS_EMAC_RMII
 /* Number of EMAC Instances */
 
 #define DEFAULT_PHY_ADDR            0x1
@@ -81,9 +77,9 @@
 /* take in account oversized frames */
 #define MAX_TRANSFER_UNIT           1500
 
-//#ifndef TMS570_MMR_SELECT_GMII_SEL
-//  #define TMS570_MMR_SELECT_GMII_SEL TMS570_BALL_XX_GMII_SEL
-//#endif
+#ifndef TMS570_MMR_SELECT_GMII_SEL
+  #define TMS570_MMR_SELECT_GMII_SEL TMS570_BALL_XX_GMII_SEL
+#endif
 
 #ifndef TMS570_BALL_K19_MII_RXCLK
   #define TMS570_BALL_K19_MII_RXCLK TMS570_BALL_K19_MII_RX_CLK
@@ -335,20 +331,9 @@ tms570_eth_init_set_pinmux(void)
 #if defined(__rtems__)
   TMS570_IOMM.KICK_REG0 = 0x83E70B13U;
   TMS570_IOMM.KICK_REG1 = 0x95A4F1E0U;
+
   tms570_bsp_pin_set_function(TMS570_BALL_V5_MDCLK, TMS570_PIN_FNC_AUTO);
   tms570_bsp_pin_set_function(TMS570_BALL_G3_MDIO, TMS570_PIN_FNC_AUTO);
-	#if defined (TMS_EMAC_RMII)
-  tms570_bsp_pin_set_function(TMS570_BALL_H19_RMII_TXEN, TMS570_PIN_FNC_AUTO);
-  tms570_bsp_pin_set_function(TMS570_BALL_J19_RMII_TXD_1, TMS570_PIN_FNC_AUTO);
-  tms570_bsp_pin_set_function(TMS570_BALL_J18_RMII_TXD_0, TMS570_PIN_FNC_AUTO);
-  tms570_bsp_pin_set_function(TMS570_BALL_B4_RMII_CRS_DV, TMS570_PIN_FNC_AUTO);
-  tms570_bsp_pin_set_function(TMS570_BALL_K19_RMII_REFCLK, TMS570_PIN_FNC_AUTO);
-  tms570_bsp_pin_set_function(TMS570_BALL_P1_RMII_RXD_0, TMS570_PIN_FNC_AUTO);
-  tms570_bsp_pin_set_function(TMS570_BALL_A14_RMII_RXD_1, TMS570_PIN_FNC_AUTO);
-  tms570_bsp_pin_set_function(TMS570_BALL_B4_RMII_CRS_DV, TMS570_PIN_FNC_AUTO); 
-  tms570_bsp_pin_set_function(TMS570_BALL_N19_RMII_RX_ER, TMS570_PIN_FNC_AUTO);
- 
-	#else
   tms570_bsp_pin_set_function(TMS570_BALL_H19_MII_TXEN, TMS570_PIN_FNC_AUTO);
   tms570_bsp_pin_set_function(TMS570_BALL_E18_MII_TXD_3, TMS570_PIN_FNC_AUTO);
   tms570_bsp_pin_set_function(TMS570_BALL_R2_MII_TXD_2, TMS570_PIN_FNC_AUTO);
@@ -364,8 +349,7 @@ tms570_eth_init_set_pinmux(void)
   tms570_bsp_pin_set_function(TMS570_BALL_B11_MII_RX_DV, TMS570_PIN_FNC_AUTO);
   tms570_bsp_pin_set_function(TMS570_BALL_B4_MII_CRS, TMS570_PIN_FNC_AUTO);
   tms570_bsp_pin_set_function(TMS570_BALL_F3_MII_COL, TMS570_PIN_FNC_AUTO);
-	#endif
-  //tms570_bsp_pin_clear_function(TMS570_MMR_SELECT_GMII_SEL, TMS570_PIN_FNC_AUTO);
+  tms570_bsp_pin_clear_function(TMS570_MMR_SELECT_GMII_SEL, TMS570_PIN_FNC_AUTO);
 
   TMS570_IOMM.KICK_REG0 = 0;
   TMS570_IOMM.KICK_REG1 = 0;
@@ -1241,4 +1225,3 @@ tms570_eth_debug_show_tx(struct tms570_netif_state *nf_state)
   tms570_eth_debug_show_BD_chain_tx(nf_state->txch.active_head, nf_state);
 }
 #endif /* if TMS570_NETIF_DEBUG */
-

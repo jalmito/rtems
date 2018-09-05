@@ -36,7 +36,7 @@
 
 #include <stdio.h>
 #include <stdbool.h>
-#include <lwip/src/include/lwip/netif.h>
+#include <lwip/netif.h>
 
 
 /**

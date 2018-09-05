@@ -52,6 +52,193 @@ $(PROJECT_INCLUDE)/arpa/nameser_compat.h: arpa/nameser_compat.h $(PROJECT_INCLUD
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/arpa/nameser_compat.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/arpa/nameser_compat.h
 
+$(PROJECT_INCLUDE)/lwip/$(dirstamp):
+	@$(MKDIR_P) $(PROJECT_INCLUDE)/lwip
+	@: > $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+PREINSTALL_DIRS += $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+
+$(PROJECT_INCLUDE)/lwip/dhcp.h: lwip/src/include/lwip/dhcp.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/dhcp.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/dhcp.h
+
+$(PROJECT_INCLUDE)/lwip/init.h: lwip/src/include/lwip/init.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/init.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/init.h
+
+$(PROJECT_INCLUDE)/lwip/udp.h: lwip/src/include/lwip/udp.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/udp.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/udp.h
+
+$(PROJECT_INCLUDE)/lwip/tcpip.h: lwip/src/include/lwip/tcpip.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/tcpip.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/tcpip.h
+
+$(PROJECT_INCLUDE)/lwip/sys.h: lwip/src/include/lwip/sys.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/sys.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/sys.h
+
+$(PROJECT_INCLUDE)/lwip/arch.h: lwip/src/include/lwip/arch.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/arch.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/arch.h
+
+$(PROJECT_INCLUDE)/lwip/opt.h: lwip/src/include/lwip/opt.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/opt.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/opt.h
+
+$(PROJECT_INCLUDE)/lwip/lwipopts.h: lwip/ports/os/rtems/lwipopts.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/lwipopts.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/lwipopts.h
+
+$(PROJECT_INCLUDE)/lwip/debug.h: lwip/src/include/lwip/debug.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/debug.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/debug.h
+
+$(PROJECT_INCLUDE)/lwip/timers.h: lwip/src/include/lwip/timers.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/timers.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/timers.h
+
+$(PROJECT_INCLUDE)/lwip/sockets.h: lwip/src/include/lwip/sockets.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/sockets.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/sockets.h
+
+$(PROJECT_INCLUDE)/lwip/api.h: lwip/src/include/lwip/api.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/api.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/api.h
+
+$(PROJECT_INCLUDE)/lwip/err.h: lwip/src/include/lwip/err.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/err.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/err.h
+
+$(PROJECT_INCLUDE)/lwip/api_msg.h: lwip/src/include/lwip/api_msg.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/api_msg.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/api_msg.h
+
+$(PROJECT_INCLUDE)/lwip/netifapi.h: lwip/src/include/lwip/netifapi.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/netifapi.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/netifapi.h
+
+$(PROJECT_INCLUDE)/lwip/netbuf.h: lwip/src/include/lwip/netbuf.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/netbuf.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/netbuf.h
+
+$(PROJECT_INCLUDE)/lwip/pbuf.h: lwip/src/include/lwip/pbuf.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/pbuf.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/pbuf.h
+
+$(PROJECT_INCLUDE)/lwip/netif.h: lwip/src/include/lwip/netif.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/netif.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/netif.h
+
+$(PROJECT_INCLUDE)/lwip/def.h: lwip/src/include/lwip/def.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/def.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/def.h
+
+$(PROJECT_INCLUDE)/lwip/mem.h: lwip/src/include/lwip/mem.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/mem.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/mem.h
+
+$(PROJECT_INCLUDE)/lwip/memp.h: lwip/src/include/lwip/memp.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/memp.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/memp.h
+
+$(PROJECT_INCLUDE)/lwip/memp_std.h: lwip/src/include/lwip/memp_std.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/memp_std.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/memp_std.h
+
+$(PROJECT_INCLUDE)/lwip/stats.h: lwip/src/include/lwip/stats.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/stats.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/stats.h
+
+$(PROJECT_INCLUDE)/lwip/snmp.h: lwip/src/include/lwip/snmp.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/snmp.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/snmp.h
+
+$(PROJECT_INCLUDE)/lwip/lwiplib.h: lwip/ports/hdk/include/lwiplib.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/lwiplib.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/lwiplib.h
+
+$(PROJECT_INCLUDE)/lwip/ip.h: lwip/src/include/ipv4/lwip/ip.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/ip.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/ip.h
+
+$(PROJECT_INCLUDE)/lwip/inet.h: lwip/src/include/ipv4/lwip/inet.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/inet.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/inet.h
+
+$(PROJECT_INCLUDE)/lwip/ip_addr.h: lwip/src/include/ipv4/lwip/ip_addr.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/ip_addr.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/ip_addr.h
+
+$(PROJECT_INCLUDE)/lwip/igmp.h: lwip/src/include/ipv4/lwip/igmp.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/igmp.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/igmp.h
+
+$(PROJECT_INCLUDE)/lwip/icmp.h: lwip/src/include/ipv4/lwip/icmp.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/icmp.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/icmp.h
+
+$(PROJECT_INCLUDE)/lwip/autoip.h: lwip/src/include/ipv4/lwip/autoip.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/autoip.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/autoip.h
+
+$(PROJECT_INCLUDE)/lwip/tcp_impl.h: lwip/src/include/lwip/tcp_impl.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/tcp_impl.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/tcp_impl.h
+
+$(PROJECT_INCLUDE)/lwip/tcp.h: lwip/src/include/lwip/tcp.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/tcp.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/tcp.h
+
+$(PROJECT_INCLUDE)/lwip/ip_frag.h: lwip/src/include/ipv4/lwip/ip_frag.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/ip_frag.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/ip_frag.h
+
+$(PROJECT_INCLUDE)/lwip/sio.h: lwip/src/include/lwip/sio.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/sio.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/sio.h
+
+$(PROJECT_INCLUDE)/lwip/snmp_asn1.h: lwip/src/include/lwip/snmp_asn1.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/snmp_asn1.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/snmp_asn1.h
+
+$(PROJECT_INCLUDE)/lwip/dns.h: lwip/src/include/lwip/dns.h $(PROJECT_INCLUDE)/lwip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/lwip/dns.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/lwip/dns.h
+
+$(PROJECT_INCLUDE)/netif/$(dirstamp):
+	@$(MKDIR_P) $(PROJECT_INCLUDE)/netif
+	@: > $(PROJECT_INCLUDE)/netif/$(dirstamp)
+PREINSTALL_DIRS += $(PROJECT_INCLUDE)/netif/$(dirstamp)
+
+$(PROJECT_INCLUDE)/netif/loopif.h: lwip/src/include/netif/loopif.h $(PROJECT_INCLUDE)/netif/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/netif/loopif.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/netif/loopif.h
+
+$(PROJECT_INCLUDE)/netif/etharp.h: lwip/src/include/netif/etharp.h $(PROJECT_INCLUDE)/netif/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/netif/etharp.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/netif/etharp.h
+
+$(PROJECT_INCLUDE)/arch/$(dirstamp):
+	@$(MKDIR_P) $(PROJECT_INCLUDE)/arch
+	@: > $(PROJECT_INCLUDE)/arch/$(dirstamp)
+PREINSTALL_DIRS += $(PROJECT_INCLUDE)/arch/$(dirstamp)
+
+$(PROJECT_INCLUDE)/arch/cc.h: lwip/ports/os/rtems/arch/cc.h $(PROJECT_INCLUDE)/arch/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/arch/cc.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/arch/cc.h
+
+$(PROJECT_INCLUDE)/arch/sys_arch.h: lwip/ports/os/rtems/arch/sys_arch.h $(PROJECT_INCLUDE)/arch/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/arch/sys_arch.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/arch/sys_arch.h
+
+$(PROJECT_INCLUDE)/arch/perf.h: lwip/ports/os/rtems/arch/perf.h $(PROJECT_INCLUDE)/arch/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/arch/perf.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/arch/perf.h
+
+$(PROJECT_INCLUDE)/arch/eth_lwip_default.h: lwip/ports/os/rtems/arch/eth_lwip_default.h $(PROJECT_INCLUDE)/arch/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/arch/eth_lwip_default.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/arch/eth_lwip_default.h
+
 $(PROJECT_INCLUDE)/machine/$(dirstamp):
 	@$(MKDIR_P) $(PROJECT_INCLUDE)/machine
 	@: > $(PROJECT_INCLUDE)/machine/$(dirstamp)

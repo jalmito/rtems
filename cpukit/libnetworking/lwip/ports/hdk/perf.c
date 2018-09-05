@@ -30,7 +30,7 @@
  *
  */
 
-#include <lwip/ports/hdk/include/arch/perf.h>
+#include "arch/perf.h"
 
 void
 perf_init(char *fname)

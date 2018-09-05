@@ -2,8 +2,8 @@
 #define EMAC_H_
 
 #include <stdbool.h>
-#include <lwip/src/include/netif/etharp.h>
-#include <lwip/src/include/lwip/sys.h>
+#include <netif/etharp.h>
+#include <lwip/sys.h>
 #include <bsp/tms570.h>
 
 /*to rtems*/

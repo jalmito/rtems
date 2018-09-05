@@ -32,12 +32,12 @@
  */
 
 //#define DEBUG 1
-#include <lwip/src/include/lwip/tcpip.h> /* includes - lwip/opt.h, lwip/api_msg.h, lwip/netifapi.h, lwip/pbuf.h, lwip/api.h, lwip/sys.h, lwip/timers.h, lwip/netif.h */
-#include <lwip/src/include/lwip/stats.h>
-#include <lwip/src/include/lwip/dhcp.h>
-#include <lwip/src/include/lwip/netifapi.h>
-#include <lwip/src/include/netif/etharp.h> /* includes - lwip/ip.h, lwip/netif.h, lwip/ip_addr.h, lwip/pbuf.h */
-#include <lwip/ports/hdk/include/arch/eth_lwip_default.h>
+#include <lwip/tcpip.h> /* includes - lwip/opt.h, lwip/api_msg.h, lwip/netifapi.h, lwip/pbuf.h, lwip/api.h, lwip/sys.h, lwip/timers.h, lwip/netif.h */
+#include <lwip/stats.h>
+#include <lwip/dhcp.h>
+#include <lwip/netifapi.h>
+#include <netif/etharp.h> /* includes - lwip/ip.h, lwip/netif.h, lwip/ip_addr.h, lwip/pbuf.h */
+#include <arch/eth_lwip_default.h>
 #include "eth_lwip.h"
 #include "tms570_netif.h"
 #include <stdio.h>

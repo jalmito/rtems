@@ -43,21 +43,21 @@
  *
  */
  
-#include <lwip/src/include/lwip/opt.h>
+#include "lwip/opt.h"
 
 #if LWIP_ARP || LWIP_ETHERNET
 
-#include <lwip/src/include/lwip/ip_addr.h>
-#include <lwip/src/include/lwip/def.h>
-#include <lwip/src/include/lwip/ip.h>
-#include <lwip/src/include/lwip/stats.h>
-#include <lwip/src/include/lwip/snmp.h>
-#include <lwip/src/include/lwip/dhcp.h>
-#include <lwip/src/include/lwip/autoip.h>
-#include <lwip/src/include/netif/etharp.h>
+#include "lwip/ip_addr.h"
+#include "lwip/def.h"
+#include "lwip/ip.h"
+#include "lwip/stats.h"
+#include "lwip/snmp.h"
+#include "lwip/dhcp.h"
+#include "lwip/autoip.h"
+#include "netif/etharp.h"
 
 #if PPPOE_SUPPORT
-#include <lwip/src/include/netif/ppp_oe.h>
+#include "netif/ppp_oe.h"
 #endif /* PPPOE_SUPPORT */
 
 #include <string.h>
