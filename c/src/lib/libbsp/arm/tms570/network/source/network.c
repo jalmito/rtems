@@ -729,7 +729,7 @@ tms_EMAC_hw_init(uint8 macaddr[6U])
       EMACMIIDisable(hdkif->emac_base);
 #endif
   
-
+	EMACRMIISpeedSet(hdkif->emac_base, EMAC_RMIISPEED_100MBPS);
   /* Enable Broadcast if enabled in the GUI. */
   /*SAFETYMCUSW 139 S MR:13.7 <APPROVED> "Parameter is taken as input from GUI." */
 #if(EMAC_BROADCAST_ENABLE)
@@ -977,7 +977,7 @@ rtems_tms_driver_attach (struct rtems_bsdnet_ifconfig *config, int attaching)
 	/*
 	 * Make sure we're really being attached
 	 */
-	configure_correct_pins();
+//	configure_correct_pins();
 	if (!attaching) {
 		printf ("SCC1 driver can not be detached.\n");
 		return 0;
