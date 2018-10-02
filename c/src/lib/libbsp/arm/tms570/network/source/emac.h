@@ -96,6 +96,9 @@ extern "C" {
 #define EMAC_DUPLEX_FULL                      (0x00000001U)
 #define EMAC_DUPLEX_HALF                      (0x00000000U)
 
+
+//#define ULAN
+
 /*
 ** Macros which can be used as matchFilt  parameters to the API 
 ** EMACMACAddrSet
@@ -188,6 +191,9 @@ typedef struct emac_tx_bd {
   volatile uint32 bufptr; /* Pointer to the actual Buffer storing the data to be transmitted. */
   volatile uint32 bufoff_len; /*Buffer Offset and Buffer Length (16 bits each) */
   volatile uint32 flags_pktlen; /*Status flags and Packet Length. (16 bits each)*/
+#ifdef ULAN
+    struct pbuf *pbuf;
+#endif
 }emac_tx_bd_t;
 
 /* EMAC RX Buffer descriptor data structure - Refer TRM for details about the buffer descriptor structure. */
@@ -196,6 +202,9 @@ typedef struct emac_rx_bd {
   volatile uint32 bufptr; /*Pointer to the actual Buffer which will store the received data.*/
   volatile uint32 bufoff_len; /*Buffer Offset and Buffer Length (16 bits each)*/
   volatile uint32 flags_pktlen; /*Status flags and Packet Length. (16 bits each)*/
+#ifdef ULAN
+    struct pbuf *pbuf;
+#endif
 }emac_rx_bd_t;
 
 /**
@@ -203,7 +212,12 @@ typedef struct emac_rx_bd {
  * receive channel
  */
 typedef struct rxch_struct {
-  volatile emac_rx_bd_t *free_head; /*Used to point to the free buffer descriptor which can receive new data.*/
+#ifdef ULAN_RECV
+	  volatile struct emac_rx_bd_t *inactive_head;
+	  volatile struct emac_rx_bd_t *inactive_tail;
+#else
+	  volatile emac_rx_bd_t *free_head; /*Used to point to the free buffer descriptor which can receive new data.*/
+#endif
   volatile emac_rx_bd_t *active_head; /*Used to point to the active descriptor in the chain which is receiving.*/
   volatile emac_rx_bd_t *active_tail; /*Used to point to the last descriptor in the chain.*/
 }rxch_t;
@@ -212,11 +226,21 @@ typedef struct rxch_struct {
  * Helper struct to hold the data used to operate on a particular
  * transmit channel
  */
+
+#ifdef ULAN
+struct txch {
+  volatile struct emac_tx_bd *active_head;
+  volatile struct emac_tx_bd *active_tail;
+  volatile struct emac_tx_bd *inactive_head;
+  volatile struct emac_tx_bd *inactive_tail;
+};
+#else
 typedef struct txch_struct {
   volatile emac_tx_bd_t *free_head; /*Used to point to the free buffer descriptor which can transmit new data.*/
   volatile emac_tx_bd_t *active_tail; /*Used to point to the last descriptor in the chain.*/
   volatile emac_tx_bd_t *next_bd_to_process; /*Used to point to the next descriptor in the chain to be processed.*/
 }txch_t;
+#endif
 /**
  * Helper struct to hold private data used to operate the ethernet interface.
  */
@@ -240,7 +264,11 @@ typedef struct hdkif_struct {
   boolean (*phy_partnerability)(uint32 param4, uint32 param5, uint16* param6);
 
   /* The tx/rx channels for the interface */
+#ifdef ULAN
+  txch txchptr;
+#else
   txch_t txchptr;
+#endif
   rxch_t rxchptr;
 }hdkif_t;
 
@@ -279,6 +307,40 @@ typedef struct pbuf_struct {
   uint16 len;
 
 }pbuf_t;
+#ifdef ULAN
+struct pbuf {
+	  /** next pbuf in singly linked pbuf chain */
+	  struct pbuf *next;
+
+	    /** pointer to the actual data in the buffer */
+	    void *payload;
+
+	      /**
+		   * total length of this buffer and all next buffers in chain
+		      * belonging to the same packet.
+		         *
+			    * For non-queue packet chains this is the invariant:
+			       * p->tot_len == p->len + (p->next? p->next->tot_len: 0)
+			          */
+	      u16_t tot_len;
+
+	        /** length of this buffer */
+	        u16_t len;
+
+		  /** pbuf_type as u8_t instead of enum to save space */
+		  u8_t /*pbuf_type*/ type;
+
+		    /** misc flags */
+		    u8_t flags;
+
+		      /**
+			   * the reference count always equals the number of pointers
+			      * that refer to this pbuf. This can be pointers from an application,
+			         * the stack itself, or pbuf->next pointers from a chain.
+				    */
+		      u16_t ref;
+};
+#endif
 
 /* Structure to hold the values of the EMAC Configuration Registers. */
 typedef struct emac_config_reg_struct {

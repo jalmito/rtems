@@ -29,6 +29,9 @@
 #include <bsp/bootcard.h>
 #include <bsp/linker-symbols.h>
 #include <rtems/endian.h>
+//#ifdef RTEMS_NETWORKING
+//  #include <rtems/rtems_bsdnet.h>
+//#endif
 
 void bsp_start( void )
 {
@@ -83,5 +86,8 @@ void bsp_start( void )
 
   /* Interrupts */
   bsp_interrupt_initialize();
+//#ifdef RTEMS_NETWORKING
+//	  rtems_bsdnet_initialize_network ();
+//#endif
 
 }
