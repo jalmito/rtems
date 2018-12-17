@@ -7,4 +7,4 @@
  *        Defaults to TMS570LS3137ZWT for now.
  */
 
-#include <bsp/tms570ls3137zwt-pins.h>
+#include <bsp/tms570lc4357-pins.h>

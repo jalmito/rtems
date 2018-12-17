@@ -25,6 +25,10 @@
 #ifndef LIBBSP_ARM_TMS570_BSP_H
 #define LIBBSP_ARM_TMS570_BSP_H
 
+#ifndef TMS570_LC43X
+#define TMS570_LC43X
+#endif
+
 #include <bspopts.h>
 
 #define BSP_FEATURE_IRQ_EXTENSION
@@ -36,9 +40,13 @@
 #include <rtems/clockdrv.h>
 #include <bsp/default-initial-extension.h>
 
+#ifdef TMS570_LC43X
+#define BSP_OSCILATOR_CLOCK 16000000
+#define BSP_PLL_OUT_CLOCK 300000000
+#else
 #define BSP_OSCILATOR_CLOCK 8000000
 #define BSP_PLL_OUT_CLOCK 160000000
-
+#endif
 /** Define operation count for Tests */
 #define OPERATION_COUNT 4
 
@@ -46,7 +54,16 @@
 extern "C" {
 #endif /* __cplusplus */
 
+   /*
+    *RTEMS Network Driver configuration
+    */ 
+    
 struct rtems_bsdnet_ifconfig;
+
+extern int rtems_tms_driver_attach (struct rtems_bsdnet_ifconfig *config, int attaching);
+#define RTEMS_BSP_NETWORK_DRIVER_NAME	"tms1"
+#define RTEMS_BSP_NETWORK_DRIVER_ATTACH	rtems_tms_driver_attach
+
 
 /** @} */
 
