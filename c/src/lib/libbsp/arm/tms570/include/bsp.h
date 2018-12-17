@@ -41,7 +41,7 @@
 #include <bsp/default-initial-extension.h>
 
 #ifdef TMS570_LC43X
-#define BSP_OSCILATOR_CLOCK 15000000
+#define BSP_OSCILATOR_CLOCK 16000000
 #define BSP_PLL_OUT_CLOCK 300000000
 #else
 #define BSP_OSCILATOR_CLOCK 8000000
