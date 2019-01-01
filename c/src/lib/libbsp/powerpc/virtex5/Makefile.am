@@ -8,9 +8,14 @@ dist_project_lib_DATA = ../../../../../../bsps/powerpc/virtex5/start/bsp_specs
 # include
 
 # start
+
+start.$(OBJEXT): ../../../../../../bsps/powerpc/virtex5/start/start.S
+	$(CPPASCOMPILE) -o $@ -c $<
+project_lib_DATA = start.$(OBJEXT)
+
 rtems_crti.$(OBJEXT): ../../../../../../bsps/powerpc/shared/start/rtems_crti.S
 	$(CPPASCOMPILE) -o $@ -c $<
-project_lib_DATA = rtems_crti.$(OBJEXT)
+project_lib_DATA += rtems_crti.$(OBJEXT)
 
 project_lib_DATA += linkcmds
 
@@ -47,7 +52,6 @@ librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/clock/clock-ppc-d
 librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/btimer/btimer-ppc-dec.c
 
 
-include $(top_srcdir)/../../../../automake/local.am
 include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
 include $(srcdir)/../../../../../../bsps/powerpc/shared/shared-sources.am
 include $(srcdir)/../../../../../../bsps/powerpc/shared/exceptions-sources.am

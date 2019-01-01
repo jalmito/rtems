@@ -200,10 +200,10 @@ SECTIONS
   PROVIDE (end = .);
 
   _WorkAreaBase = . ;
-  . = 0x00480000 ;
 
-  _CPU_Interrupt_stack_low  = 0xFFFFF000;
-  _CPU_Interrupt_stack_high = 0xFFFFFFFF;
+  .rtemsstack (NOLOAD) : {
+    *(SORT(.rtemsstack.*))
+  } > onchip_ram
 
   /* Stabs debugging sections.  */
   .stab 0 : { *(.stab) }
@@ -238,7 +238,5 @@ SECTIONS
   .debug_funcnames 0 : { *(.debug_funcnames) }
   .debug_typenames 0 : { *(.debug_typenames) }
   .debug_varnames  0 : { *(.debug_varnames) }
-
-  .stack 0xFFFFFEC0 : { _stack = .; *(.stack) } > onchip_ram
   /* These must appear regardless of  .  */
 }

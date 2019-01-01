@@ -259,7 +259,7 @@ SYM (_ISR_Handler):
         andl    #0x03fc,d0               | d0 = vector offset in vbr
 
 
-#if ( CPU_HAS_SOFTWARE_INTERRUPT_STACK == 1 )
+#if ( M68K_HAS_SEPARATE_STACKS == 0 )
         | Make a0 point just above interrupt stack
         movel   INTERRUPT_STACK_HIGH,a0
         cmpl    INTERRUPT_STACK_LOW,a7  | stack below interrupt stack?
@@ -272,7 +272,7 @@ SYM (_ISR_Handler):
         movel   a1,a7@-                 | store task stack pointer
                                         |     on interrupt stack
 2:
-#endif /* CPU_HAS_SOFTWARE_INTERRUPT_STACK == 1 */
+#endif /* M68K_HAS_SEPARATE_STACKS == 0 */
 
         addql   #1,ISR_NEST_LEVEL        | one nest level deeper
 
@@ -285,14 +285,14 @@ SYM (_ISR_Handler):
         addql   #4,a7                    | remove vector number
         subql   #1,ISR_NEST_LEVEL        | Reduce interrupt-nesting count
 
-#if ( CPU_HAS_SOFTWARE_INTERRUPT_STACK == 1 )
+#if ( M68K_HAS_SEPARATE_STACKS == 0 )
         movel   INTERRUPT_STACK_HIGH,a0
         subql   #4,a0
         cmpl    a0,a7                   | At top of interrupt stack?
         bne.b   1f                      | No, do not restore task stack pointer
         movel   (a7),a7                 | Restore task stack pointer
 1:
-#endif /* CPU_HAS_SOFTWARE_INTERRUPT_STACK == 1 */
+#endif /* M68K_HAS_SEPARATE_STACKS == 0 */
         subql   #1,THREAD_DISPATCH_DISABLE_LEVEL
                                          | unnest multitasking
         bne.b    exit                    | If dispatch disabled, exit
@@ -324,7 +324,7 @@ bframe:
 #if ( M68K_HAS_SEPARATE_STACKS == 1 )
         movec   msp,a0                   | a0 = master stack pointer
         movew   #0,a0@-                  | push format word
-        movel   #SYM(_ISR_Dispatch),a0@- | push return addr
+        movel   #thread_dispatch,a0@-    | push return addr
         movew   a0@(6),a0@-              | push saved sr
         movec   a0,msp                   | set master stack pointer
 #else
@@ -344,8 +344,8 @@ exit:   moveml  a7@,d0-d1/a0-a1          | restore d0-d1,a0-a1
         rte                              | return to thread
                                          |   OR _Isr_dispatch
 
-/*void _ISR_Dispatch()
- *
+#if ( M68K_HAS_SEPARATE_STACKS == 1 )
+/*
  *  Entry point from the outermost interrupt service routine exit.
  *  The current stack is the supervisor mode stack if this processor
  *  has separate stacks.
@@ -357,8 +357,7 @@ exit:   moveml  a7@,d0-d1/a0-a1          | restore d0-d1,a0-a1
  *    4.  return from interrupt
  */
 
-        .global SYM (_ISR_Dispatch)
-SYM (_ISR_Dispatch):
+thread_dispatch:
 #if ( !defined(__mcoldfire__) )
         movml   d0-d1/a0-a1,a7@-
         jsr     SYM (_Thread_Dispatch)
@@ -375,3 +374,4 @@ SYM (_ISR_Dispatch):
         addql   #2,a7                    | pop format/id
 #endif /* M68K_HAS_VBR */
         rte
+#endif /* M68K_HAS_SEPARATE_STACKS */

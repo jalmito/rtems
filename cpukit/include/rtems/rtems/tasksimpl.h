@@ -17,7 +17,7 @@
 #ifndef _RTEMS_RTEMS_TASKSIMPL_H
 #define _RTEMS_RTEMS_TASKSIMPL_H
 
-#include <rtems/rtems/tasks.h>
+#include <rtems/rtems/tasksdata.h>
 #include <rtems/score/objectimpl.h>
 #include <rtems/score/schedulerimpl.h>
 #include <rtems/score/threadimpl.h>
@@ -33,12 +33,6 @@ extern "C" {
  *
  * @{
  */
-
-/**
- *  The following instantiates the information control block used to
- *  manage this class of objects.
- */
-extern Thread_Information _RTEMS_tasks_Information;
 
 /**
  *  @brief RTEMS User Task Initialization

@@ -44,13 +44,12 @@ uint32_t bsp_time_base_frequency = 10000000;
     offset += VECTOR_TABLE_ENTRY_SIZE; \
   } while (0)
 
-static void t32mppc_initialize_exceptions(void *interrupt_stack_begin)
+static void t32mppc_initialize_exceptions(void)
 {
   uintptr_t addr;
 
   ppc_exc_initialize_interrupt_stack(
-    (uintptr_t) interrupt_stack_begin,
-    rtems_configuration_get_interrupt_stack_size()
+    (uintptr_t) _ISR_Stack_area_begin
   );
 
   addr = (uintptr_t) bsp_exc_vector_base;
@@ -77,13 +76,15 @@ static void t32mppc_initialize_exceptions(void *interrupt_stack_begin)
   MTIVOR(BOOKE_IVOR35, addr);
 }
 
+uint32_t _CPU_Counter_frequency(void)
+{
+  return bsp_time_base_frequency;
+}
+
 void bsp_start(void)
 {
   get_ppc_cpu_type();
   get_ppc_cpu_revision();
-
-  rtems_counter_initialize_converter(bsp_time_base_frequency);
-
-  t32mppc_initialize_exceptions(bsp_section_work_begin);
+  t32mppc_initialize_exceptions();
   bsp_interrupt_initialize();
 }

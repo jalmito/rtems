@@ -23,12 +23,6 @@
 #include <rtems/score/chainimpl.h>
 #include <rtems/score/sysstate.h>
 
-/* #define RTEMS_DEBUG_OBJECT_ALLOCATION */
-
-#if defined(RTEMS_DEBUG_OBJECT_ALLOCATION)
-#include <rtems/bspIo.h>
-#endif
-
 static Objects_Control *_Objects_Get_inactive(
   Objects_Information *information
 )
@@ -53,7 +47,7 @@ Objects_Control *_Objects_Allocate_unprotected(
    *  should be all zeroed out because it is in the BSS.  So let's
    *  check that code for this manager is even present.
    */
-  if ( information->size == 0 )
+  if ( information->object_size == 0 )
     return NULL;
 
   /*
@@ -62,38 +56,32 @@ Objects_Control *_Objects_Allocate_unprotected(
    */
   the_object = _Objects_Get_inactive( information );
 
-  if ( information->auto_extend ) {
+  if ( _Objects_Is_auto_extend( information ) ) {
     /*
      *  If the list is empty then we are out of objects and need to
      *  extend information base.
      */
 
-    if ( !the_object ) {
+    if ( the_object == NULL ) {
       _Objects_Extend_information( information );
       the_object = _Objects_Get_inactive( information );
     }
 
-    if ( the_object ) {
-      uint32_t   block;
+    if ( the_object != NULL ) {
+      Objects_Maximum objects_per_block;
+      Objects_Maximum block;
 
-      block = (uint32_t) _Objects_Get_index( the_object->id ) -
-              _Objects_Get_index( information->minimum_id );
-      block /= information->allocation_size;
+      objects_per_block = information->objects_per_block;
+      block = _Objects_Get_index( the_object->id ) - OBJECTS_INDEX_MINIMUM;
 
-      information->inactive_per_block[ block ]--;
-      information->inactive--;
+      if ( block > objects_per_block ) {
+        block /= objects_per_block;
+
+        information->inactive_per_block[ block ]--;
+        information->inactive--;
+      }
     }
   }
-
-#if defined(RTEMS_DEBUG_OBJECT_ALLOCATION)
-  if ( !the_object ) {
-    printk(
-      "OBJECT ALLOCATION FAILURE! API/Class %d/%d\n",
-      information->the_api,
-      information->the_class
-    );
-  }
-#endif
 
   return the_object;
 }

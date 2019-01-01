@@ -25,6 +25,8 @@
   #include "config.h"
 #endif
 
+#define _GNU_SOURCE
+
 #include <rtems/test.h>
 #include <tmacros.h>
 
@@ -61,12 +63,18 @@ const char rtems_test_name[] = "PSXCONFIG 1";
 #define CONFIGURE_MAXIMUM_USER_EXTENSIONS 17
 
 #define POSIX_MQ_COUNT 5
+#ifdef RTEMS_POSIX_API
 #define CONFIGURE_MAXIMUM_POSIX_QUEUED_SIGNALS 7
+#endif
 #define CONFIGURE_MAXIMUM_POSIX_SEMAPHORES 41
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
+#define CONFIGURE_MINIMUM_POSIX_THREAD_STACK_SIZE CPU_STACK_MINIMUM_SIZE
+
 #define CONFIGURE_MAXIMUM_POSIX_THREADS 3
+#ifdef RTEMS_POSIX_API
 #define CONFIGURE_MAXIMUM_POSIX_TIMERS 47
+#endif
 
 #ifndef CONFIGURE_MAXIMUM_TASKS
   #define CONFIGURE_MAXIMUM_TASKS 1
@@ -168,8 +176,6 @@ const char rtems_test_name[] = "PSXCONFIG 1";
 #define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
-#define CONFIGURE_MAXIMUM_DRIVERS 2
-
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
@@ -240,7 +246,6 @@ static rtems_task Init(rtems_task_argument argument)
 {
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   int eno = 0;
-  int rv = 0;
   rtems_id id = RTEMS_ID_NONE;
   rtems_name name = rtems_build_name('C', 'O', 'N', 'F');
   rtems_extensions_table table;
@@ -464,7 +469,20 @@ static rtems_task Init(rtems_task_argument argument)
 #ifdef CONFIGURE_MAXIMUM_POSIX_THREADS
   for (i = 0; i < CONFIGURE_MAXIMUM_POSIX_THREADS; ++i) {
     pthread_t thread;
+    pthread_attr_t attr;
+    size_t stack_size;
+
     eno = pthread_create(&thread, NULL, posix_thread, NULL);
+    rtems_test_assert(eno == 0);
+
+    eno = pthread_getattr_np(thread, &attr);
+    rtems_test_assert(eno == 0);
+
+    eno = pthread_attr_getstacksize(&attr, &stack_size);
+    rtems_test_assert(eno == 0);
+    rtems_test_assert(stack_size == CPU_STACK_MINIMUM_SIZE);
+
+    eno = pthread_attr_destroy(&attr);
     rtems_test_assert(eno == 0);
   }
   rtems_resource_snapshot_take(&snapshot);
@@ -476,6 +494,8 @@ static rtems_task Init(rtems_task_argument argument)
 #ifdef CONFIGURE_MAXIMUM_POSIX_TIMERS
   for (i = 0; i < CONFIGURE_MAXIMUM_POSIX_TIMERS; ++i) {
     timer_t timer_id;
+    int rv;
+
     rv = timer_create(CLOCK_REALTIME, NULL, &timer_id);
     rtems_test_assert(rv == 0);
   }

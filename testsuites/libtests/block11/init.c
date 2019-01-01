@@ -10,7 +10,7 @@
  * Copyright (c) 2012 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
- *  Obere Lagerstr. 30
+ *  Dornierstr. 4
  *  82178 Puchheim
  *  Germany
  *  <rtems@embedded-brains.de>
@@ -37,10 +37,9 @@
 #include <rtems/diskdevs.h>
 #include <rtems/malloc.h>
 
-const char rtems_test_name[] = "BLOCK 11";
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
-/* forward declarations to avoid warnings */
-static rtems_task Init(rtems_task_argument argument);
+const char rtems_test_name[] = "BLOCK 11";
 
 #define ASSERT_SC(sc) rtems_test_assert((sc) == RTEMS_SUCCESSFUL)
 
@@ -401,22 +400,13 @@ static void test_blkdev_imfs_errors(void)
 
 static rtems_task Init(rtems_task_argument argument)
 {
-  rtems_status_code sc;
-
   TEST_BEGIN();
-
-  sc = rtems_disk_io_initialize();
-  ASSERT_SC(sc);
 
   test_blkdev_imfs_read_and_write();
   test_blkdev_imfs_parameters();
   test_blkdev_imfs_errors();
 
-  sc = rtems_disk_io_done();
-  ASSERT_SC(sc);
-
   TEST_END();
-
   exit(0);
 }
 

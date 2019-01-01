@@ -26,8 +26,7 @@
 
 #if defined(RTEMS_NETWORKING) && defined(MPC55XX_HAS_SIU)
 
-#define __INSIDE_RTEMS_BSD_TCPIP_STACK__ 1
-#define __BSD_VISIBLE 1
+#include <machine/rtems-bsd-kernel-space.h>
 
 #include <errno.h>
 #include <assert.h>
@@ -1501,7 +1500,7 @@ static void smsc9218i_transmit_task(void *arg)
   rtems_bsdnet_semaphore_release();
 
   /* Terminate self */
-  (void) rtems_task_delete(RTEMS_SELF);
+  rtems_task_exit();
 }
 
 #if defined(DEBUG)

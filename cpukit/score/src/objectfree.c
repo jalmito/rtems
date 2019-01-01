@@ -27,29 +27,35 @@ void _Objects_Free(
   Objects_Control     *the_object
 )
 {
-  uint32_t    allocation_size = information->allocation_size;
-
   _Assert( _Objects_Allocator_is_owner() );
 
   _Chain_Append_unprotected( &information->Inactive, &the_object->Node );
 
-  if ( information->auto_extend ) {
-    uint32_t    block;
+  if ( _Objects_Is_auto_extend( information ) ) {
+    Objects_Maximum objects_per_block;
+    Objects_Maximum block;
+    Objects_Maximum inactive;
 
-    block = (uint32_t) (_Objects_Get_index( the_object->id ) -
-                        _Objects_Get_index( information->minimum_id ));
-    block /= information->allocation_size;
+    objects_per_block = information->objects_per_block;
+    block = _Objects_Get_index( the_object->id ) - OBJECTS_INDEX_MINIMUM;
 
-    information->inactive_per_block[ block ]++;
-    information->inactive++;
+    if ( block > objects_per_block ) {
+      block /= objects_per_block;
 
-    /*
-     *  Check if the threshold level has been met of
-     *  1.5 x allocation_size are free.
-     */
+      ++information->inactive_per_block[ block ];
 
-    if ( information->inactive > ( allocation_size + ( allocation_size >> 1 ) ) ) {
-      _Objects_Shrink_information( information );
+      inactive = information->inactive;
+      ++inactive;
+      information->inactive = inactive;
+
+      /*
+       *  Check if the threshold level has been met of
+       *  1.5 x objects_per_block are free.
+       */
+
+      if ( inactive > ( objects_per_block + ( objects_per_block >> 1 ) ) ) {
+        _Objects_Shrink_information( information );
+      }
     }
   }
 }

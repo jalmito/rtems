@@ -34,18 +34,6 @@ extern "C" {
 /* conditional compilation parameters */
 
 /*
- *  Does the executive manage a dedicated interrupt stack in software?
- *
- *  If TRUE, then a stack is allocated in _ISR_Handler_initialization.
- *  If FALSE, nothing is done.
- *
- *  The SPARC does not have a dedicated HW interrupt stack and one has
- *  been implemented in SW.
- */
-
-#define CPU_HAS_SOFTWARE_INTERRUPT_STACK   TRUE
-
-/*
  *  Does the CPU follow the simple vectored interrupt model?
  *
  *  If TRUE, then RTEMS allocates the vector table it internally manages.
@@ -57,26 +45,6 @@ extern "C" {
  *  XXX document implementation including references if appropriate
  */
 #define CPU_SIMPLE_VECTORED_INTERRUPTS TRUE
-
-/*
- *  Does this CPU have hardware support for a dedicated interrupt stack?
- *
- *  If TRUE, then it must be installed during initialization.
- *  If FALSE, then no installation is performed.
- *
- *  The SPARC does not have a dedicated HW interrupt stack.
- */
-
-#define CPU_HAS_HARDWARE_INTERRUPT_STACK  FALSE
-
-/*
- *  Do we allocate a dedicated interrupt stack in the Interrupt Manager?
- *
- *  If TRUE, then the memory is allocated during initialization.
- *  If FALSE, then the memory is allocated during initialization.
- */
-
-#define CPU_ALLOCATE_INTERRUPT_STACK      TRUE
 
 /*
  *  Does the RTEMS invoke the user's ISR with the vector number and
@@ -137,19 +105,6 @@ extern "C" {
 #define CPU_USE_DEFERRED_FP_SWITCH       TRUE
 
 #define CPU_ENABLE_ROBUST_THREAD_DISPATCH FALSE
-
-/*
- *  Does this port provide a CPU dependent IDLE task implementation?
- *
- *  If TRUE, then the routine _CPU_Thread_Idle_body
- *  must be provided and is the default IDLE thread body instead of
- *  _CPU_Thread_Idle_body.
- *
- *  If FALSE, then use the generic IDLE thread body if the BSP does
- *  not provide one.
- */
-
-#define CPU_PROVIDES_IDLE_THREAD_BODY    FALSE
 
 /*
  *  Does the stack grow up (toward higher addresses) or down
@@ -532,7 +487,7 @@ extern Context_Control_fp _CPU_Null_fp_context;
 
 /*
  *  This flag is context switched with each thread.  It indicates
- *  that THIS thread has an _ISR_Dispatch stack frame on its stack.
+ *  that THIS thread has an interrupt stack frame on its stack.
  *  By using this flag, we can avoid nesting more interrupt dispatching
  *  attempts on a previously interrupted thread's stack.
  */
@@ -680,20 +635,6 @@ extern const CPU_Trap_table_entry _CPU_Trap_slot_template;
 #define CPU_HEAP_ALIGNMENT         CPU_ALIGNMENT
 
 /*
- *  This number corresponds to the byte alignment requirement for memory
- *  buffers allocated by the partition manager.  This alignment requirement
- *  may be stricter than that for the data types alignment specified by
- *  CPU_ALIGNMENT.  It is common for the partition to follow the same
- *  alignment requirement as CPU_ALIGNMENT.  If the CPU_ALIGNMENT is strict
- *  enough for the partition, then this should be set to CPU_ALIGNMENT.
- *
- *  NOTE:  This does not have to be a power of 2.  It does have to
- *         be greater or equal to than CPU_ALIGNMENT.
- */
-
-#define CPU_PARTITION_ALIGNMENT    CPU_ALIGNMENT
-
-/*
  *  This number corresponds to the byte alignment requirement for the
  *  stack.  This alignment requirement may be stricter than that for the
  *  data types alignment specified by CPU_ALIGNMENT.  If the CPU_ALIGNMENT
@@ -708,6 +649,8 @@ extern const CPU_Trap_table_entry _CPU_Trap_slot_template;
  */
 
 #define CPU_STACK_ALIGNMENT        16
+
+#define CPU_INTERRUPT_STACK_ALIGNMENT CPU_CACHE_LINE_BYTES
 
 #ifndef ASM
 
@@ -896,43 +839,23 @@ void _CPU_Context_Initialize(
 
 void _CPU_Initialize(void);
 
-/*
- *  _CPU_ISR_install_raw_handler
- *
- *  This routine installs new_handler to be directly called from the trap
- *  table.
- */
+typedef void ( *CPU_ISR_raw_handler )( void );
 
 void _CPU_ISR_install_raw_handler(
-  uint32_t    vector,
-  proc_ptr    new_handler,
-  proc_ptr   *old_handler
+  uint32_t             vector,
+  CPU_ISR_raw_handler  new_handler,
+  CPU_ISR_raw_handler *old_handler
 );
 
-/*
- *  _CPU_ISR_install_vector
- *
- *  This routine installs an interrupt vector.
- */
+typedef void ( *CPU_ISR_handler )( uint32_t );
 
 void _CPU_ISR_install_vector(
-  uint64_t    vector,
-  proc_ptr    new_handler,
-  proc_ptr   *old_handler
+  uint32_t         vector,
+  CPU_ISR_handler  new_handler,
+  CPU_ISR_handler *old_handler
 );
 
-#if (CPU_PROVIDES_IDLE_THREAD_BODY == TRUE)
-
-/*
- *  _CPU_Thread_Idle_body
- *
- *  Some SPARC implementations have low power, sleep, or idle modes.  This
- *  tries to take advantage of those models.
- */
-
 void *_CPU_Thread_Idle_body( uintptr_t ignored );
-
-#endif /* CPU_PROVIDES_IDLE_THREAD_BODY */
 
 /*
  *  _CPU_Context_switch
@@ -975,18 +898,6 @@ void _CPU_Context_save_fp(
 void _CPU_Context_restore_fp(
   Context_Control_fp **fp_context_ptr
 );
-
-static inline void _CPU_Context_volatile_clobber( uintptr_t pattern )
-{
-  /* TODO */
-}
-
-static inline void _CPU_Context_validate( uintptr_t pattern )
-{
-  while (1) {
-    /* TODO */
-  }
-}
 
 /* FIXME */
 typedef CPU_Interrupt_frame CPU_Exception_frame;
@@ -1031,6 +942,8 @@ static inline uint32_t CPU_swap_u32(
   (((value&0xff) << 8) | ((value >> 8)&0xff))
 
 typedef uint32_t CPU_Counter_ticks;
+
+uint32_t _CPU_Counter_frequency( void );
 
 CPU_Counter_ticks _CPU_Counter_read( void );
 

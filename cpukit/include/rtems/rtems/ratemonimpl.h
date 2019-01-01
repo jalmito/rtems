@@ -19,7 +19,7 @@
 #ifndef _RTEMS_RTEMS_RATEMONIMPL_H
 #define _RTEMS_RTEMS_RATEMONIMPL_H
 
-#include <rtems/rtems/ratemon.h>
+#include <rtems/rtems/ratemondata.h>
 #include <rtems/score/objectimpl.h>
 #include <rtems/score/schedulerimpl.h>
 #include <rtems/score/threadimpl.h>
@@ -47,14 +47,6 @@ extern "C" {
 
 #define RATE_MONOTONIC_READY_AGAIN \
   ( THREAD_WAIT_CLASS_PERIOD | THREAD_WAIT_STATE_READY_AGAIN )
-
-/**
- *  @brief Rate Monotonic Period Class Management Structure
- *
- *  This instance of Objects_Information is used to manage the
- *  set of rate monotonic period instances.
- */
-extern Objects_Information _Rate_monotonic_Information;
 
 /**
  *  @brief Allocates a period control block from

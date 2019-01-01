@@ -21,7 +21,7 @@
 #include <rtems/sysinit.h>
 #include <rtems/rtems/signalimpl.h>
 #include <rtems/rtems/asrimpl.h>
-#include <rtems/rtems/tasks.h>
+#include <rtems/rtems/tasksdata.h>
 #include <rtems/score/assert.h>
 #include <rtems/score/threadimpl.h>
 
@@ -36,7 +36,7 @@ void _Signal_Action_handler(
   RTEMS_API_Control *api;
   ASR_Information   *asr;
   rtems_signal_set   signal_set;
-  Modes_Control      prev_mode;
+  rtems_mode      prev_mode;
 
   (void) action;
 

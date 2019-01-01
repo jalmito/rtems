@@ -12,10 +12,9 @@
  *  2007-09-07, Ported GBIT support from 4.6.5
  */
 
-#define __INSIDE_RTEMS_BSD_TCPIP_STACK__
+#include <machine/rtems-bsd-kernel-space.h>
 
 #include <rtems.h>
-#define _KERNEL
 #define CPU_U32_FIX
 #include <bsp.h>
 
@@ -44,22 +43,14 @@
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
 
-/* map via rtems_interrupt_lock_* API: */
-#define SPIN_DECLARE(lock) RTEMS_INTERRUPT_LOCK_MEMBER(lock)
-#define SPIN_INIT(lock, name) rtems_interrupt_lock_initialize(lock, name)
-#define SPIN_LOCK(lock, level) rtems_interrupt_lock_acquire_isr(lock, &level)
-#define SPIN_LOCK_IRQ(lock, level) rtems_interrupt_lock_acquire(lock, &level)
-#define SPIN_UNLOCK(lock, level) rtems_interrupt_lock_release_isr(lock, &level)
-#define SPIN_UNLOCK_IRQ(lock, level) rtems_interrupt_lock_release(lock, &level)
-#define SPIN_IRQFLAGS(k) rtems_interrupt_lock_context k
-#define SPIN_ISR_IRQFLAGS(k) SPIN_IRQFLAGS(k)
-
 #ifdef malloc
 #undef malloc
 #endif
 #ifdef free
 #undef free
 #endif
+
+#include <grlib_impl.h>
 
 #if defined(__m68k__)
 extern m68k_isr_entry set_vector( rtems_isr_entry, rtems_vector_number, int );
@@ -194,6 +185,7 @@ struct greth_softc
    int auto_neg;
    unsigned int advmodes; /* advertise ethernet speed modes. 0 = all modes. */
    struct timespec auto_neg_time;
+   int mc_available;
 
    /*
     * Statistics
@@ -224,7 +216,7 @@ int greth_process_tx(struct greth_softc *sc);
 static char *almalloc(int sz, int alignment)
 {
         char *tmp;
-        tmp = calloc(1, sz + (alignment-1));
+        tmp = grlib_calloc(1, sz + (alignment-1));
         tmp = (char *) (((int)tmp+alignment) & ~(alignment -1));
         return(tmp);
 }
@@ -335,12 +327,85 @@ static void print_init_info(struct greth_softc *sc)
     }
 #ifdef GRETH_AUTONEGO_PRINT_TIME
     if ( sc->auto_neg ) {
-        printf("Autonegotiation Time: %ldms\n", sc->auto_neg_time.tv_sec * 1000 +
+        printf("Autonegotiation Time: %" PRIdMAX "ms\n",
+               (intmax_t)sc->auto_neg_time.tv_sec * 1000 +
                sc->auto_neg_time.tv_nsec / 1000000);
     }
 #endif
 }
 
+/*
+ * Generates the hash words based on CRCs of the enabled MAC addresses that are
+ * allowed to be received. The allowed MAC addresses are maintained in a linked
+ * "multi-cast" list available in the arpcom structure.
+ *
+ * Returns the number of MAC addresses that were processed (in the list)
+ */
+static int
+greth_mac_filter_calc(struct arpcom *ac, uint32_t *msb, uint32_t *lsb)
+{
+    struct ether_multistep step;
+    struct ether_multi *enm;
+    int cnt = 0;
+    uint32_t crc, htindex, ht[2] = {0, 0};
+
+    /* Go through the Ethernet Multicast addresses one by one and add their
+     * CRC contribution to the MAC filter.
+     */
+    ETHER_FIRST_MULTI(step, ac, enm);
+    while (enm) {
+        crc = ether_crc32_be((uint8_t *)enm->enm_addrlo, 6);
+        htindex = crc & 0x3f;
+        ht[htindex >> 5] |= (1 << (htindex & 0x1F));
+        cnt++;
+        ETHER_NEXT_MULTI(step, enm);
+    }
+
+    if (cnt > 0) {
+        *msb = ht[1];
+        *lsb = ht[0];
+    }
+
+    return cnt;
+}
+
+/*
+ * Initialize the ethernet hardware
+ */
+static int greth_mac_filter_set(struct greth_softc *sc)
+{
+    struct ifnet *ifp = &sc->arpcom.ac_if;
+    uint32_t hash_msb, hash_lsb, ctrl;
+    SPIN_IRQFLAGS(flags);
+
+    hash_msb = 0;
+    hash_lsb = 0;
+    ctrl = 0;
+    if (ifp->if_flags & IFF_PROMISC) {
+        /* No need to enable multi-cast when promiscous mode accepts all */
+        ctrl |= GRETH_CTRL_PRO;
+    } else if(!sc->mc_available) {
+        return EINVAL; /* no hardware support for multicast filtering. */
+    } else if (ifp->if_flags & IFF_ALLMULTI) {
+        /* We should accept all multicast addresses */
+        ctrl |= GRETH_CTRL_MCE;
+        hash_msb = 0xFFFFFFFF;
+        hash_lsb = 0xFFFFFFFF;
+    } else if (greth_mac_filter_calc(&sc->arpcom, &hash_msb, &hash_lsb) > 0) {
+        /* Generate hash for MAC filtering out multicast addresses */
+        ctrl |= GRETH_CTRL_MCE;
+    } else {
+        /* Multicast list is empty .. disable multicast */
+    }
+    SPIN_LOCK_IRQ(&sc->devlock, flags);
+    sc->regs->ht_msb = hash_msb;
+    sc->regs->ht_lsb = hash_lsb;
+    sc->regs->ctrl = (sc->regs->ctrl & ~(GRETH_CTRL_PRO | GRETH_CTRL_MCE)) |
+                     ctrl;
+    SPIN_UNLOCK_IRQ(&sc->devlock, flags);
+
+    return 0;
+}
 
 /*
  * Initialize the ethernet hardware
@@ -571,8 +636,8 @@ auto_neg_done:
     regs->txdesc = (int) sc->txdesc_remote;
     regs->rxdesc = (int) sc->rxdesc_remote;
 
-    sc->rxmbuf = calloc(sc->rxbufs, sizeof(*sc->rxmbuf));
-    sc->txmbuf = calloc(sc->txbufs, sizeof(*sc->txmbuf));
+    sc->rxmbuf = grlib_calloc(sc->rxbufs, sizeof(*sc->rxmbuf));
+    sc->txmbuf = grlib_calloc(sc->txbufs, sizeof(*sc->txmbuf));
 
     for (i = 0; i < sc->txbufs; i++)
       {
@@ -581,7 +646,7 @@ auto_neg_done:
             drvmgr_translate_check(
                 sc->dev, 
                 CPUMEM_TO_DMA,
-                (void *)malloc(GRETH_MAXBUF_LEN),
+                (void *)grlib_malloc(GRETH_MAXBUF_LEN),
                 (void **)&sc->txdesc[i].addr,
                 GRETH_MAXBUF_LEN);
         }
@@ -868,23 +933,23 @@ sendpacket (struct ifnet *ifp, struct mbuf *m)
             if ((m = m->m_next) == NULL)
                     break;
     }
-    
+
     m_freem (n);
-    
+
     /* don't send long packets */
 
     if (len <= GRETH_MAXBUF_LEN) {
             if (dp->tx_ptr < dp->txbufs-1) {
-                    dp->txdesc[dp->tx_ptr].ctrl = GRETH_TXD_ENABLE | len;
+                    dp->txdesc[dp->tx_ptr].ctrl = GRETH_TXD_IRQ |
+                                                  GRETH_TXD_ENABLE | len;
             } else {
-                    dp->txdesc[dp->tx_ptr].ctrl = 
+                    dp->txdesc[dp->tx_ptr].ctrl = GRETH_TXD_IRQ |
                             GRETH_TXD_WRAP | GRETH_TXD_ENABLE | len;
             }
             dp->tx_ptr = (dp->tx_ptr + 1) % dp->txbufs;
             SPIN_LOCK_IRQ(&dp->devlock, flags);
             dp->regs->ctrl = dp->regs->ctrl | GRETH_CTRL_TXEN;
             SPIN_UNLOCK_IRQ(&dp->devlock, flags);
-            
     }
 
     return 0;
@@ -1182,6 +1247,11 @@ greth_init (void *arg)
       }
 
     /*
+     * Setup promiscous/multi-cast MAC address filters if user enabled it
+     */
+    greth_mac_filter_set(sc);
+
+    /*
      * Tell the world that we're running.
      */
     ifp->if_flags |= IFF_RUNNING;
@@ -1240,6 +1310,7 @@ greth_ioctl (struct ifnet *ifp, ioctl_command_t command, caddr_t data)
 {
     struct greth_softc *sc = ifp->if_softc;
     int error = 0;
+    struct ifreq *ifr;
 
     switch (command)
       {
@@ -1273,8 +1344,21 @@ greth_ioctl (struct ifnet *ifp, ioctl_command_t command, caddr_t data)
 	  break;
 
 	  /*
-	   * FIXME: All sorts of multicast commands need to be added here!
+	   * Multicast commands: Enabling/disabling filtering of MAC addresses
 	   */
+      case SIOCADDMULTI:
+      case SIOCDELMULTI:
+      ifr = (struct ifreq *)data;
+      if (command == SIOCADDMULTI) {
+        error = ether_addmulti(ifr, &sc->arpcom);
+      } else {
+        error = ether_delmulti(ifr, &sc->arpcom);
+      }
+      if (error == ENETRESET) {
+        error = greth_mac_filter_set(sc);
+      }
+      break;
+
       default:
 	  error = EINVAL;
 	  break;
@@ -1336,6 +1420,8 @@ greth_interface_driver_attach (
     ifp->if_start = greth_start;
     ifp->if_output = ether_output;
     ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX;
+    if (sc->mc_available)
+        ifp->if_flags |= IFF_MULTICAST;
     if (ifp->if_snd.ifq_maxlen == 0)
 	ifp->if_snd.ifq_maxlen = ifqmaxlen;
 
@@ -1418,10 +1504,9 @@ int greth_init2(struct drvmgr_dev *dev)
 	struct greth_softc *priv;
 
 	DBG("GRETH[%d] on bus %s\n", dev->minor_drv, dev->parent->dev->name);
-	priv = dev->priv = malloc(sizeof(struct greth_softc));
+	priv = dev->priv = grlib_calloc(1, sizeof(*priv));
 	if ( !priv )
 		return DRVMGR_NOMEM;
-	memset(priv, 0, sizeof(*priv));
 	priv->dev = dev;
 
 	/* This core will not find other cores, so we wait for init3() */
@@ -1450,8 +1535,7 @@ int greth_init3(struct drvmgr_dev *dev)
     SPIN_INIT(&sc->devlock, sc->devName);
 
     /* Register GRETH device as an Network interface */
-    ifp = malloc(sizeof(struct rtems_bsdnet_ifconfig));
-    memset(ifp, 0, sizeof(*ifp));
+    ifp = grlib_calloc(1, sizeof(*ifp));
 
     ifp->name = sc->devName;
     ifp->drv_ctrl = sc;
@@ -1539,6 +1623,9 @@ int greth_device_init(struct greth_softc *sc)
     value = drvmgr_dev_key_get(sc->dev, "advModes", DRVMGR_KT_INT);
     if ( value )
         sc->advmodes = value->i;
+
+    /* Check if multicast support is available */
+    sc->mc_available = sc->regs->ctrl & GRETH_CTRL_MC;
 
     return 0;
 }

@@ -15,6 +15,7 @@
  *  http://www.rtems.org/license/LICENSE.
  */
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,7 +24,6 @@
 
 #include <bsp.h>
 #include <rtems/bspIo.h>
-#include <rtems/score/isrlock.h> /* spin-lock */
 #include <pci.h>
 #include <pci/access.h>
 
@@ -38,15 +38,7 @@
 
 #include <bsp/gr_701.h>
 
-/* map via rtems_interrupt_lock_* API: */
-#define SPIN_DECLARE(lock) RTEMS_INTERRUPT_LOCK_MEMBER(lock)
-#define SPIN_INIT(lock, name) rtems_interrupt_lock_initialize(lock, name)
-#define SPIN_LOCK(lock, level) rtems_interrupt_lock_acquire_isr(lock, &level)
-#define SPIN_LOCK_IRQ(lock, level) rtems_interrupt_lock_acquire(lock, &level)
-#define SPIN_UNLOCK(lock, level) rtems_interrupt_lock_release_isr(lock, &level)
-#define SPIN_UNLOCK_IRQ(lock, level) rtems_interrupt_lock_release(lock, &level)
-#define SPIN_IRQFLAGS(k) rtems_interrupt_lock_context k
-#define SPIN_ISR_IRQFLAGS(k) SPIN_IRQFLAGS(k)
+#include <grlib_impl.h>
 
 /* Offset from 0x80000000 (dual bus version) */
 #define AHB1_BASE_ADDR 0x80000000
@@ -325,11 +317,10 @@ int gr701_init1(struct drvmgr_dev *dev)
 	uint32_t bar0, bar1, bar0_size, bar1_size;
 	int resources_cnt;
 
-	priv = malloc(sizeof(struct gr701_priv));
+	priv = grlib_calloc(1, sizeof(*priv));
 	if ( !priv )
 		return DRVMGR_NOMEM;
 
-	memset(priv, 0, sizeof(*priv));
 	dev->priv = priv;
 	priv->dev = dev;
 
@@ -349,14 +340,16 @@ int gr701_init1(struct drvmgr_dev *dev)
 	bar0_size = devinfo->resources[0].size;
 	bar1 = devinfo->resources[1].address;
 	bar1_size = devinfo->resources[1].size;
-	printf("\n\n--- GR-701[%d] ---\n", dev->minor_drv);
-	printf(" PCI BUS: 0x%x, SLOT: 0x%x, FUNCTION: 0x%x\n",
+	printk("\n\n--- GR-701[%d] ---\n", dev->minor_drv);
+	printk(" PCI BUS: 0x%x, SLOT: 0x%x, FUNCTION: 0x%x\n",
 		PCI_DEV_EXPAND(priv->pcidev));
-	printf(" PCI VENDOR: 0x%04x, DEVICE: 0x%04x\n\n\n",
+	printk(" PCI VENDOR: 0x%04x, DEVICE: 0x%04x\n\n\n",
 		devinfo->id.vendor, devinfo->id.device);
-	printf(" PCI BAR[0]: 0x%lx - 0x%lx\n", bar0, bar0 + bar0_size - 1);
-	printf(" PCI BAR[1]: 0x%lx - 0x%lx\n", bar1, bar1 + bar1_size - 1);
-	printf(" IRQ: %d\n\n\n", devinfo->irq);
+	printk(" PCI BAR[0]: 0x%" PRIx32 " - 0x%" PRIx32 "\n",
+		bar0, bar0 + bar0_size - 1);
+	printk(" PCI BAR[1]: 0x%" PRIx32 " - 0x%" PRIx32 "\n",
+		bar1, bar1 + bar1_size - 1);
+	printk(" IRQ: %d\n\n\n", devinfo->irq);
 
 	/* all neccessary space assigned to GR-701 target? */
 	if ((bar0_size == 0) || (bar1_size == 0))
@@ -379,7 +372,7 @@ int gr701_init1(struct drvmgr_dev *dev)
 		genirq_destroy(priv->genirq);
 		free(priv);
 		dev->priv = NULL;
-		printf(" Failed to initialize GR-701 HW\n");
+		printk(" Failed to initialize GR-701 HW\n");
 		return DRVMGR_FAIL;
 	}
 
@@ -582,8 +575,10 @@ void gr701_print_dev(struct drvmgr_dev *dev, int options)
 	bar1 = devinfo->resources[1].address;
 	bar1_size = devinfo->resources[1].size;
 
-	printf(" PCI BAR[0]: 0x%lx - 0x%lx\n", bar0, bar0 + bar0_size - 1);
-	printf(" PCI BAR[1]: 0x%lx - 0x%lx\n", bar1, bar1 + bar1_size - 1);
+	printf(" PCI BAR[0]: 0x%" PRIx32 " - 0x%" PRIx32 "\n",
+		bar0, bar0 + bar0_size - 1);
+	printf(" PCI BAR[1]: 0x%" PRIx32 " - 0x%" PRIx32 "\n",
+		bar1, bar1 + bar1_size - 1);
 	printf(" IRQ:             %d\n", devinfo->irq);
 
 	/* Frequency is the same as the PCI bus frequency */

@@ -31,12 +31,6 @@ extern "C" {
 #endif
 
 /**
- *  This defines the information control block used to manage
- *  this class of objects.
- */
-extern Objects_Information _POSIX_Message_queue_Information;
-
-/**
  * @brief Delete a POSIX Message Queue
  *
  * This routine supports the mq_unlink and mq_close routines by
@@ -156,8 +150,10 @@ RTEMS_INLINE_ROUTINE void _POSIX_Message_queue_Namespace_remove (
   POSIX_Message_queue_Control *the_mq
 )
 {
-  _Objects_Namespace_remove( 
-    &_POSIX_Message_queue_Information, &the_mq->Object );
+  _Objects_Namespace_remove_string(
+    &_POSIX_Message_queue_Information,
+    &the_mq->Object
+  );
 }
 
 RTEMS_INLINE_ROUTINE POSIX_Message_queue_Control *

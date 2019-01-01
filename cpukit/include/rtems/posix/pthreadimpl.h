@@ -40,14 +40,9 @@ extern "C" {
 /**
  * The following sets the minimum stack size for POSIX threads.
  */
-#define PTHREAD_MINIMUM_STACK_SIZE (_Stack_Minimum() * 2)
+#define PTHREAD_MINIMUM_STACK_SIZE _Configuration_POSIX_Minimum_stack_size
 
-/**
- * The following defines the information control block used to manage
- * this class of objects.
- */
-extern Thread_Information _POSIX_Threads_Information;
-
+#if defined(RTEMS_POSIX_API)
 RTEMS_INLINE_ROUTINE void _POSIX_Threads_Sporadic_timer_insert(
   Thread_Control    *the_thread,
   POSIX_API_Control *api
@@ -62,6 +57,7 @@ RTEMS_INLINE_ROUTINE void _POSIX_Threads_Sporadic_timer_insert(
     _Timespec_To_ticks( &api->Sporadic.sched_ss_repl_period )
   );
 }
+#endif
 
 void _POSIX_Threads_Sporadic_timer( Watchdog_Control *watchdog );
 
@@ -97,7 +93,7 @@ int _POSIX_Thread_Translate_to_sched_policy(
  */
 int _POSIX_Thread_Translate_sched_param(
   int                                  policy,
-  struct sched_param                  *param,
+  const struct sched_param            *param,
   Thread_CPU_budget_algorithms        *budget_algorithm,
   Thread_CPU_budget_algorithm_callout *budget_callout
 );

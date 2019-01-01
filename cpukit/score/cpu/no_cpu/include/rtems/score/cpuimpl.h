@@ -73,6 +73,57 @@ register struct Per_CPU_Control *_CPU_Per_CPU_current asm( "rX" );
  */
 #define _CPU_Get_thread_executing() ( _CPU_Per_CPU_current->executing )
 
+/**
+ * @ingroup CPUContext
+ *
+ * @brief Clobbers all volatile registers with values derived from the pattern
+ * parameter.
+ *
+ * This function is used only in test sptests/spcontext01.
+ *
+ * @param[in] pattern Pattern used to generate distinct register values.
+ *
+ * @see _CPU_Context_validate().
+ */
+void _CPU_Context_volatile_clobber( uintptr_t pattern );
+
+/**
+ * @ingroup CPUContext
+ *
+ * @brief Initializes and validates the CPU context with values derived from
+ * the pattern parameter.
+ *
+ * This function will not return if the CPU context remains consistent.  In
+ * case this function returns the CPU port is broken.
+ *
+ * This function is used only in test sptests/spcontext01.
+ *
+ * @param[in] pattern Pattern used to generate distinct register values.
+ *
+ * @see _CPU_Context_volatile_clobber().
+ */
+void _CPU_Context_validate( uintptr_t pattern );
+
+/**
+ * @brief Emits an illegal instruction.
+ *
+ * This function is used only in test sptests/spfatal26.
+ */
+RTEMS_INLINE_ROUTINE void _CPU_Instruction_illegal( void )
+{
+  __asm__ volatile ( ".word 0" );
+}
+
+/**
+ * @brief Emits a no operation instruction (nop).
+ *
+ * This function is used only in test sptests/spcache01.
+ */
+RTEMS_INLINE_ROUTINE void _CPU_Instruction_no_operation( void )
+{
+  __asm__ volatile ( "nop" );
+}
+
 #ifdef __cplusplus
 }
 #endif

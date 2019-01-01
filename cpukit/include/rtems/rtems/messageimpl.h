@@ -1,8 +1,9 @@
 /**
- * @file rtems/rtems/message.inl
+ * @file
  *
- *  This include file contains the static inline implementation of all
- *  inlined routines in the Message Manager.
+ * @ingroup ClassicMessageQueueImpl
+ *
+ * @brief Classic Message Queue Manager Implementation
  */
 
 /*  COPYRIGHT (c) 1989-2008.
@@ -16,7 +17,7 @@
 #ifndef _RTEMS_RTEMS_MESSAGEIMPL_H
 #define _RTEMS_RTEMS_MESSAGEIMPL_H
 
-#include <rtems/rtems/message.h>
+#include <rtems/rtems/messagedata.h>
 #include <rtems/score/objectimpl.h>
 #include <rtems/score/coremsgimpl.h>
 
@@ -49,12 +50,6 @@ typedef enum {
    */
   MESSAGE_QUEUE_URGENT_REQUEST = 1
 }  Message_queue_Submit_types;
-
-/**
- *  The following defines the information control block used to
- *  manage this class of objects.
- */
-extern Objects_Information _Message_queue_Information;
 
 /**
  *  @brief Message_queue_Submit

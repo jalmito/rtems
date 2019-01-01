@@ -26,7 +26,6 @@ project_lib_DATA = start.$(OBJEXT)
 
 project_lib_DATA += linkcmds
 dist_project_lib_DATA += ../../../../../../bsps/arm/realview-pbx-a9/start/linkcmds.realview_pbx_a9_qemu
-dist_project_lib_DATA += ../../../../../../bsps/arm/realview-pbx-a9/start/linkcmds.realview_pbx_a9_qemu_smp
 
 ###############################################################################
 #                  LibBSP                                                     #
@@ -40,7 +39,6 @@ librtemsbsp_a_SOURCES =
 librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/getentropy/getentropy-cpucounter.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspfatal-default.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/bspgetworkarea-default.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/cpucounter/cpucounterdiff.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/sbrk.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/btimer/btimer-stub.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/start/stackalloc.c
@@ -67,12 +65,14 @@ librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/getserialmouse
 librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/serial/arm-pl011.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/serial/arm-pl050.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/realview-pbx-a9/console/console-config.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/realview-pbx-a9/console/console-polled.c
 
 # Clock
 librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/clock/clock-a9mpcore.c
 
 # Cache
 librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/cache/cache-cp15.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/shared/cache/cache-v7ar-disable-data.S
 
 # Start hooks
 librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/realview-pbx-a9/start/bspstarthooks.c
@@ -86,7 +86,6 @@ librtemsbsp_a_SOURCES += ../../../../../../bsps/arm/realview-pbx-a9/start/fb-con
 ###############################################################################
 
 
-include $(top_srcdir)/../../../../automake/local.am
 include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
 include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
 include $(srcdir)/../../../../../../bsps/arm/realview-pbx-a9/headers.am

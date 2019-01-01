@@ -32,13 +32,16 @@
 
 SPR_RW(SPRG1)
 
-extern unsigned long intrStackPtr;
-
 /*
  *  Driver configuration parameters
  */
 uint32_t   bsp_clicks_per_usec;
 uint32_t   bsp_clock_speed;	       /* Serial clocks per second */
+
+uint32_t _CPU_Counter_frequency(void)
+{
+  return BSP_CRYSTAL_HZ / 4;
+}
 
 /*
  *  bsp_start()
@@ -62,7 +65,7 @@ uint32_t   bsp_clock_speed;	       /* Serial clocks per second */
  */
 void bsp_start(void)
 {
-  register unsigned char* intrStack;
+  char* intrStack;
 
   /*
    * Get CPU identification dynamically.  Note that the get_ppc_cpu_type()
@@ -75,7 +78,8 @@ void bsp_start(void)
   /*
    * Initialize some SPRG registers related to irq handling
    */
-  intrStack = (((unsigned char*)&intrStackPtr) - PPC_MINIMUM_STACK_FRAME_SIZE);
+  intrStack = (char *)_ISR_Stack_area_end -
+     PPC_MINIMUM_STACK_FRAME_SIZE;
   _write_SPRG1((unsigned int)intrStack);
 
   /*
@@ -88,7 +92,6 @@ void bsp_start(void)
    */
   bsp_clicks_per_usec = BSP_CRYSTAL_HZ / 4 / 1000000;
   bsp_clock_speed     = BSP_CLOCK_HZ;	/* for SCI baud rate generator */
-  rtems_counter_initialize_converter(BSP_CRYSTAL_HZ / 4);
 
   /*
    * Initalize RTEMS IRQ system

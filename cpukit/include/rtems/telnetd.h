@@ -59,13 +59,14 @@ typedef struct {
   /**
    * @brief Task priority.
    *
-   * If this parameter is equal to zero, then the priority of network task is
-   * used or 100 if this priority is less than two.
+   * Use 0 for the default value.
    */
   rtems_task_priority priority;
 
   /**
    * @brief Task stack size.
+   *
+   * Use 0 for the default value.
    */
   size_t stack_size;
 
@@ -77,18 +78,39 @@ typedef struct {
   rtems_shell_login_check_t login_check;
 
   /**
-   * @brief Keep standard IO of the caller.
+   * @brief This is an obsolete configuration option.
    *
-   * Telnet takes over the standard input, output and error associated with
-   * task, if this parameter is set to @c true.  In this case, it will @b not
-   * listen on any sockets.  When this parameter is @c false, Telnet will
-   * create other tasks for the shell which listen on sockets.
+   * It must be set to false, otherwise rtems_telnetd_start() will do nothing
+   * and returns with a status of RTEMS_NOT_IMPLEMENTED.
    */
   bool keep_stdio;
+
+  /**
+   * @brief Maximum number of clients which can connect to the system at a
+   * time.
+   *
+   * Use 0 for the default value.
+   */
+  uint16_t client_maximum;
+
+  /**
+   * @brief Server port number in host byte order.
+   *
+   * Use 0 for the default value.
+   */
+  uint16_t port;
 } rtems_telnetd_config_table;
 
 /**
- * @brief Start the Telnet subsystem with the provided configuration.
+ * @brief Starts the Telnet server using the provided configuration.
+ *
+ * @retval RTEMS_SUCCESSFUL Successful operation.
+ * @retval RTEMS_INVALID_ADDRESS The command function in the configuration is
+ *   @c NULL.
+ * @retval RTEMS_RESOURCE_IN_USE The server port is already in use.
+ * @retval RTEMS_NOT_IMPLEMENTED The keep stdio configuration option is true.
+ * @retval RTEMS_UNSATISFIED Not enough resources to start the Telnet server or
+ *   task priority in configuration is invalid.
  */
 rtems_status_code rtems_telnetd_start(const rtems_telnetd_config_table *config);
 

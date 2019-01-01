@@ -7,13 +7,7 @@
  */
 
 /*
- * Copyright (c) 2009-2011 embedded brains GmbH.  All rights reserved.
- *
- *  embedded brains GmbH
- *  Obere Lagerstr. 30
- *  82178 Puchheim
- *  Germany
- *  <rtems@embedded-brains.de>
+ * Copyright (C) 2009, 2018 embedded brains GmbH
  *
  * The license and distribution terms for this file may be
  * found in the file LICENSE in this distribution or at
@@ -21,18 +15,25 @@
  */
 
 #include <libcpu/arm-cp15.h>
+
 #include "cache-cp15.h"
 
 #define CPU_DATA_CACHE_ALIGNMENT 32
+
 #define CPU_INSTRUCTION_CACHE_ALIGNMENT 32
+
 #if defined(__ARM_ARCH_7A__)
 /* Some/many ARM Cortex-A cores have L1 data line length 64 bytes */
 #define CPU_MAXIMAL_CACHE_ALIGNMENT 64
 #endif
 
-#define CPU_CACHE_SUPPORT_PROVIDES_RANGE_FUNCTIONS \
-          ARM_CACHE_L1_CPU_SUPPORT_PROVIDES_RANGE_FUNCTIONS
+#define CPU_CACHE_SUPPORT_PROVIDES_RANGE_FUNCTIONS
 
+#define CPU_CACHE_SUPPORT_PROVIDES_CACHE_SIZE_FUNCTIONS
+
+#if __ARM_ARCH >= 7 && (__ARM_ARCH_PROFILE == 65 || __ARM_ARCH_PROFILE == 82)
+#define CPU_CACHE_SUPPORT_PROVIDES_DISABLE_DATA
+#endif
 
 static inline void _CPU_cache_flush_1_data_line(const void *d_addr)
 {
@@ -179,6 +180,45 @@ static inline void _CPU_cache_disable_instruction(void)
   ctrl &= ~ARM_CP15_CTRL_I;
   arm_cp15_set_control(ctrl);
   rtems_interrupt_local_enable(level);
+}
+
+static inline size_t arm_cp15_get_cache_size(
+  uint32_t level,
+  uint32_t which
+)
+{
+  uint32_t clidr;
+  uint32_t loc;
+  uint32_t ccsidr;
+
+  clidr = arm_cp15_get_cache_level_id();
+  loc = arm_clidr_get_level_of_coherency(clidr);
+
+  if (level >= loc) {
+    return 0;
+  }
+
+  if (level == 0) {
+    level = loc - 1;
+  }
+
+  ccsidr = arm_cp15_get_cache_size_id_for_level(
+    ARM_CP15_CACHE_CSS_LEVEL(level) | which
+  );
+
+  return (1U << arm_ccsidr_get_line_power(ccsidr))
+    * arm_ccsidr_get_associativity(ccsidr)
+    * arm_ccsidr_get_num_sets(ccsidr);
+}
+
+static inline size_t _CPU_cache_get_data_cache_size(uint32_t level)
+{
+  return arm_cp15_get_cache_size(level, ARM_CP15_CACHE_CSS_ID_DATA);
+}
+
+static inline size_t _CPU_cache_get_instruction_cache_size(uint32_t level)
+{
+  return arm_cp15_get_cache_size(level, ARM_CP15_CACHE_CSS_ID_INSTRUCTION);
 }
 
 #include "../../shared/cache/cacheimpl.h"

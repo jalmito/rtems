@@ -76,11 +76,28 @@ static const char *bsp_tqm_get_cib_string( const char *cib_id)
   }
 }
 
+static uint32_t str_to_u32(const char *s)
+{
+  uint32_t v = 0;
+
+  while (true) {
+    unsigned char digit = (unsigned char)*s - '0';
+
+    if (digit > 9) {
+      break;
+    }
+
+    v = (v * 10) + digit;
+    ++s;
+  }
+
+  return v;
+}
+
 static rtems_status_code  bsp_tqm_get_cib_uint32( const char *cib_id,
 					   uint32_t   *result)
 {
   const char *item_ptr;
-  char *end_ptr;
   item_ptr = bsp_tqm_get_cib_string(cib_id);
   if (item_ptr == NULL) {
     return RTEMS_INVALID_ID;
@@ -88,17 +105,17 @@ static rtems_status_code  bsp_tqm_get_cib_uint32( const char *cib_id,
   /*
    * convert string to uint32
    */
-  *result = strtoul(item_ptr,&end_ptr,10);
+  *result = str_to_u32(item_ptr);
   return RTEMS_SUCCESSFUL;
+}
+
+uint32_t _CPU_Counter_frequency(void)
+{
+  return bsp_time_base_frequency;
 }
 
 void bsp_start( void)
 {
-
-  uintptr_t interrupt_stack_start = (uintptr_t) bsp_interrupt_stack_start;
-  uintptr_t interrupt_stack_size = (uintptr_t) bsp_interrupt_stack_end
-    - interrupt_stack_start;
-
   /*
    * Get CPU identification dynamically. Note that the get_ppc_cpu_type()
    * function stores the result in global variables so that it can be used
@@ -142,12 +159,8 @@ void bsp_start( void)
 
   bsp_time_base_frequency = BSP_bus_frequency / 16;
   bsp_clicks_per_usec = bsp_time_base_frequency / 1000000;
-  rtems_counter_initialize_converter(bsp_time_base_frequency);
 
-  /* Initialize exception handler */
-  ppc_exc_initialize(interrupt_stack_start, interrupt_stack_size);
-
-  /* Initalize interrupt support */
+  ppc_exc_initialize();
   bsp_interrupt_initialize();
 
 #ifdef SHOW_MORE_INIT_SETTINGS

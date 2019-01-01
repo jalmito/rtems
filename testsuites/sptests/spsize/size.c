@@ -368,7 +368,7 @@ uninitialized =
 #if (CPU_HARDWARE_FP == 1) || (CPU_SOFTWARE_FP == 1)
                 (sizeof _Thread_Allocated_fp)             +
 #endif
-                (sizeof _Thread_Internal_information)     +
+                (sizeof _Thread_Information)     +
 
 /*threadq.h*/
 
@@ -391,10 +391,8 @@ uninitialized =
 /* cpu.h */
 uninitialized += (sizeof _CPU_Null_fp_context);
 
-#if (CPU_ALLOCATE_INTERRUPT_STACK == TRUE)
 uninitialized += (sizeof _CPU_Interrupt_stack_low) +
                  (sizeof _CPU_Interrupt_stack_high);
-#endif
 
 #endif
 

@@ -4,6 +4,7 @@ include_HEADERS =
 include_HEADERS += ../../../../../bsps/sparc/include/ambapp.h
 include_HEADERS += ../../../../../bsps/sparc/include/ambapp_ids.h
 include_HEADERS += ../../../../../bsps/sparc/include/grlib.h
+include_HEADERS += ../../../../../bsps/sparc/include/grlib_impl.h
 
 include_bspdir = $(includedir)/bsp
 include_bsp_HEADERS =
@@ -61,6 +62,7 @@ include_bsp_HEADERS += ../../../../../bsps/sparc/include/bsp/pcif.h
 include_bsp_HEADERS += ../../../../../bsps/sparc/include/bsp/satcan.h
 include_bsp_HEADERS += ../../../../../bsps/sparc/include/bsp/spictrl.h
 include_bsp_HEADERS += ../../../../../bsps/sparc/include/bsp/spwcuc.h
+include_bsp_HEADERS += ../../../../../bsps/sparc/include/bsp/spwtdp.h
 include_bsp_HEADERS += ../../../../../bsps/sparc/include/bsp/tlib.h
 
 include_drvmgrdir = $(includedir)/drvmgr

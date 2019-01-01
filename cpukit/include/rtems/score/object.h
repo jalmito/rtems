@@ -22,8 +22,6 @@
 
 #include <rtems/score/basedefs.h>
 #include <rtems/score/cpu.h>
-#include <rtems/score/chain.h>
-#include <rtems/score/rbtree.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,16 +33,6 @@ extern "C" {
  * @brief Provides services for all APIs.
  */
 /**@{*/
-
-#if defined(RTEMS_POSIX_API)
-  /**
-   *  This macro is defined when an API is enabled that requires the
-   *  use of strings for object names.  Since the Classic API uses
-   *  32-bit unsigned integers and not strings, this allows us to
-   *  disable this in the smallest RTEMS configuratinos.
-   */
-  #define RTEMS_SCORE_OBJECT_ENABLE_STRING_NAMES
-#endif
 
 /**
  * @defgroup ScoreCPU CPU Architecture Support
@@ -67,50 +55,12 @@ extern "C" {
  *  object names.
  */
 typedef union {
-  #if defined(RTEMS_SCORE_OBJECT_ENABLE_STRING_NAMES)
-    /** This is a pointer to a string name. */
-    const char *name_p;
-  #endif
+  /** This is a pointer to a string name. */
+  const char *name_p;
   /** This is the actual 32-bit "raw" integer name. */
   uint32_t    name_u32;
 } Objects_Name;
 
-#if defined(RTEMS_USE_16_BIT_OBJECT)
-/**
- *  The following type defines the control block used to manage
- *  object IDs.  The format is as follows (0=LSB):
- *
- *     Bits  0 ..  7    = index  (up to 254 objects of a type)
- *     Bits  8 .. 10    = API    (up to 7 API classes)
- *     Bits 11 .. 15    = class  (up to 31 object types per API)
- */
-typedef uint16_t   Objects_Id;
-
-/**
- * This type is used to store the maximum number of allowed objects
- * of each type.
- */
-typedef uint8_t    Objects_Maximum;
-
-#define OBJECTS_INDEX_START_BIT  0U
-#define OBJECTS_API_START_BIT    8U
-#define OBJECTS_CLASS_START_BIT 11U
-
-#define OBJECTS_INDEX_MASK      (Objects_Id)0x00ffU
-#define OBJECTS_API_MASK        (Objects_Id)0x0700U
-#define OBJECTS_CLASS_MASK      (Objects_Id)0xF800U
-
-#define OBJECTS_INDEX_VALID_BITS  (Objects_Id)0x00ffU
-#define OBJECTS_API_VALID_BITS    (Objects_Id)0x0007U
-/* OBJECTS_NODE_VALID_BITS should not be used with 16 bit Ids */
-#define OBJECTS_CLASS_VALID_BITS  (Objects_Id)0x001fU
-
-#define OBJECTS_UNLIMITED_OBJECTS 0x8000U
-
-#define OBJECTS_ID_INITIAL_INDEX  (0)
-#define OBJECTS_ID_FINAL_INDEX    (0xff)
-
-#else
 /**
  *  The following type defines the control block used to manage
  *  object IDs.  The format is as follows (0=LSB):
@@ -210,7 +160,6 @@ typedef uint16_t   Objects_Maximum;
  *  This is the highest value for the index portion of an object Id.
  */
 #define OBJECTS_ID_FINAL_INDEX    (0xffffU)
-#endif
 
 /**
  *  This enumerated type is used in the class field of the object ID.
@@ -225,62 +174,6 @@ typedef enum {
 
 /** This macro is used to generically specify the last API index. */
 #define OBJECTS_APIS_LAST OBJECTS_POSIX_API
-
-/**
- *  The following defines the Object Control Block used to manage
- *  each object local to this node.
- */
-typedef struct {
-  /** This is the chain node portion of an object. */
-  Chain_Node     Node;
-  /** This is the object's ID. */
-  Objects_Id     id;
-  /** This is the object's name. */
-  Objects_Name   name;
-} Objects_Control;
-
-#if defined( RTEMS_MULTIPROCESSING )
-/**
- * @brief This defines the Global Object Control Block used to manage objects
- * resident on other nodes.
- */
-typedef struct {
-  /**
-   * @brief Nodes to manage active and inactive global objects.
-   */
-  union {
-    /**
-     * @brief Inactive global objects reside on a chain.
-     */
-    Chain_Node Inactive;
-
-    struct {
-      /**
-       * @brief Node to lookup an active global object by identifier.
-       */
-      RBTree_Node Id_lookup;
-
-      /**
-       * @brief Node to lookup an active global object by name.
-       */
-      RBTree_Node Name_lookup;
-    } Active;
-  } Nodes;
-
-  /**
-   * @brief The global object identifier.
-   */
-  Objects_Id id;
-
-  /**
-   * @brief The global object name.
-   *
-   * Using an unsigned thirty two bit value is broken but works.  If any API is
-   * MP with variable length names .. BOOM!!!!
-   */
-  uint32_t name;
-} Objects_MP_Control;
-#endif
 
 /**
  *  No object can have this ID.
@@ -383,15 +276,7 @@ RTEMS_INLINE_ROUTINE uint32_t _Objects_Get_node(
   Objects_Id id
 )
 {
-  /*
-   * If using 16-bit Ids, then there is no node field and it MUST
-   * be a single processor system.
-   */
-  #if defined(RTEMS_USE_16_BIT_OBJECT)
-    return 1;
-  #else
-    return (id >> OBJECTS_NODE_START_BIT) & OBJECTS_NODE_VALID_BITS;
-  #endif
+  return (id >> OBJECTS_NODE_START_BIT) & OBJECTS_NODE_VALID_BITS;
 }
 
 /**
@@ -422,20 +307,11 @@ RTEMS_INLINE_ROUTINE Objects_Maximum _Objects_Get_index(
  *
  * @return This method returns an object Id constructed from the arguments.
  */
-RTEMS_INLINE_ROUTINE Objects_Id _Objects_Build_id(
-  Objects_APIs     the_api,
-  uint16_t         the_class,
-  uint8_t          node,
-  uint16_t         index
-)
-{
-  return (( (Objects_Id) the_api )   << OBJECTS_API_START_BIT)   |
-         (( (Objects_Id) the_class ) << OBJECTS_CLASS_START_BIT) |
-         #if !defined(RTEMS_USE_16_BIT_OBJECT)
-           (( (Objects_Id) node )    << OBJECTS_NODE_START_BIT)  |
-         #endif
-         (( (Objects_Id) index )     << OBJECTS_INDEX_START_BIT);
-}
+#define _Objects_Build_id( the_api, the_class, node, index ) \
+  ( (Objects_Id) ( (Objects_Id) the_api   << OBJECTS_API_START_BIT )   | \
+                 ( (Objects_Id) the_class << OBJECTS_CLASS_START_BIT ) | \
+                 ( (Objects_Id) node      << OBJECTS_NODE_START_BIT )  | \
+                 ( (Objects_Id) index     << OBJECTS_INDEX_START_BIT ) )
 
 /**
  * Returns if the object maximum specifies unlimited objects.
@@ -445,10 +321,8 @@ RTEMS_INLINE_ROUTINE Objects_Id _Objects_Build_id(
  * @retval true Unlimited objects are available.
  * @retval false The object count is fixed.
  */
-RTEMS_INLINE_ROUTINE bool _Objects_Is_unlimited( uint32_t maximum )
-{
-  return (maximum & OBJECTS_UNLIMITED_OBJECTS) != 0;
-}
+#define _Objects_Is_unlimited( maximum ) \
+  ( ( ( maximum ) & OBJECTS_UNLIMITED_OBJECTS ) != 0 )
 
 /*
  * We cannot use an inline function for this since it may be evaluated at

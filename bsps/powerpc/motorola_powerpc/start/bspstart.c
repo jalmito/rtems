@@ -119,6 +119,11 @@ static unsigned int get_eumbbar(void) {
 }
 #endif
 
+uint32_t _CPU_Counter_frequency(void)
+{
+  return BSP_bus_frequency / (BSP_time_base_divisor / 1000);
+}
+
 /*
  *  bsp_start
  *
@@ -130,8 +135,6 @@ void bsp_start( void )
 #if !defined(mvme2100)
   unsigned l2cr;
 #endif
-  uintptr_t intrStackStart;
-  uintptr_t intrStackSize;
   prep_t boardManufacturer;
   motorolaBoard myBoard;
   Triv121PgTbl	pt=0;
@@ -212,16 +215,7 @@ void bsp_start( void )
     set_L2CR(0xb9A14000);
 #endif
 
-  /*
-   * Initialize the interrupt related settings.
-   */
-  intrStackStart = (uintptr_t) __rtems_end;
-  intrStackSize = rtems_configuration_get_interrupt_stack_size();
-
-  /*
-   * Initialize default raw exception handlers.
-   */
-  ppc_exc_initialize(intrStackStart, intrStackSize);
+  ppc_exc_initialize();
 
   boardManufacturer   =  checkPrepBoardType(&residualCopy);
   if (boardManufacturer != PREP_Motorola) {
@@ -237,7 +231,6 @@ void bsp_start( void )
 #ifdef SHOW_MORE_INIT_SETTINGS
   printk("Residuals are located at %x\n", (unsigned) &residualCopy);
   printk("Additionnal boot options are %s\n", loaderParam);
-  printk("Software IRQ stack starts at %x with size %u\n", intrStackStart, intrStackSize);
   printk("-----------------------------------------\n");
 #endif
 
@@ -346,9 +339,6 @@ void bsp_start( void )
    *  initialize the device driver parameters
    */
   bsp_clicks_per_usec 	 = BSP_bus_frequency/(BSP_time_base_divisor * 1000);
-  rtems_counter_initialize_converter(
-    BSP_bus_frequency / (BSP_time_base_divisor / 1000)
-  );
 
   /*
    * Initalize RTEMS IRQ system

@@ -100,7 +100,7 @@ static rtems_task workerTask(rtems_task_argument arg)
 {
     int s = arg;
     char msg[80];
-    char reply[100];
+    char reply[120];
     int i;
 
     for (;;) {
@@ -120,7 +120,7 @@ static rtems_task workerTask(rtems_task_argument arg)
     if (close(s) < 0)
         printf("Can't close worker task socket: %s\n", strerror(errno));
     printf("Worker task terminating.\n");
-    rtems_task_delete(RTEMS_SELF);
+    rtems_task_exit();
 }
 
 /*
@@ -152,11 +152,11 @@ static rtems_task serverTask(rtems_task_argument arg)
         s1 = accept(s, (struct sockaddr *)&farAddr, &addrlen);
         if (s1 < 0)
             if (errno == ENXIO)
-                rtems_task_delete(RTEMS_SELF);
+                rtems_task_exit();
             else
                 rtems_panic("Can't accept connection: %s", strerror(errno));
         else
-            printf("ACCEPTED:%lX\n", ntohl(farAddr.sin_addr.s_addr));
+            printf("ACCEPTED:%" PRIu32 "\n", ntohl(farAddr.sin_addr.s_addr));
         spawnTask(workerTask, myPriority, s1);
     }
 }
@@ -220,7 +220,7 @@ static rtems_task clientTask(rtems_task_argument arg)
 {
     clientWorker(arg);
     printf("Client task terminating.\n");
-    rtems_task_delete( RTEMS_SELF );
+    rtems_task_exit();
 }
 
 /*

@@ -21,6 +21,8 @@
 #include <rtems/clockdrv.h>
 #include <rtems/score/percpu.h>
 #include <rtems/score/smpimpl.h>
+#include <rtems/score/timecounter.h>
+#include <rtems/score/thread.h>
 #include <rtems/score/watchdogimpl.h>
 
 #ifdef Clock_driver_nanoseconds_since_last_tick
@@ -110,7 +112,7 @@ static void Clock_driver_timecounter_tick( void )
 volatile uint32_t    Clock_driver_ticks;
 
 #ifdef Clock_driver_support_shutdown_hardware
-void Clock_exit( void );
+#error "Clock_driver_support_shutdown_hardware() is no longer supported"
 #endif
 
 /**
@@ -190,21 +192,6 @@ rtems_isr Clock_isr(
   #endif
 }
 
-#ifdef Clock_driver_support_shutdown_hardware
-/**
- *  @brief Clock_exit
- *
- *  This routine allows the clock driver to exit by masking the interrupt and
- *  disabling the clock's counter.
- */
-void Clock_exit( void )
-{
-  Clock_driver_support_shutdown_hardware();
-
-  /* do not restore old vector */
-}
-#endif
-
 /**
  * @brief Clock_initialize
  *
@@ -244,10 +231,6 @@ rtems_device_driver Clock_initialize(
    *  Now initialize the hardware that is the source of the tick ISR.
    */
   Clock_driver_support_initialize_hardware();
-
-#ifdef Clock_driver_support_shutdown_hardware
-  atexit( Clock_exit );
-#endif
 
   /*
    *  If we are counting ISRs per tick, then initialize the counter.

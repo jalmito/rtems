@@ -27,8 +27,6 @@ extern "C" {
 #include <rtems/score/basedefs.h>
 #include <rtems/score/nios2.h>
 
-#define CPU_HAS_SOFTWARE_INTERRUPT_STACK TRUE
-
 #define CPU_SIMPLE_VECTORED_INTERRUPTS TRUE
 
 #define CPU_INTERRUPT_NUMBER_OF_VECTORS 32
@@ -36,10 +34,6 @@ extern "C" {
 #define CPU_INTERRUPT_MAXIMUM_VECTOR_NUMBER (CPU_INTERRUPT_NUMBER_OF_VECTORS - 1)
 
 #define CPU_PROVIDES_ISR_IS_IN_PROGRESS TRUE
-
-#define CPU_HAS_HARDWARE_INTERRUPT_STACK FALSE
-
-#define CPU_ALLOCATE_INTERRUPT_STACK TRUE
 
 #define CPU_ISR_PASSES_FRAME_POINTER FALSE
 
@@ -56,8 +50,6 @@ extern "C" {
 #define CPU_USE_DEFERRED_FP_SWITCH FALSE
 
 #define CPU_ENABLE_ROBUST_THREAD_DISPATCH FALSE
-
-#define CPU_PROVIDES_IDLE_THREAD_BODY FALSE
 
 #define CPU_STACK_GROWS_UP FALSE
 
@@ -79,13 +71,13 @@ extern "C" {
 
 #define CPU_HEAP_ALIGNMENT CPU_ALIGNMENT
 
-#define CPU_PARTITION_ALIGNMENT CPU_ALIGNMENT
-
 /*
  * Alignment value according to "Nios II Processor Reference" chapter 7
  * "Application Binary Interface" section "Stacks".
  */
 #define CPU_STACK_ALIGNMENT 4
+
+#define CPU_INTERRUPT_STACK_ALIGNMENT CPU_CACHE_LINE_BYTES
 
 /*
  * A Nios II configuration with an external interrupt controller (EIC) supports
@@ -304,33 +296,21 @@ void _CPU_Fatal_halt( uint32_t _source, uint32_t _error )
  */
 void _CPU_Initialize( void );
 
-/**
- * @brief CPU ISR install raw handler.
- */
-void _CPU_ISR_install_raw_handler(
-  uint32_t vector,
-  proc_ptr new_handler,
-  proc_ptr *old_handler
+typedef void ( *CPU_ISR_handler )( uint32_t );
+
+void _CPU_ISR_install_vector(
+  uint32_t         vector,
+  CPU_ISR_handler  new_handler,
+  CPU_ISR_handler *old_handler
 );
 
-/**
- * @brief CPU ISR install vector.
- */
-void _CPU_ISR_install_vector(
-  uint32_t vector,
-  proc_ptr new_handler,
-  proc_ptr *old_handler
-);
+void *_CPU_Thread_Idle_body( uintptr_t ignored );
 
 void _CPU_Context_switch( Context_Control *run, Context_Control *heir );
 
 void _CPU_Context_restore(
   Context_Control *new_context
 ) RTEMS_NO_RETURN;
-
-void _CPU_Context_volatile_clobber( uintptr_t pattern );
-
-void _CPU_Context_validate( uintptr_t pattern );
 
 void _CPU_Exception_frame_print( const CPU_Exception_frame *frame );
 
@@ -352,6 +332,8 @@ static inline uint32_t CPU_swap_u32( uint32_t value )
   (((value&0xff) << 8) | ((value >> 8)&0xff))
 
 typedef uint32_t CPU_Counter_ticks;
+
+uint32_t _CPU_Counter_frequency( void );
 
 CPU_Counter_ticks _CPU_Counter_read( void );
 

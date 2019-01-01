@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 1999,2000,2001 Jonathan Lemon <jlemon@FreeBSD.org>
  * All rights reserved.
  *
@@ -23,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: head/sys/sys/event.h 313704 2017-02-13 19:00:09Z ed $
+ * $FreeBSD: head/sys/sys/event.h 336457 2018-07-18 13:04:03Z dab $
  */
 
 #ifndef _SYS_EVENT_H_
@@ -47,6 +49,22 @@
 #define EVFILT_EMPTY		(-13)	/* empty send socket buf */
 #define EVFILT_SYSCOUNT		13
 
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+#define	EV_SET(kevp_, a, b, c, d, e, f) do {	\
+	*(kevp_) = (struct kevent){		\
+	    .ident = (a),			\
+	    .filter = (b),			\
+	    .flags = (c),			\
+	    .fflags = (d),			\
+	    .data = (e),			\
+	    .udata = (f),			\
+	    .ext = {0},				\
+	};					\
+} while(0)
+#else /* Pre-C99 or not STDC (e.g., C++) */
+/* The definition of the local variable kevp could possibly conflict
+ * with a user-defined value passed in parameters a-f.
+ */
 #define EV_SET(kevp_, a, b, c, d, e, f) do {	\
 	struct kevent *kevp = (kevp_);		\
 	(kevp)->ident = (a);			\
@@ -55,9 +73,26 @@
 	(kevp)->fflags = (d);			\
 	(kevp)->data = (e);			\
 	(kevp)->udata = (f);			\
+	(kevp)->ext[0] = 0;			\
+	(kevp)->ext[1] = 0;			\
+	(kevp)->ext[2] = 0;			\
+	(kevp)->ext[3] = 0;			\
 } while(0)
+#endif
 
 struct kevent {
+	__uintptr_t	ident;		/* identifier for this event */
+	short		filter;		/* filter for event */
+	unsigned short	flags;		/* action flags for kqueue */
+	unsigned int	fflags;		/* filter flag value */
+	__int64_t	data;		/* filter data value */
+	void		*udata;		/* opaque user data identifier */
+	__uint64_t	ext[4];		/* extensions */
+};
+
+#if defined(_WANT_FREEBSD11_KEVENT)
+/* Older structure used in FreeBSD 11.x and older. */
+struct kevent_freebsd11 {
 	__uintptr_t	ident;		/* identifier for this event */
 	short		filter;		/* filter for event */
 	unsigned short	flags;
@@ -65,6 +100,36 @@ struct kevent {
 	__intptr_t	data;
 	void		*udata;		/* opaque user data identifier */
 };
+#endif
+
+#if defined(_WANT_KEVENT32) || (defined(_KERNEL) && defined(__LP64__))
+struct kevent32 {
+	uint32_t	ident;		/* identifier for this event */
+	short		filter;		/* filter for event */
+	u_short		flags;
+	u_int		fflags;
+#ifndef __amd64__
+	uint32_t	pad0;
+#endif
+	int32_t		data1, data2;
+	uint32_t	udata;		/* opaque user data identifier */
+#ifndef __amd64__
+	uint32_t	pad1;
+#endif
+	uint32_t	ext64[8];
+};
+
+#ifdef _WANT_FREEBSD11_KEVENT
+struct kevent32_freebsd11 {
+	u_int32_t	ident;		/* identifier for this event */
+	short		filter;		/* filter for event */
+	u_short		flags;
+	u_int		fflags;
+	int32_t		data;
+	u_int32_t	udata;		/* opaque user data identifier */
+};
+#endif
+#endif
 
 /* actions */
 #define EV_ADD		0x0001		/* add event to kq (implies enable) */
@@ -149,6 +214,7 @@ struct kevent {
 #define NOTE_MSECONDS		0x00000002	/* data is milliseconds */
 #define NOTE_USECONDS		0x00000004	/* data is microseconds */
 #define NOTE_NSECONDS		0x00000008	/* data is nanoseconds */
+#define	NOTE_ABSTIME		0x00000010	/* timeout is absolute */
 
 struct knote;
 SLIST_HEAD(klist, knote);
@@ -173,7 +239,7 @@ struct knlist {
 #define	KNF_LISTLOCKED	0x0001			/* knlist is locked */
 #define	KNF_NOKQLOCK	0x0002			/* do not keep KQ_LOCK */
 
-#define KNOTE(list, hist, flags)	knote(list, hist, flags)
+#define KNOTE(list, hint, flags)	knote(list, hint, flags)
 #define KNOTE_LOCKED(list, hint)	knote(list, hint, KNF_LISTLOCKED)
 #define KNOTE_UNLOCKED(list, hint)	knote(list, hint, 0)
 
@@ -232,7 +298,7 @@ struct knote {
 #define	KN_SCAN		0x100			/* flux set in kqueue_scan() */
 	int			kn_influx;
 	int			kn_sfflags;	/* saved filter flags */
-	intptr_t		kn_sdata;	/* saved data field */
+	int64_t			kn_sdata;	/* saved data field */
 	union {
 		struct		file *p_fp;	/* file data pointer */
 		struct		proc *p_proc;	/* proc pointer */
@@ -253,6 +319,7 @@ struct kevent_copyops {
 	void	*arg;
 	int	(*k_copyout)(void *arg, struct kevent *kevp, int count);
 	int	(*k_copyin)(void *arg, struct kevent *kevp, int count);
+	size_t	kevent_size;
 };
 
 struct thread;

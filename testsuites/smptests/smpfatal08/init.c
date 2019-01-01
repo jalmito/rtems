@@ -34,15 +34,17 @@ const char rtems_test_name[] = "SMPFATAL 8";
  * without BSP support.
  */
 
-void bsp_start_on_secondary_processor(void)
+void bsp_start_on_secondary_processor(struct Per_CPU_Control *cpu_self)
 {
   /* Provided to avoid multiple definitions of the CPU SMP support functions */
+  (void) cpu_self;
 }
 
 #if QORIQ_THREAD_COUNT > 1
-void qoriq_start_thread(void)
+void qoriq_start_thread(Per_CPU_Control *cpu_self)
 {
   /* Provided to avoid multiple definitions of the CPU SMP support functions */
+  (void) cpu_self;
 }
 #endif
 
@@ -71,7 +73,8 @@ void _CPU_SMP_Prepare_start_multitasking(void)
 }
 
 #if defined(RTEMS_PARAVIRT) \
-  || (!defined(__leon__) && !defined(__PPC__) && !defined(__arm__))
+  || (!defined(__leon__) && !defined(__PPC__) \
+    && !defined(__arm__) && !defined(__riscv))
 uint32_t _CPU_SMP_Get_current_processor(void)
 {
   return 0;

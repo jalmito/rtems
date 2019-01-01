@@ -162,6 +162,11 @@ BSP_getBoardType( void )
 	return board_type;
 }
 
+uint32_t _CPU_Counter_frequency(void)
+{
+  return BSP_bus_frequency / (BSP_time_base_divisor / 1000);
+}
+
 /*
  *  bsp_start
  *
@@ -172,8 +177,6 @@ void bsp_start( void )
 {
   unsigned char  *stack;
   char           *chpt;
-  uint32_t       intrStackStart;
-  uint32_t       intrStackSize;
 
   Triv121PgTbl	pt=0;
 
@@ -226,21 +229,7 @@ void bsp_start( void )
 
   *((uint32_t *)stack) = 0;
 
-  /*
-   * Initialize the interrupt related settings
-   * SPRG0 = interrupt nesting level count
-   * SPRG1 = software managed IRQ stack
-   *
-   * This could be done latter (e.g in IRQ_INIT) but it helps to understand
-   * some settings below...
-   */
-  intrStackStart = (uint32_t)__rtems_end;
-  intrStackSize  = rtems_configuration_get_interrupt_stack_size();
-
-  /*
-   * Initialize default raw exception handlers. See vectors/vectors_init.c
-   */
-  ppc_exc_initialize(intrStackStart, intrStackSize);
+  ppc_exc_initialize();
 
   printk("CPU: %s\n", get_ppc_cpu_type_name(current_ppc_cpu));
 
@@ -330,9 +319,6 @@ void bsp_start( void )
    */
 
   bsp_clicks_per_usec = BSP_bus_frequency/(BSP_time_base_divisor * 1000);
-  rtems_counter_initialize_converter(
-    BSP_bus_frequency / (BSP_time_base_divisor / 1000)
-  );
 
 #ifdef SHOW_MORE_INIT_SETTINGS
   printk(

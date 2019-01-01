@@ -105,12 +105,6 @@
  */
 #define CPU_SIMPLE_VECTORED_INTERRUPTS FALSE
 
-#define CPU_HAS_SOFTWARE_INTERRUPT_STACK FALSE
-
-#define CPU_HAS_HARDWARE_INTERRUPT_STACK FALSE
-
-#define CPU_ALLOCATE_INTERRUPT_STACK FALSE
-
 #define CPU_ISR_PASSES_FRAME_POINTER FALSE
 
 #define CPU_HARDWARE_FP FALSE
@@ -124,12 +118,6 @@
 #define CPU_USE_DEFERRED_FP_SWITCH FALSE
 
 #define CPU_ENABLE_ROBUST_THREAD_DISPATCH TRUE
-
-#if defined(ARM_MULTILIB_HAS_WFI)
-  #define CPU_PROVIDES_IDLE_THREAD_BODY TRUE
-#else
-  #define CPU_PROVIDES_IDLE_THREAD_BODY FALSE
-#endif
 
 #define CPU_STACK_GROWS_UP FALSE
 
@@ -159,11 +147,10 @@
 
 #define CPU_HEAP_ALIGNMENT CPU_ALIGNMENT
 
-/* AAPCS, section 4.3.1, Aggregates */
-#define CPU_PARTITION_ALIGNMENT 4
-
 /* AAPCS, section 5.2.1.2, Stack constraints at a public interface */
 #define CPU_STACK_ALIGNMENT 8
+
+#define CPU_INTERRUPT_STACK_ALIGNMENT CPU_CACHE_LINE_BYTES
 
 /*
  * Bitfield handler macros.
@@ -477,10 +464,12 @@ void _CPU_Context_Initialize(
  */
 void _CPU_Initialize( void );
 
+typedef void ( *CPU_ISR_handler )( void );
+
 void _CPU_ISR_install_vector(
-  uint32_t vector,
-  proc_ptr new_handler,
-  proc_ptr *old_handler
+  uint32_t         vector,
+  CPU_ISR_handler  new_handler,
+  CPU_ISR_handler *old_handler
 );
 
 /**
@@ -496,10 +485,6 @@ void _CPU_Context_restore( Context_Control *new_context )
     RTEMS_NO_RETURN;
   #define _CPU_Start_multitasking _ARMV7M_Start_multitasking
 #endif
-
-void _CPU_Context_volatile_clobber( uintptr_t pattern );
-
-void _CPU_Context_validate( uintptr_t pattern );
 
 #ifdef RTEMS_SMP
   uint32_t _CPU_SMP_Initialize( void );
@@ -596,16 +581,19 @@ static inline uint16_t CPU_swap_u16( uint16_t value )
 
 typedef uint32_t CPU_Counter_ticks;
 
+uint32_t _CPU_Counter_frequency( void );
+
 CPU_Counter_ticks _CPU_Counter_read( void );
 
-CPU_Counter_ticks _CPU_Counter_difference(
+static inline CPU_Counter_ticks _CPU_Counter_difference(
   CPU_Counter_ticks second,
   CPU_Counter_ticks first
-);
+)
+{
+  return second - first;
+}
 
-#if CPU_PROVIDES_IDLE_THREAD_BODY == TRUE
-  void *_CPU_Thread_Idle_body( uintptr_t ignored );
-#endif
+void *_CPU_Thread_Idle_body( uintptr_t ignored );
 
 /** @} */
 

@@ -22,11 +22,13 @@
  *  RTEMS basic type definitions
  */
 
+#include <sys/cpuset.h>
+#include <sys/_timespec.h>
+#include <sys/_timeval.h>
 #include <stdint.h>
-#include <rtems/score/heap.h>
+#include <rtems/score/heapinfo.h>
 #include <rtems/score/object.h>
-#include <rtems/score/priority.h>
-#include <rtems/score/watchdog.h>
+#include <rtems/score/watchdogticks.h>
 #include <rtems/rtems/modes.h>
 #if defined(RTEMS_MULTIPROCESSING)
 #include <rtems/score/mpci.h>
@@ -47,21 +49,21 @@ extern "C" {
  *
  * @deprecated Use @c float instead.
  */
-typedef single_precision rtems_single;
+typedef single_precision rtems_single RTEMS_DEPRECATED;
 
 /**
  * @brief Double precision float type.
  *
  * @deprecated Use @c double instead.
  */
-typedef double_precision rtems_double;
+typedef double_precision rtems_double RTEMS_DEPRECATED;
 
 /**
  * @brief RTEMS boolean type.
  *
  * @deprecated Use @c bool instead
  */
-typedef boolean          rtems_boolean;
+typedef boolean          rtems_boolean RTEMS_DEPRECATED;
 #endif
 
 /**
@@ -89,13 +91,13 @@ typedef Objects_Id       rtems_id;
 /**
  * @brief Public name for task context area.
  */
-typedef Context_Control            rtems_context;
+typedef Context_Control            rtems_context RTEMS_DEPRECATED;
 
 #if (CPU_HARDWARE_FP == TRUE) || (CPU_SOFTWARE_FP == TRUE)
 /**
  * @brief Public name for task floating point context area.
  */
-typedef Context_Control_fp         rtems_context_fp;
+typedef Context_Control_fp         rtems_context_fp RTEMS_DEPRECATED;
 #endif
 
 #if (CPU_ISR_PASSES_FRAME_POINTER == TRUE)
@@ -115,7 +117,7 @@ typedef CPU_Interrupt_frame        rtems_interrupt_frame;
  * @brief Information structure returned by the Heap Handler via the Region
  * Manager.
  */
-typedef Heap_Information_block region_information_block;
+typedef Heap_Information_block region_information_block RTEMS_DEPRECATED;
 
 /**
  * @brief Used to manage and manipulate intervals specified by
@@ -129,7 +131,7 @@ typedef Watchdog_Interval rtems_interval;
  * When using nanoseconds granularity timing, RTEMS may internally use a
  * variety of representations.
  */
-typedef struct timespec rtems_thread_cpu_usage_t;
+typedef struct timespec rtems_thread_cpu_usage_t RTEMS_DEPRECATED;
 
 /**
  * @brief Data structure to manage and manipulate calendar
@@ -165,11 +167,6 @@ typedef struct {
    */
   uint32_t   ticks;
 }   rtems_time_of_day;
-
-/**
- * @brief Task mode type.
- */
-typedef Modes_Control rtems_mode;
 
 /*
  *  MPCI related entries

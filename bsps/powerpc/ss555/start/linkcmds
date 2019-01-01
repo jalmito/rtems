@@ -16,6 +16,7 @@
 
 OUTPUT_FORMAT("elf32-powerpc", "elf32-powerpc", "elf32-powerpc")
 OUTPUT_ARCH(powerpc) 
+STARTUP(start.o)
 ENTRY(start)
 EXTERN(_vectors)
 
@@ -232,21 +233,9 @@ SECTIONS
 
   PROVIDE(_end = bss.end);
 
-  /*
-   * Initialization stack
-   */
-  InitStack_start = ALIGN(0x10);
-  . += 0x1000;
-  initStack = .;
-  PROVIDE(initStackPtr = initStack);
-
-  /*
-   * Interrupt stack
-   */
-  IntrStack_start = ALIGN(0x10);
-  . += 0x4000;
-  intrStack = .;
-  PROVIDE(intrStackPtr = intrStack);
+  .rtemsstack (NOLOAD) : {
+    *(SORT(.rtemsstack.*))
+  }
 
   /*
    * Work Area

@@ -56,7 +56,7 @@ void _CPU_Initialize(void)
 
 
 
-  proc_ptr ignored;
+  CPU_ISR_raw_handler ignored;
 
 #if 0
   /* occassionally useful debug stuff */
@@ -101,21 +101,14 @@ uint32_t   _CPU_ISR_Get_level( void )
     return (_tmpimask & 0xffe0) ? 0 : 1;
 }
 
-/*
- *  _CPU_ISR_install_raw_handler
- *
- *  NO_CPU Specific Information:
- *
- *  XXX document implementation including references if appropriate
- */
-
 void _CPU_ISR_install_raw_handler(
-  uint32_t    vector,
-  proc_ptr    new_handler,
-  proc_ptr   *old_handler
+  uint32_t             vector,
+  CPU_ISR_raw_handler  new_handler,
+  CPU_ISR_raw_handler *old_handler
 )
 {
-   proc_ptr *interrupt_table = NULL;
+   CPU_ISR_raw_handler *interrupt_table;
+
   /*
    *  This is where we install the interrupt handler into the "raw" interrupt
    *  table used by the CPU to dispatch interrupt handlers.
@@ -129,32 +122,13 @@ void _CPU_ISR_install_raw_handler(
 
 }
 
-/*
- *  _CPU_ISR_install_vector
- *
- *  This kernel routine installs the RTEMS handler for the
- *  specified vector.
- *
- *  Input parameters:
- *    vector      - interrupt vector number
- *    old_handler - former ISR for this vector number
- *    new_handler - replacement ISR for this vector number
- *
- *  Output parameters:  NONE
- *
- *
- *  NO_CPU Specific Information:
- *
- *  XXX document implementation including references if appropriate
- */
-
 void _CPU_ISR_install_vector(
-  uint32_t    vector,
-  proc_ptr    new_handler,
-  proc_ptr   *old_handler
+  uint32_t         vector,
+  CPU_ISR_handler  new_handler,
+  CPU_ISR_handler *old_handler
 )
 {
-   proc_ptr ignored;
+   CPU_ISR_raw_handler ignored;
 
    *old_handler = _ISR_Vector_table[ vector ];
 
@@ -168,14 +142,12 @@ void _CPU_ISR_install_vector(
     _CPU_ISR_install_raw_handler( vector, _ISR_Handler, &ignored );
 }
 
-#if (CPU_PROVIDES_IDLE_THREAD_BODY == TRUE)
-void *_CPU_Thread_Idle_body(uint32_t ignored)
+void *_CPU_Thread_Idle_body(uintptr_t ignored)
 {
   while (1) {
     __asm__ __volatile__("ssync; idle; ssync");
   }
 }
-#endif
 
 /*
  * Copied from the arm port.
@@ -197,18 +169,4 @@ void _CPU_Context_Initialize(
     the_context->register_sp = stack_high - 12;
     the_context->register_rets = (uint32_t) entry_point;
     the_context->imask = new_level ? 0 : 0xffff;
-}
-
-
-
-/*
- *  _CPU_Install_interrupt_stack
- *
- *  NO_CPU Specific Information:
- *
- *  XXX document implementation including references if appropriate
- */
-
-void _CPU_Install_interrupt_stack( void )
-{
 }

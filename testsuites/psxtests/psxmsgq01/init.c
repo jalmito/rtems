@@ -910,6 +910,7 @@ void wait_for_signal(
   int           expect_signal
 )
 {
+#if defined(RTEMS_POSIX_API)
   siginfo_t         siginfo;
   int               status;
   struct timespec   timeout;
@@ -936,10 +937,12 @@ void wait_for_signal(
     fatal_int_service_status( signo, -1, "error return status");
     fatal_posix_service_status( errno, EAGAIN, "errno EAGAIN");
   }
+#endif
 }
 
 void verify_notify(void)
 {
+#if defined(RTEMS_POSIX_API)
   struct sigevent event;
   int             status;
   timer_t         timer_id;
@@ -1019,7 +1022,7 @@ void verify_notify(void)
   Show_send_msg_to_que( "Init:", RW_QUEUE, 0 );
   wait_for_signal( &set, 3, 0 );
   Read_msg_from_que( RW_QUEUE, 0 );
-
+#endif
 }
 
 void verify_with_threads(void)

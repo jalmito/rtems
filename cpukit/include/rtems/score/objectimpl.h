@@ -19,7 +19,7 @@
 #ifndef _RTEMS_SCORE_OBJECTIMPL_H
 #define _RTEMS_SCORE_OBJECTIMPL_H
 
-#include <rtems/score/object.h>
+#include <rtems/score/objectdata.h>
 #include <rtems/score/apimutex.h>
 #include <rtems/score/isrlock.h>
 #include <rtems/score/threaddispatch.h>
@@ -43,53 +43,11 @@ typedef bool    (*Objects_Name_comparators)(
   uint16_t     /* length */
 );
 
-/**
- *  This enumerated type is used in the class field of the object ID
- *  for RTEMS internal object classes.
- */
-typedef enum {
-  OBJECTS_INTERNAL_NO_CLASS =  0,
-  OBJECTS_INTERNAL_THREADS  =  1
-} Objects_Internal_API;
-
 /** This macro is used to generically specify the last API index. */
 #define OBJECTS_INTERNAL_CLASSES_LAST OBJECTS_INTERNAL_THREADS
 
-/**
- *  This enumerated type is used in the class field of the object ID
- *  for the RTEMS Classic API.
- */
-typedef enum {
-  OBJECTS_CLASSIC_NO_CLASS     = 0,
-  OBJECTS_RTEMS_TASKS          = 1,
-  OBJECTS_RTEMS_TIMERS         = 2,
-  OBJECTS_RTEMS_SEMAPHORES     = 3,
-  OBJECTS_RTEMS_MESSAGE_QUEUES = 4,
-  OBJECTS_RTEMS_PARTITIONS     = 5,
-  OBJECTS_RTEMS_REGIONS        = 6,
-  OBJECTS_RTEMS_PORTS          = 7,
-  OBJECTS_RTEMS_PERIODS        = 8,
-  OBJECTS_RTEMS_EXTENSIONS     = 9,
-  OBJECTS_RTEMS_BARRIERS       = 10
-} Objects_Classic_API;
-
 /** This macro is used to generically specify the last API index. */
 #define OBJECTS_RTEMS_CLASSES_LAST OBJECTS_RTEMS_BARRIERS
-
-/**
- *  This enumerated type is used in the class field of the object ID
- *  for the POSIX API.
- */
-typedef enum {
-  OBJECTS_POSIX_NO_CLASS            = 0,
-  OBJECTS_POSIX_THREADS             = 1,
-  OBJECTS_POSIX_KEYS                = 2,
-  OBJECTS_POSIX_INTERRUPTS          = 3,
-  OBJECTS_POSIX_MESSAGE_QUEUES      = 5,
-  OBJECTS_POSIX_SEMAPHORES          = 7,
-  OBJECTS_POSIX_TIMERS              = 9,
-  OBJECTS_POSIX_SHMS                = 12
-} Objects_POSIX_API;
 
 /** This macro is used to generically specify the last API index. */
 #define OBJECTS_POSIX_CLASSES_LAST OBJECTS_POSIX_SHMS
@@ -102,75 +60,6 @@ typedef enum {
   OBJECTS_FAKE_OBJECTS_NO_CLASS   = 0,
   OBJECTS_FAKE_OBJECTS_SCHEDULERS = 1
 } Objects_Fake_objects_API;
-
-#if defined(RTEMS_MULTIPROCESSING)
-/**
- *  The following type defines the callout used when a local task
- *  is extracted from a remote thread queue (i.e. it's proxy must
- *  extracted from the remote queue).
- */
-typedef void ( *Objects_Thread_queue_Extract_callout )(
-  Thread_Control *,
-  Objects_Id
-);
-#endif
-
-/**
- *  The following defines the structure for the information used to
- *  manage each class of objects.
- */
-typedef struct {
-  /** This field indicates the API of this object class. */
-  Objects_APIs      the_api;
-  /** This is the class of this object set. */
-  uint16_t          the_class;
-  /** This is the minimum valid id of this object class. */
-  Objects_Id        minimum_id;
-  /** This is the maximum valid id of this object class. */
-  Objects_Id        maximum_id;
-  /** This is the maximum number of objects in this class. */
-  Objects_Maximum   maximum;
-  /** This is the true if unlimited objects in this class. */
-  bool              auto_extend;
-  /** This is the number of objects in a block. */
-  Objects_Maximum   allocation_size;
-  /** This is the size in bytes of each object instance. */
-  size_t            size;
-  /** This points to the table of local objects. */
-  Objects_Control **local_table;
-  /** This is the chain of inactive control blocks. */
-  Chain_Control     Inactive;
-  /** This is the number of objects on the Inactive list. */
-  Objects_Maximum   inactive;
-  /** This is the number of inactive objects per block. */
-  uint32_t         *inactive_per_block;
-  /** This is a table to the chain of inactive object memory blocks. */
-  void            **object_blocks;
-  #if defined(RTEMS_SCORE_OBJECT_ENABLE_STRING_NAMES)
-    /** This is true if names are strings. */
-    bool              is_string;
-  #endif
-  /** This is the maximum length of names. */
-  uint16_t          name_length;
-  #if defined(RTEMS_MULTIPROCESSING)
-    /** This is this object class' method called when extracting a thread. */
-    Objects_Thread_queue_Extract_callout extract;
-
-    /**
-     * @brief The global objects of this object information sorted by object
-     * identifier.
-     */
-    RBTree_Control   Global_by_id;
-
-    /**
-     * @brief The global objects of this object information sorted by object
-     * name.
-     *
-     * Objects with the same name are sorted according to their identifier.
-     */
-    RBTree_Control   Global_by_name;
-  #endif
-}   Objects_Information;
 
 /**
  *  The following is referenced to the node number of the local node.
@@ -189,6 +78,11 @@ extern uint16_t _Objects_Maximum_nodes;
 #else
 #define _Objects_Maximum_nodes 1
 #endif
+
+/**
+ * This is the minimum object ID index associated with an object.
+ */
+#define OBJECTS_INDEX_MINIMUM 1U
 
 /**
  *  The following is the list of information blocks per API for each object
@@ -221,83 +115,13 @@ void _Objects_Shrink_information(
   Objects_Information *information
 );
 
-void _Objects_Do_initialize_information(
-  Objects_Information *information,
-  Objects_APIs         the_api,
-  uint16_t             the_class,
-  uint32_t             maximum,
-  uint16_t             size,
-  bool                 is_string,
-  uint32_t             maximum_name_length
-#if defined(RTEMS_MULTIPROCESSING)
-  ,
-  Objects_Thread_queue_Extract_callout extract
-#endif
-);
-
 /**
- *  @brief Initialize object Information
+ * @brief Initializes the specified objects information.
  *
- *  This function initializes an object class information record.
- *  SUPPORTS_GLOBAL is true if the object class supports global
- *  objects, and false otherwise.  Maximum indicates the number
- *  of objects required in this class and size indicates the size
- *  in bytes of each control block for this object class.  The
- *  name length and string designator are also set.  In addition,
- *  the class may be a task, therefore this information is also included.
- *
- *  @param[in] information points to an object class information block.
- *  @param[in] the_api indicates the API associated with this information block.
- *  @param[in] the_class indicates the class of object being managed
- *             by this information block.  It is specific to @a the_api.
- *  @param[in] maximum is the maximum number of instances of this object
- *             class which may be concurrently active.
- *  @param[in] size is the size of the data structure for this class.
- *  @param[in] is_string is true if this object uses string style names.
- *  @param[in] maximum_name_length is the maximum length of object names.
+ * The objects information must be statically pre-initialized with the
+ * OBJECTS_INFORMATION_DEFINE() macro before this function is called.
  */
-#if defined(RTEMS_MULTIPROCESSING)
-  #define _Objects_Initialize_information( \
-    information, \
-    the_api, \
-    the_class, \
-    maximum, \
-    size, \
-    is_string, \
-    maximum_name_length, \
-    extract \
-  ) \
-    _Objects_Do_initialize_information( \
-      information, \
-      the_api, \
-      the_class, \
-      maximum, \
-      size, \
-      is_string, \
-      maximum_name_length, \
-      extract \
-    )
-#else
-  #define _Objects_Initialize_information( \
-    information, \
-    the_api, \
-    the_class, \
-    maximum, \
-    size, \
-    is_string, \
-    maximum_name_length, \
-    extract \
-  ) \
-    _Objects_Do_initialize_information( \
-      information, \
-      the_api, \
-      the_class, \
-      maximum, \
-      size, \
-      is_string, \
-      maximum_name_length \
-    )
-#endif
+void _Objects_Initialize_information( Objects_Information *information );
 
 /**
  *  @brief Object API Maximum Class
@@ -685,22 +509,31 @@ size_t _Objects_Name_to_string(
  *  @retval If successful, true is returned.  Otherwise false is returned.
  */
 bool _Objects_Set_name(
-  Objects_Information *information,
-  Objects_Control     *the_object,
-  const char          *name
+  const Objects_Information *information,
+  Objects_Control           *the_object,
+  const char                *name
 );
 
 /**
- *  @brief Removes object from namespace.
+ * @brief Removes object with a 32-bit integer name from its namespace.
  *
- *  This function removes @a the_object from the namespace.
- *
- *  @param[in] information points to an Object Information Table.
- *  @param[in] the_object is a pointer to an object.
+ * @param[in] information The corresponding object information table.
+ * @param[in] the_object The object.
  */
-void _Objects_Namespace_remove(
-  Objects_Information  *information,
-  Objects_Control      *the_object
+void _Objects_Namespace_remove_u32(
+  const Objects_Information *information,
+  Objects_Control           *the_object
+);
+
+/**
+ * @brief Removes object with a string name from its namespace.
+ *
+ * @param[in] information The corresponding object information table.
+ * @param[in] the_object The object.
+ */
+void _Objects_Namespace_remove_string(
+  const Objects_Information *information,
+  Objects_Control           *the_object
 );
 
 /**
@@ -713,8 +546,8 @@ void _Objects_Namespace_remove(
  *  @param[in] the_object is a pointer to an object
  */
 void _Objects_Close(
-  Objects_Information  *information,
-  Objects_Control      *the_object
+  const Objects_Information *information,
+  Objects_Control           *the_object
 );
 
 /**
@@ -728,11 +561,18 @@ Objects_Maximum _Objects_Active_count(
   const Objects_Information *information
 );
 
+RTEMS_INLINE_ROUTINE bool _Objects_Has_string_name(
+  const Objects_Information *information
+)
+{
+  return information->name_length > 0;
+}
+
 RTEMS_INLINE_ROUTINE Objects_Maximum _Objects_Extend_size(
   const Objects_Information *information
 )
 {
-  return information->auto_extend ? information->allocation_size : 0;
+  return information->objects_per_block;
 }
 
 /**
@@ -814,6 +654,52 @@ RTEMS_INLINE_ROUTINE bool _Objects_Are_ids_equal(
 }
 
 /**
+ * Returns the identifier with the minimum index for the specified identifier.
+ *
+ * The specified identifier must have valid API, class and node fields.
+ *
+ * @param[in] id The identifier to be processed.
+ *
+ * @return The corresponding ID with the minimum index.
+ */
+RTEMS_INLINE_ROUTINE Objects_Id _Objects_Get_minimum_id( Objects_Id id )
+{
+  id &= ~OBJECTS_INDEX_MASK;
+  id += (Objects_Id) OBJECTS_INDEX_MINIMUM << OBJECTS_INDEX_START_BIT;
+  return id;
+}
+
+/**
+ * Returns the maximum index of the specified object class.
+ *
+ * @param[in] information The object information.
+ *
+ * @return The maximum index of the specified object class.
+ */
+RTEMS_INLINE_ROUTINE Objects_Maximum _Objects_Get_maximum_index(
+  const Objects_Information *information
+)
+{
+  return _Objects_Get_index( information->maximum_id );
+}
+
+/**
+ * @brief Returns true if the automatic object extension (unlimited objects) is
+ * enabled, otherwise false.
+ *
+ * @param[in] information The object information.
+ *
+ * @retval true The automatic object extension (unlimited objects) is enabled.
+ * @retval false Otherwise.
+ */
+RTEMS_INLINE_ROUTINE Objects_Maximum _Objects_Is_auto_extend(
+  const Objects_Information *information
+)
+{
+  return information->objects_per_block != 0;
+}
+
+/**
  * This function sets the pointer to the local_table object
  * referenced by the index.
  *
@@ -828,9 +714,9 @@ RTEMS_INLINE_ROUTINE bool _Objects_Are_ids_equal(
  */
 
 RTEMS_INLINE_ROUTINE void _Objects_Set_local_object(
-  Objects_Information *information,
-  uint32_t             index,
-  Objects_Control     *the_object
+  const Objects_Information *information,
+  uint32_t                   index,
+  Objects_Control           *the_object
 )
 {
   /*
@@ -838,12 +724,10 @@ RTEMS_INLINE_ROUTINE void _Objects_Set_local_object(
    *  where the Id is known to be good.  Therefore, this should NOT
    *  occur in normal situations.
    */
-  #if defined(RTEMS_DEBUG)
-    if ( index > information->maximum )
-      return;
-  #endif
+  _Assert( index >= OBJECTS_INDEX_MINIMUM );
+  _Assert( index <= _Objects_Get_maximum_index( information ) );
 
-  information->local_table[ index ] = the_object;
+  information->local_table[ index - OBJECTS_INDEX_MINIMUM ] = the_object;
 }
 
 /**
@@ -861,8 +745,8 @@ RTEMS_INLINE_ROUTINE void _Objects_Set_local_object(
  */
 
 RTEMS_INLINE_ROUTINE void _Objects_Invalidate_Id(
-  Objects_Information  *information,
-  Objects_Control      *the_object
+  const Objects_Information *information,
+  Objects_Control           *the_object
 )
 {
   _Assert( information != NULL );
@@ -910,12 +794,12 @@ RTEMS_INLINE_ROUTINE void _Objects_Open(
  * @param[in] name is the name of the object to make accessible
  */
 RTEMS_INLINE_ROUTINE void _Objects_Open_u32(
-  Objects_Information *information,
-  Objects_Control     *the_object,
-  uint32_t             name
+  const Objects_Information *information,
+  Objects_Control           *the_object,
+  uint32_t                   name
 )
 {
-  /* ASSERT: information->is_string == false */
+  _Assert( !_Objects_Has_string_name( information ) );
   the_object->name.name_u32 = name;
 
   _Objects_Set_local_object(
@@ -934,15 +818,13 @@ RTEMS_INLINE_ROUTINE void _Objects_Open_u32(
  * @param[in] name is the name of the object to make accessible
  */
 RTEMS_INLINE_ROUTINE void _Objects_Open_string(
-  Objects_Information *information,
-  Objects_Control     *the_object,
-  const char          *name
+  const Objects_Information *information,
+  Objects_Control           *the_object,
+  const char                *name
 )
 {
-  #if defined(RTEMS_SCORE_OBJECT_ENABLE_STRING_NAMES)
-    /* ASSERT: information->is_string */
-    the_object->name.name_p = name;
-  #endif
+  _Assert( _Objects_Has_string_name( information ) );
+  the_object->name.name_p = name;
 
   _Objects_Set_local_object(
     information,

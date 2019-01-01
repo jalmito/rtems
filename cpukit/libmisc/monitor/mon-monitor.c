@@ -32,11 +32,6 @@
 
 #include <rtems/monitor.h>
 
-/* set by trap handler */
-extern rtems_tcb       *debugger_interrupted_task;
-extern rtems_context   *debugger_interrupted_task_context;
-extern uint32_t   debugger_trap;
-
 /*
  * Various id's for the monitor
  * They need to be public variables for access by other agencies
@@ -223,7 +218,6 @@ static const rtems_monitor_command_entry_t rtems_monitor_commands[] = {
 #else
   #define RTEMS_MONITOR_POSIX_NEXT 19
 #endif
-#ifdef RTEMS_POSIX_API
     { "pthread",
       "Display information about the specified pthreads. "
       "Default is to display information about all pthreads on this node.\n"
@@ -234,9 +228,6 @@ static const rtems_monitor_command_entry_t rtems_monitor_commands[] = {
       &rtems_monitor_commands[RTEMS_MONITOR_POSIX_NEXT],
     },
   #define RTEMS_MONITOR_DEBUGGER_NEXT (RTEMS_MONITOR_POSIX_NEXT + 1)
-#else
-  #define RTEMS_MONITOR_DEBUGGER_NEXT RTEMS_MONITOR_POSIX_NEXT
-#endif
 #ifdef CPU_INVOKE_DEBUGGER
     { "debugger",
       "Enter the debugger, if possible. "

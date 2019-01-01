@@ -17,7 +17,7 @@
 #ifndef _RTEMS_RTEMS_REGIONIMPL_H
 #define _RTEMS_RTEMS_REGIONIMPL_H
 
-#include <rtems/rtems/region.h>
+#include <rtems/rtems/regiondata.h>
 #include <rtems/score/apimutex.h>
 #include <rtems/score/heapimpl.h>
 #include <rtems/score/objectimpl.h>
@@ -37,12 +37,6 @@ extern "C" {
 
 #define REGION_OF_THREAD_QUEUE_QUEUE( queue ) \
   RTEMS_CONTAINER_OF( queue, Region_Control, Wait_queue.Queue )
-
-/**
- *  The following defines the information control block used to
- *  manage this class of objects.
- */
-extern Objects_Information _Region_Information;
 
 /**
  *  @brief Region_Allocate

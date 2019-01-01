@@ -24,6 +24,7 @@
  *   bar1 RESOURCE 0xf0000000            L2-Cache registers
  */
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,7 +33,6 @@
 
 #include <bsp.h>
 #include <rtems/bspIo.h>
-#include <rtems/score/isrlock.h> /* spin-lock */
 #include <pci.h>
 
 #include <ambapp.h>
@@ -45,15 +45,7 @@
 
 #include <bsp/gr_leon4_n2x.h>
 
-/* map via rtems_interrupt_lock_* API: */
-#define SPIN_DECLARE(lock) RTEMS_INTERRUPT_LOCK_MEMBER(lock)
-#define SPIN_INIT(lock, name) rtems_interrupt_lock_initialize(lock, name)
-#define SPIN_LOCK(lock, level) rtems_interrupt_lock_acquire_isr(lock, &level)
-#define SPIN_LOCK_IRQ(lock, level) rtems_interrupt_lock_acquire(lock, &level)
-#define SPIN_UNLOCK(lock, level) rtems_interrupt_lock_release_isr(lock, &level)
-#define SPIN_UNLOCK_IRQ(lock, level) rtems_interrupt_lock_release(lock, &level)
-#define SPIN_IRQFLAGS(k) rtems_interrupt_lock_context k
-#define SPIN_ISR_IRQFLAGS(k) SPIN_IRQFLAGS(k)
+#include <grlib_impl.h>
 
 /* Determines which PCI address the AHB masters on the LEON-N2X board will
  * access when accessing the AHB to PCI window, it should be set so that the
@@ -508,13 +500,13 @@ int gr_cpci_leon4_n2x_init1(struct drvmgr_dev *dev)
 
 	priv->devinfo = devinfo = (struct pci_dev_info *)dev->businfo;
 	priv->pcidev = devinfo->pcidev;
-	printf("\n\n--- GR-CPCI-LEON4-N2X[%d] ---\n", dev->minor_drv);
-	printf(" PCI BUS: 0x%x, SLOT: 0x%x, FUNCTION: 0x%x\n",
+	printk("\n\n--- GR-CPCI-LEON4-N2X[%d] ---\n", dev->minor_drv);
+	printk(" PCI BUS: 0x%x, SLOT: 0x%x, FUNCTION: 0x%x\n",
 		PCI_DEV_EXPAND(priv->pcidev));
-	printf(" PCI VENDOR: 0x%04x, DEVICE: 0x%04x\n",
+	printk(" PCI VENDOR: 0x%04x, DEVICE: 0x%04x\n",
 		devinfo->id.vendor, devinfo->id.device);
 	for (i = 0; i < 3; i++) {
-		printf(" PCI BAR[%d]: 0x%08lx - 0x%08lx\n",
+		printk(" PCI BAR[%d]: 0x%08" PRIx32 " - 0x%08" PRIx32 "\n",
 			i, devinfo->resources[i].address,
 			devinfo->resources[i].address +
 			(devinfo->resources[i].size - 1));
@@ -522,7 +514,7 @@ int gr_cpci_leon4_n2x_init1(struct drvmgr_dev *dev)
 		if (devinfo->resources[i].size == 0)
 			return DRVMGR_ENORES;
 	}
-	printf(" IRQ: %d\n\n\n", devinfo->irq);
+	printk(" IRQ: %d\n\n\n", devinfo->irq);
 
 	/* Initialize spin-lock for this PCI perihperal device. This is to
 	 * protect the Interrupt Controller Registers. The genirq layer is
@@ -568,7 +560,7 @@ int gr_cpci_leon4_n2x_init1(struct drvmgr_dev *dev)
 
 	if ((status = gr_cpci_leon4_n2x_hw_init1(priv)) != 0) {
 		genirq_destroy(priv->genirq);
-		printf(" Failed to initialize GR-CPCI-LEON4-N2X HW: %d\n", status);
+		printk(" Failed to initialize GR-CPCI-LEON4-N2X HW: %d\n", status);
 		return DRVMGR_FAIL;
 	}
 
@@ -769,8 +761,9 @@ void gr_cpci_leon4_n2x_print_dev(struct drvmgr_dev *dev, int options)
 
 	bar0 = devinfo->resources[0].address;
 	bar0_size = devinfo->resources[0].size;
-	printf(" PCI BAR[0]: 0x%lx - 0x%lx\n", bar0, bar0 + bar0_size - 1);
-	printf(" IRQ REGS:        0x%x\n", (unsigned int)priv->irq);
+	printf(" PCI BAR[0]: 0x%" PRIx32 " - 0x%" PRIx32 "\n",
+		bar0, bar0 + bar0_size - 1);
+	printf(" IRQ REGS:        0x%" PRIxPTR "\n", (uintptr_t)priv->irq);
 	printf(" IRQ:             %d\n", devinfo->irq);
 	printf(" PCI REVISION:    %d\n", devinfo->rev);
 	printf(" FREQ:            %d Hz\n", priv->amba_freq_hz);

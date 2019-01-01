@@ -15,7 +15,6 @@ project_lib_DATA = start.$(OBJEXT)
 project_lib_DATA += linkcmds
 
 project_lib_LIBRARIES = librtemsbsp.a
-librtemsbsp_a_CPPFLAGS = $(AM_CPPFLAGS) -DTX39
 librtemsbsp_a_SOURCES =
 
 # startup
@@ -41,7 +40,6 @@ librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/cache/nocache.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/irq/installisrentries.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/mips/shared/irq/isr_entries.S
 
-include $(top_srcdir)/../../../../automake/local.am
 include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
 include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
 include $(srcdir)/../../../../../../bsps/mips/jmr3904/headers.am

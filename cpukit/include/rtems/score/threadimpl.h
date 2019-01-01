@@ -31,9 +31,9 @@
 #include <rtems/score/statesimpl.h>
 #include <rtems/score/status.h>
 #include <rtems/score/sysstate.h>
+#include <rtems/score/timestampimpl.h>
 #include <rtems/score/threadqimpl.h>
 #include <rtems/score/todimpl.h>
-#include <rtems/score/freechain.h>
 #include <rtems/score/watchdogimpl.h>
 #include <rtems/config.h>
 
@@ -56,18 +56,6 @@ extern "C" {
  *  Self for the GNU Ada Run-Time
  */
 extern void *rtems_ada_self;
-
-typedef struct {
-  Objects_Information Objects;
-
-  Freechain_Control Free_thread_queue_heads;
-} Thread_Information;
-
-/**
- *  The following defines the information control block used to
- *  manage this class of objects.
- */
-extern Thread_Information _Thread_Internal_information;
 
 /**
  * @brief Object identifier of the global constructor thread.
@@ -99,14 +87,7 @@ void _Thread_Iterate(
   void           *arg
 );
 
-void _Thread_Initialize_information(
-  Thread_Information  *information,
-  Objects_APIs         the_api,
-  uint16_t             the_class,
-  uint32_t             maximum,
-  bool                 is_string,
-  uint32_t             maximum_name_length
-);
+void _Thread_Initialize_information( Thread_Information *information );
 
 /**
  *  @brief Initialize thread handler.
@@ -829,7 +810,7 @@ RTEMS_INLINE_ROUTINE uint32_t _Thread_Get_maximum_internal_threads(void)
 RTEMS_INLINE_ROUTINE Thread_Control *_Thread_Internal_allocate( void )
 {
   return (Thread_Control *)
-    _Objects_Allocate_unprotected( &_Thread_Internal_information.Objects );
+    _Objects_Allocate_unprotected( &_Thread_Information.Objects );
 }
 
 /**
@@ -1025,7 +1006,7 @@ RTEMS_INLINE_ROUTINE const Scheduler_Control *_Thread_Scheduler_get_home(
 )
 {
 #if defined(RTEMS_SMP)
-  return the_thread->Scheduler.home;
+  return the_thread->Scheduler.home_scheduler;
 #else
   (void) the_thread;
   return &_Scheduler_Table[ 0 ];
@@ -1079,9 +1060,7 @@ RTEMS_INLINE_ROUTINE void _Thread_Scheduler_release_critical(
   _ISR_lock_Release( &the_thread->Scheduler.Lock, lock_context );
 }
 
-#if defined(RTEMS_SMP)
 void _Thread_Scheduler_process_requests( Thread_Control *the_thread );
-#endif
 
 RTEMS_INLINE_ROUTINE void _Thread_Scheduler_add_request(
   Thread_Control         *the_thread,
@@ -1788,7 +1767,6 @@ RTEMS_INLINE_ROUTINE bool _Thread_Wait_flags_try_change_acquire(
   Thread_Wait_flags  desired_flags
 )
 {
-  bool success;
 #if defined(RTEMS_SMP)
   return _Atomic_Compare_exchange_uint(
     &the_thread->Wait.flags,
@@ -1798,6 +1776,7 @@ RTEMS_INLINE_ROUTINE bool _Thread_Wait_flags_try_change_acquire(
     ATOMIC_ORDER_ACQUIRE
   );
 #else
+  bool      success;
   ISR_Level level;
 
   _ISR_Local_disable( level );
@@ -1809,9 +1788,8 @@ RTEMS_INLINE_ROUTINE bool _Thread_Wait_flags_try_change_acquire(
   );
 
   _ISR_Local_enable( level );
-#endif
-
   return success;
+#endif
 }
 
 /**
@@ -1955,6 +1933,56 @@ size_t _Thread_Get_name(
   char                 *buffer,
   size_t                buffer_size
 );
+
+#if defined(RTEMS_SMP)
+#define THREAD_PIN_STEP 2
+
+#define THREAD_PIN_PREEMPTION 1
+
+void _Thread_Do_unpin(
+  Thread_Control  *executing,
+  Per_CPU_Control *cpu_self
+);
+#endif
+
+RTEMS_INLINE_ROUTINE void _Thread_Pin( Thread_Control *executing )
+{
+#if defined(RTEMS_SMP)
+  _Assert( executing == _Thread_Executing );
+
+  executing->Scheduler.pin_level += THREAD_PIN_STEP;
+#else
+  (void) executing;
+#endif
+}
+
+RTEMS_INLINE_ROUTINE void _Thread_Unpin(
+  Thread_Control  *executing,
+  Per_CPU_Control *cpu_self
+)
+{
+#if defined(RTEMS_SMP)
+  unsigned int pin_level;
+
+  _Assert( executing == _Thread_Executing );
+
+  pin_level = executing->Scheduler.pin_level;
+  _Assert( pin_level > 0 );
+
+  if (
+    RTEMS_PREDICT_TRUE(
+      pin_level != ( THREAD_PIN_STEP | THREAD_PIN_PREEMPTION )
+    )
+  ) {
+    executing->Scheduler.pin_level = pin_level - THREAD_PIN_STEP;
+  } else {
+    _Thread_Do_unpin( executing, cpu_self );
+  }
+#else
+  (void) executing;
+  (void) cpu_self;
+#endif
+}
 
 /** @}*/
 

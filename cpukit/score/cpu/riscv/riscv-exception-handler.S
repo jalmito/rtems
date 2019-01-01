@@ -7,6 +7,8 @@
  */
 
 /*
+ * Copyright (c) 2018 embedded brains GmbH
+
  * Copyright (c) 2015 University of York.
  * Hesham Almatary <hesham@alumni.york.ac.uk>
  *
@@ -36,186 +38,233 @@
 #include "config.h"
 #endif
 
-#include <rtems/score/cpu.h>
-
 #include <rtems/asm.h>
 #include <rtems/score/percpu.h>
 
-EXTERN(bsp_start_vector_table_begin)
-EXTERN(_Thread_Dispatch)
-PUBLIC(ISR_Handler)
+PUBLIC(_RISCV_Exception_handler)
 
-.section .text, "ax"
-.align 4
-TYPE_FUNC(ISR_Handler)
-SYM(ISR_Handler):
-  addi sp, sp, -1 * 36 * CPU_SIZEOF_POINTER
+	.section	.text, "ax", @progbits
+	.align	2
 
-  SREG x1, (1 * CPU_SIZEOF_POINTER)(sp)
-  /* Skip x2/sp */
-  SREG x3, (3 * CPU_SIZEOF_POINTER)(sp)
-  SREG x4, (4 * CPU_SIZEOF_POINTER)(sp)
-  SREG x5, (5 * CPU_SIZEOF_POINTER)(sp)
-  SREG x6, (6 * CPU_SIZEOF_POINTER)(sp)
-  SREG x7, (7 * CPU_SIZEOF_POINTER)(sp)
-  SREG x8, (8 * CPU_SIZEOF_POINTER)(sp)
-  SREG x9, (9 * CPU_SIZEOF_POINTER)(sp)
-  SREG x10, (10 * CPU_SIZEOF_POINTER)(sp)
-  SREG x11, (11 * CPU_SIZEOF_POINTER)(sp)
-  SREG x12, (12 * CPU_SIZEOF_POINTER)(sp)
-  SREG x13, (13 * CPU_SIZEOF_POINTER)(sp)
-  SREG x14, (14 * CPU_SIZEOF_POINTER)(sp)
-  SREG x15, (15 * CPU_SIZEOF_POINTER)(sp)
-  SREG x16, (16 * CPU_SIZEOF_POINTER)(sp)
-  SREG x17, (17 * CPU_SIZEOF_POINTER)(sp)
-  SREG x18, (18 * CPU_SIZEOF_POINTER)(sp)
-  SREG x19, (19 * CPU_SIZEOF_POINTER)(sp)
-  SREG x20, (20 * CPU_SIZEOF_POINTER)(sp)
-  SREG x21, (21 * CPU_SIZEOF_POINTER)(sp)
-  SREG x22, (22 * CPU_SIZEOF_POINTER)(sp)
-  SREG x23, (23 * CPU_SIZEOF_POINTER)(sp)
-  SREG x24, (24 * CPU_SIZEOF_POINTER)(sp)
-  SREG x25, (25 * CPU_SIZEOF_POINTER)(sp)
-  SREG x26, (26 * CPU_SIZEOF_POINTER)(sp)
-  SREG x27, (27 * CPU_SIZEOF_POINTER)(sp)
-  SREG x28, (28 * CPU_SIZEOF_POINTER)(sp)
-  SREG x29, (28 * CPU_SIZEOF_POINTER)(sp)
-  SREG x30, (30 * CPU_SIZEOF_POINTER)(sp)
-  SREG x31, (31 * CPU_SIZEOF_POINTER)(sp)
+TYPE_FUNC(_RISCV_Exception_handler)
+SYM(_RISCV_Exception_handler):
+	addi	sp, sp, -CPU_INTERRUPT_FRAME_SIZE
 
-  /* Exception level related registers */
-  csrr a0, mstatus
-  SREG a0, (32 * CPU_SIZEOF_POINTER)(sp)
-  csrr a0, mcause
-  SREG a0, (33 * CPU_SIZEOF_POINTER)(sp)
-  csrr a1, mepc
-  SREG a1, (34 * CPU_SIZEOF_POINTER)(sp)
-
-  /* FIXME Only handle interrupts for now (MSB = 1) */
-  andi a0, a0, 0xf
-
-  /* Increment nesting level */
-  la t0, ISR_NEST_LEVEL
-
-  /* Disable multitasking */
-  la t1, THREAD_DISPATCH_DISABLE_LEVEL
-
-  lw t2, (t0)
-  lw t3, (t1)
-  addi t2, t2, 1
-  addi t3, t3, 1
-  sw t2, (t0)
-  sw t3, (t1)
-
-  /* Save interrupted task stack pointer */
-  addi t4, sp, 36 * CPU_SIZEOF_POINTER
-  SREG t4, (2 * CPU_SIZEOF_POINTER)(sp)
-
-  /* Keep sp (Exception frame address) in s1 */
-  mv   s1, sp
-
-  /* Call the exception handler from vector table */
-
-  /* First function arg for C handler is vector number,
-   * and the second is a pointer to exception frame.
-   * a0/mcause/vector number is already loaded above */
-  mv a1, sp
-
-  /* calculate the offset */
-  la   t5, bsp_start_vector_table_begin
-#if __riscv_xlen == 32
-  slli t6, a0, 2
-#else /* xlen = 64 */
-  slli t6, a0, 3
+	/* Save */
+	SREG	a0, RISCV_INTERRUPT_FRAME_A0(sp)
+	SREG	a1, RISCV_INTERRUPT_FRAME_A1(sp)
+	SREG	a2, RISCV_INTERRUPT_FRAME_A2(sp)
+	SREG	s0, RISCV_INTERRUPT_FRAME_S0(sp)
+	csrr	a0, mcause
+	csrr	a1, mstatus
+	csrr	a2, mepc
+	GET_SELF_CPU_CONTROL	s0
+	SREG	s1, RISCV_INTERRUPT_FRAME_S1(sp)
+#if __riscv_flen > 0
+	frcsr	s1
 #endif
-  add  t5, t5, t6
-  LREG t5, (t5)
+	SREG	ra, RISCV_INTERRUPT_FRAME_RA(sp)
+	SREG	a3, RISCV_INTERRUPT_FRAME_A3(sp)
+	SREG	a4, RISCV_INTERRUPT_FRAME_A4(sp)
+	SREG	a5, RISCV_INTERRUPT_FRAME_A5(sp)
+	SREG	a6, RISCV_INTERRUPT_FRAME_A6(sp)
+	SREG	a7, RISCV_INTERRUPT_FRAME_A7(sp)
+	SREG	t0, RISCV_INTERRUPT_FRAME_T0(sp)
+	SREG	t1, RISCV_INTERRUPT_FRAME_T1(sp)
+	SREG	t2, RISCV_INTERRUPT_FRAME_T2(sp)
+	SREG	t3, RISCV_INTERRUPT_FRAME_T3(sp)
+	SREG	t4, RISCV_INTERRUPT_FRAME_T4(sp)
+	SREG	t5, RISCV_INTERRUPT_FRAME_T5(sp)
+	SREG	t6, RISCV_INTERRUPT_FRAME_T6(sp)
+	SREG	a1, RISCV_INTERRUPT_FRAME_MSTATUS(sp)
+	SREG	a2, RISCV_INTERRUPT_FRAME_MEPC(sp)
+#if __riscv_flen > 0
+	sw	s1, RISCV_INTERRUPT_FRAME_FCSR(sp)
+	FSREG	ft0, RISCV_INTERRUPT_FRAME_FT0(sp)
+	FSREG	ft1, RISCV_INTERRUPT_FRAME_FT1(sp)
+	FSREG	ft2, RISCV_INTERRUPT_FRAME_FT2(sp)
+	FSREG	ft3, RISCV_INTERRUPT_FRAME_FT3(sp)
+	FSREG	ft4, RISCV_INTERRUPT_FRAME_FT4(sp)
+	FSREG	ft5, RISCV_INTERRUPT_FRAME_FT5(sp)
+	FSREG	ft6, RISCV_INTERRUPT_FRAME_FT6(sp)
+	FSREG	ft7, RISCV_INTERRUPT_FRAME_FT7(sp)
+	FSREG	ft8, RISCV_INTERRUPT_FRAME_FT8(sp)
+	FSREG	ft9, RISCV_INTERRUPT_FRAME_FT9(sp)
+	FSREG	ft10, RISCV_INTERRUPT_FRAME_FT10(sp)
+	FSREG	ft11, RISCV_INTERRUPT_FRAME_FT11(sp)
+	FSREG	fa0, RISCV_INTERRUPT_FRAME_FA0(sp)
+	FSREG	fa1, RISCV_INTERRUPT_FRAME_FA1(sp)
+	FSREG	fa2, RISCV_INTERRUPT_FRAME_FA2(sp)
+	FSREG	fa3, RISCV_INTERRUPT_FRAME_FA3(sp)
+	FSREG	fa4, RISCV_INTERRUPT_FRAME_FA4(sp)
+	FSREG	fa5, RISCV_INTERRUPT_FRAME_FA5(sp)
+	FSREG	fa6, RISCV_INTERRUPT_FRAME_FA6(sp)
+	FSREG	fa7, RISCV_INTERRUPT_FRAME_FA7(sp)
+#endif
 
-  /* Do not switch stacks if we are in a nested interrupt. At
-   * this point t2 should be holding ISR_NEST_LEVEL value.
-   */
-  li   s0, 1
-  bgtu t2, s0, jump_to_c_handler
+	/* Check if this is a synchronous or interrupt exception */
+	bgez	a0, .Lsynchronous_exception
 
-  /* Switch to RTEMS dedicated interrupt stack */
-  la     sp, INTERRUPT_STACK_HIGH
-  LREG   sp, (sp)
+	/* Increment interrupt nest and thread dispatch disable level */
+	lw	t0, PER_CPU_ISR_NEST_LEVEL(s0)
+	lw	t1, PER_CPU_THREAD_DISPATCH_DISABLE_LEVEL(s0)
+	addi	t2, t0, 1
+	addi	t1, t1, 1
+	sw	t2, PER_CPU_ISR_NEST_LEVEL(s0)
+	sw	t1, PER_CPU_THREAD_DISPATCH_DISABLE_LEVEL(s0)
 
-jump_to_c_handler:
-  jalr t5
+	CLEAR_RESERVATIONS	s0
 
-  /* Switch back to the interrupted task stack */
-  mv sp, s1
+	/*
+	 * Remember current stack pointer in non-volatile register s1.  Switch
+	 * to interrupt stack if necessary.
+	 */
+	mv	s1, sp
+	bnez	t0, .Linterrupt_stack_switch_done
+	LREG	sp, PER_CPU_INTERRUPT_STACK_HIGH(s0)
+.Linterrupt_stack_switch_done:
 
-  /* Decrement nesting level */
-  la t0, ISR_NEST_LEVEL
+	mv	a1, s0
+	call	_RISCV_Interrupt_dispatch
 
-  /* Enable multitasking */
-  la t1, THREAD_DISPATCH_DISABLE_LEVEL
+	/* Load some per-CPU variables */
+	lw	t0, PER_CPU_THREAD_DISPATCH_DISABLE_LEVEL(s0)
+	lbu	t1, PER_CPU_DISPATCH_NEEDED(s0)
+	lw	t2, PER_CPU_ISR_DISPATCH_DISABLE(s0)
+	lw	t3, PER_CPU_ISR_NEST_LEVEL(s0)
 
-  Lw t2, (t0)
-  lw t3, (t1)
-  addi t2, t2, -1
-  addi t3, t3, -1
-  sw t2, (t0)
-  sw t3, (t1)
+	/* Restore stack pointer */
+	mv	sp, s1
 
-  /* Check if _ISR_Nest_level > 0 */
-  bgtz t2, exception_frame_restore
+	/* Decrement levels and determine thread dispatch state */
+	xor	t1, t1, t0
+	addi	t0, t0, -1
+	or	t1, t1, t0
+	or	t1, t1, t2
+	addi	t3, t3, -1
 
-  /* Check if _Thread_Dispatch_disable_level > 0 */
-  bgtz t3, exception_frame_restore
+	/* Store thread dispatch disable and ISR nest levels */
+	sw	t0, PER_CPU_THREAD_DISPATCH_DISABLE_LEVEL(s0)
+	sw	t3, PER_CPU_ISR_NEST_LEVEL(s0)
 
-  /* Check if dispatch needed */
-  la   x31, DISPATCH_NEEDED
-  lw x31, (x31)
-  beqz x31, exception_frame_restore
+	/*
+	 * Check thread dispatch necessary, ISR dispatch disable and thread
+	 * dispatch disable level.
+	 */
+	bnez	t1, .Lthread_dispatch_done
 
-  la x31, _Thread_Dispatch
-  jalr x31
+.Ldo_thread_dispatch:
 
-  SYM(exception_frame_restore):
-  LREG x1, (1 * CPU_SIZEOF_POINTER)(sp)
-  /* Skip sp/x2 */
-  LREG x3, (3 * CPU_SIZEOF_POINTER)(sp)
-  LREG x4, (4 * CPU_SIZEOF_POINTER)(sp)
-  LREG x5, (5 * CPU_SIZEOF_POINTER)(sp)
-  LREG x6, (6 * CPU_SIZEOF_POINTER)(sp)
-  LREG x7, (7 * CPU_SIZEOF_POINTER)(sp)
-  LREG x8, (8 * CPU_SIZEOF_POINTER)(sp)
-  LREG x9, (9 * CPU_SIZEOF_POINTER)(sp)
-  LREG x10, (10 * CPU_SIZEOF_POINTER)(sp)
-  LREG x11, (11 * CPU_SIZEOF_POINTER)(sp)
-  LREG x12, (12 * CPU_SIZEOF_POINTER)(sp)
-  LREG x13, (13 * CPU_SIZEOF_POINTER)(sp)
-  LREG x14, (14 * CPU_SIZEOF_POINTER)(sp)
-  LREG x15, (15 * CPU_SIZEOF_POINTER)(sp)
-  LREG x16, (16 * CPU_SIZEOF_POINTER)(sp)
-  LREG x17, (17 * CPU_SIZEOF_POINTER)(sp)
-  LREG x18, (18 * CPU_SIZEOF_POINTER)(sp)
-  LREG x19, (19 * CPU_SIZEOF_POINTER)(sp)
-  LREG x20, (20 * CPU_SIZEOF_POINTER)(sp)
-  LREG x21, (21 * CPU_SIZEOF_POINTER)(sp)
-  LREG x22, (22 * CPU_SIZEOF_POINTER)(sp)
-  LREG x23, (23 * CPU_SIZEOF_POINTER)(sp)
-  LREG x24, (24 * CPU_SIZEOF_POINTER)(sp)
-  LREG x25, (25 * CPU_SIZEOF_POINTER)(sp)
-  LREG x26, (26 * CPU_SIZEOF_POINTER)(sp)
-  LREG x27, (27 * CPU_SIZEOF_POINTER)(sp)
-  LREG x28, (28 * CPU_SIZEOF_POINTER)(sp)
-  LREG x29, (29 * CPU_SIZEOF_POINTER)(sp)
-  LREG x30, (30 * CPU_SIZEOF_POINTER)(sp)
+	/* Set ISR dispatch disable and thread dispatch disable level to one */
+	li	t0, 1
+	sw	t0, PER_CPU_ISR_DISPATCH_DISABLE(s0)
+	sw	t0, PER_CPU_THREAD_DISPATCH_DISABLE_LEVEL(s0)
 
-  /* Load mstatus */
-  LREG x31, (32 * CPU_SIZEOF_POINTER)(sp)
-  csrw mstatus, x31
-  /* Load mepc */
-  LREG x31, (34 * CPU_SIZEOF_POINTER)(sp)
-  csrw mepc, x31
+	/* Call _Thread_Do_dispatch(), this function will enable interrupts */
+	mv	a0, s0
+	li	a1, RISCV_MSTATUS_MIE
+	call	_Thread_Do_dispatch
 
-  LREG x31, (31 * CPU_SIZEOF_POINTER)(sp)
+	/* Disable interrupts */
+	csrrc	zero, mstatus, RISCV_MSTATUS_MIE
 
-  /* Unwind exception frame */
-  addi sp, sp, 36 * CPU_SIZEOF_POINTER
+#ifdef RTEMS_SMP
+	GET_SELF_CPU_CONTROL	s0
+#endif
 
-  mret
+	/* Check if we have to do the thread dispatch again */
+	lbu	t0, PER_CPU_DISPATCH_NEEDED(s0)
+	bnez	t0, .Ldo_thread_dispatch
+
+	/* We are done with thread dispatching */
+	sw	zero, PER_CPU_ISR_DISPATCH_DISABLE(s0)
+
+.Lthread_dispatch_done:
+
+	/* Restore */
+	LREG	a0, RISCV_INTERRUPT_FRAME_MSTATUS(sp)
+	LREG	a1, RISCV_INTERRUPT_FRAME_MEPC(sp)
+	LREG	a2, RISCV_INTERRUPT_FRAME_A2(sp)
+	LREG	s0, RISCV_INTERRUPT_FRAME_S0(sp)
+	LREG	s1, RISCV_INTERRUPT_FRAME_S1(sp)
+	LREG	ra, RISCV_INTERRUPT_FRAME_RA(sp)
+	LREG	a3, RISCV_INTERRUPT_FRAME_A3(sp)
+	LREG	a4, RISCV_INTERRUPT_FRAME_A4(sp)
+	LREG	a5, RISCV_INTERRUPT_FRAME_A5(sp)
+	LREG	a6, RISCV_INTERRUPT_FRAME_A6(sp)
+	LREG	a7, RISCV_INTERRUPT_FRAME_A7(sp)
+	LREG	t0, RISCV_INTERRUPT_FRAME_T0(sp)
+	LREG	t1, RISCV_INTERRUPT_FRAME_T1(sp)
+	LREG	t2, RISCV_INTERRUPT_FRAME_T2(sp)
+	LREG	t3, RISCV_INTERRUPT_FRAME_T3(sp)
+	LREG	t4, RISCV_INTERRUPT_FRAME_T4(sp)
+	LREG	t5, RISCV_INTERRUPT_FRAME_T5(sp)
+	LREG	t6, RISCV_INTERRUPT_FRAME_T6(sp)
+	csrw	mstatus, a0
+	csrw	mepc, a1
+#if __riscv_flen > 0
+	lw	a0, RISCV_INTERRUPT_FRAME_FCSR(sp)
+	FLREG	ft0, RISCV_INTERRUPT_FRAME_FT0(sp)
+	FLREG	ft1, RISCV_INTERRUPT_FRAME_FT1(sp)
+	FLREG	ft2, RISCV_INTERRUPT_FRAME_FT2(sp)
+	FLREG	ft3, RISCV_INTERRUPT_FRAME_FT3(sp)
+	FLREG	ft4, RISCV_INTERRUPT_FRAME_FT4(sp)
+	FLREG	ft5, RISCV_INTERRUPT_FRAME_FT5(sp)
+	FLREG	ft6, RISCV_INTERRUPT_FRAME_FT6(sp)
+	FLREG	ft7, RISCV_INTERRUPT_FRAME_FT7(sp)
+	FLREG	ft8, RISCV_INTERRUPT_FRAME_FT8(sp)
+	FLREG	ft9, RISCV_INTERRUPT_FRAME_FT9(sp)
+	FLREG	ft10, RISCV_INTERRUPT_FRAME_FT10(sp)
+	FLREG	ft11, RISCV_INTERRUPT_FRAME_FT11(sp)
+	FLREG	fa0, RISCV_INTERRUPT_FRAME_FA0(sp)
+	FLREG	fa1, RISCV_INTERRUPT_FRAME_FA1(sp)
+	FLREG	fa2, RISCV_INTERRUPT_FRAME_FA2(sp)
+	FLREG	fa3, RISCV_INTERRUPT_FRAME_FA3(sp)
+	FLREG	fa4, RISCV_INTERRUPT_FRAME_FA4(sp)
+	FLREG	fa5, RISCV_INTERRUPT_FRAME_FA5(sp)
+	FLREG	fa6, RISCV_INTERRUPT_FRAME_FA6(sp)
+	FLREG	fa7, RISCV_INTERRUPT_FRAME_FA7(sp)
+	fscsr	a0
+#endif
+	LREG	a0, RISCV_INTERRUPT_FRAME_A0(sp)
+	LREG	a1, RISCV_INTERRUPT_FRAME_A1(sp)
+
+	addi	sp, sp, CPU_INTERRUPT_FRAME_SIZE
+
+	mret
+
+.Lsynchronous_exception:
+
+	SREG	a0, RISCV_EXCEPTION_FRAME_MCAUSE(sp)
+	addi	a0, sp, CPU_INTERRUPT_FRAME_SIZE
+	SREG	a0, RISCV_EXCEPTION_FRAME_SP(sp)
+	SREG	gp, RISCV_EXCEPTION_FRAME_GP(sp)
+	SREG	tp, RISCV_EXCEPTION_FRAME_TP(sp)
+	SREG	s2, RISCV_EXCEPTION_FRAME_S2(sp)
+	SREG	s3, RISCV_EXCEPTION_FRAME_S3(sp)
+	SREG	s4, RISCV_EXCEPTION_FRAME_S4(sp)
+	SREG	s5, RISCV_EXCEPTION_FRAME_S5(sp)
+	SREG	s6, RISCV_EXCEPTION_FRAME_S6(sp)
+	SREG	s7, RISCV_EXCEPTION_FRAME_S7(sp)
+	SREG	s8, RISCV_EXCEPTION_FRAME_S8(sp)
+	SREG	s9, RISCV_EXCEPTION_FRAME_S9(sp)
+	SREG	s10, RISCV_EXCEPTION_FRAME_S10(sp)
+	SREG	s11, RISCV_EXCEPTION_FRAME_S11(sp)
+#if __riscv_flen > 0
+	FSREG	fs0, RISCV_EXCEPTION_FRAME_FS0(sp)
+	FSREG	fs1, RISCV_EXCEPTION_FRAME_FS1(sp)
+	FSREG	fs2, RISCV_EXCEPTION_FRAME_FS2(sp)
+	FSREG	fs3, RISCV_EXCEPTION_FRAME_FS3(sp)
+	FSREG	fs4, RISCV_EXCEPTION_FRAME_FS4(sp)
+	FSREG	fs5, RISCV_EXCEPTION_FRAME_FS5(sp)
+	FSREG	fs6, RISCV_EXCEPTION_FRAME_FS6(sp)
+	FSREG	fs7, RISCV_EXCEPTION_FRAME_FS7(sp)
+	FSREG	fs8, RISCV_EXCEPTION_FRAME_FS8(sp)
+	FSREG	fs9, RISCV_EXCEPTION_FRAME_FS9(sp)
+	FSREG	fs10, RISCV_EXCEPTION_FRAME_FS10(sp)
+	FSREG	fs11, RISCV_EXCEPTION_FRAME_FS11(sp)
+#endif
+
+	li	a0, 9
+	mv	a1, sp
+	call	_Terminate

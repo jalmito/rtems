@@ -73,7 +73,13 @@ static int do_open(
   bool make = (oflag & O_CREAT) == O_CREAT;
   bool exclusive = (oflag & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL);
   bool truncate = (oflag & O_TRUNC) == O_TRUNC;
-  int eval_flags = RTEMS_FS_FOLLOW_LINK
+  bool open_dir;
+#ifdef O_NOFOLLOW
+  int follow = (oflag & O_NOFOLLOW) == O_NOFOLLOW ? 0 : RTEMS_FS_FOLLOW_LINK;
+#else
+  int follow = RTEMS_FS_FOLLOW_LINK;
+#endif
+  int eval_flags = follow
     | (read_access ? RTEMS_FS_PERMS_READ : 0)
     | (write_access ? RTEMS_FS_PERMS_WRITE : 0)
     | (make ? RTEMS_FS_MAKE : 0)
@@ -86,13 +92,23 @@ static int do_open(
     create_regular_file( &ctx, mode );
   }
 
-  if ( write_access ) {
+#ifdef O_DIRECTORY
+  open_dir = ( oflag & O_DIRECTORY ) == O_DIRECTORY;
+#else
+  open_dir = false;
+#endif
+
+  if ( write_access || open_dir ) {
     const rtems_filesystem_location_info_t *currentloc =
       rtems_filesystem_eval_path_get_currentloc( &ctx );
     mode_t type = rtems_filesystem_location_type( currentloc );
 
-    if ( S_ISDIR( type ) ) {
+    if ( write_access && S_ISDIR( type ) ) {
       rtems_filesystem_eval_path_error( &ctx, EISDIR );
+    }
+
+    if ( open_dir && !S_ISDIR( type ) ) {
+      rtems_filesystem_eval_path_error( &ctx, ENOTDIR );
     }
   }
 

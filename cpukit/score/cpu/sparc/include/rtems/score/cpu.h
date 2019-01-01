@@ -69,17 +69,6 @@ extern "C" {
 #endif
 
 /**
- * Does the executive manage a dedicated interrupt stack in software?
- *
- * If TRUE, then a stack is allocated in _ISR_Handler_initialization.
- * If FALSE, nothing is done.
- *
- * The SPARC does not have a dedicated HW interrupt stack and one has
- * been implemented in SW.
- */
-#define CPU_HAS_SOFTWARE_INTERRUPT_STACK   TRUE
-
-/**
  * Does the CPU follow the simple vectored interrupt model?
  *
  * - If TRUE, then RTEMS allocates the vector table it internally manages.
@@ -90,29 +79,6 @@ extern "C" {
  * PIC and the CPU directly vectors the interrupts.
  */
 #define CPU_SIMPLE_VECTORED_INTERRUPTS TRUE
-
-/**
- * Does this CPU have hardware support for a dedicated interrupt stack?
- *
- * - If TRUE, then it must be installed during initialization.
- * - If FALSE, then no installation is performed.
- *
- * The SPARC does not have a dedicated HW interrupt stack.
- */
-#define CPU_HAS_HARDWARE_INTERRUPT_STACK  FALSE
-
-/**
- * Do we allocate a dedicated interrupt stack in the Interrupt Manager?
- *
- * - If TRUE, then the memory is allocated during initialization.
- * - If FALSE, then the memory is allocated during initialization.
- *
- * The SPARC does not have hardware support for switching to a
- * dedicated interrupt stack.  The port includes support for doing this
- * in software.
- *
- */
-#define CPU_ALLOCATE_INTERRUPT_STACK      TRUE
 
 /**
  * Does the RTEMS invoke the user's ISR with the vector number and
@@ -168,22 +134,6 @@ extern "C" {
 #define CPU_USE_DEFERRED_FP_SWITCH FALSE
 
 #define CPU_ENABLE_ROBUST_THREAD_DISPATCH FALSE
-
-/**
- * Does this port provide a CPU dependent IDLE task implementation?
- *
- * - If TRUE, then the routine _CPU_Thread_Idle_body
- * must be provided and is the default IDLE thread body instead of
- * _CPU_Thread_Idle_body.
- *
- * - If FALSE, then use the generic IDLE thread body if the BSP does
- * not provide one.
- *
- * The SPARC architecture does not have a low power or halt instruction.
- * It is left to the BSP and/or CPU specific code to provide an IDLE
- * thread body which is aware of low power modes.
- */
-#define CPU_PROVIDES_IDLE_THREAD_BODY    FALSE
 
 /**
  * Does the stack grow up (toward higher addresses) or down
@@ -805,23 +755,12 @@ extern const CPU_Trap_table_entry _CPU_Trap_slot_template;
 #define CPU_HEAP_ALIGNMENT         CPU_ALIGNMENT
 
 /**
- * This number corresponds to the byte alignment requirement for memory
- * buffers allocated by the partition manager.  This alignment requirement
- * may be stricter than that for the data types alignment specified by
- * CPU_ALIGNMENT.  It is common for the partition to follow the same
- * alignment requirement as CPU_ALIGNMENT.  If the CPU_ALIGNMENT is strict
- * enough for the partition, then this should be set to CPU_ALIGNMENT.
- *
- * NOTE:  This does not have to be a power of 2.  It does have to
- *        be greater or equal to than CPU_ALIGNMENT.
- */
-#define CPU_PARTITION_ALIGNMENT    CPU_ALIGNMENT
-
-/**
  * Stack frames must be doubleword aligned according to the System V ABI for
  * SPARC.
  */
 #define CPU_STACK_ALIGNMENT CPU_ALIGNMENT
+
+#define CPU_INTERRUPT_STACK_ALIGNMENT CPU_CACHE_LINE_BYTES
 
 #ifndef ASM
 
@@ -1001,6 +940,8 @@ extern void _CPU_Fatal_halt(uint32_t source, uint32_t error)
  */
 void _CPU_Initialize(void);
 
+typedef void ( *CPU_ISR_raw_handler )( void );
+
 /**
  * @brief SPARC specific raw ISR installer.
  *
@@ -1012,10 +953,12 @@ void _CPU_Initialize(void);
  * @param[in] old_handler will contain the old ISR handler
  */
 void _CPU_ISR_install_raw_handler(
-  uint32_t    vector,
-  proc_ptr    new_handler,
-  proc_ptr   *old_handler
+  uint32_t             vector,
+  CPU_ISR_raw_handler  new_handler,
+  CPU_ISR_raw_handler *old_handler
 );
+
+typedef void ( *CPU_ISR_handler )( uint32_t );
 
 /**
  * @brief SPARC specific RTEMS ISR installer.
@@ -1028,10 +971,12 @@ void _CPU_ISR_install_raw_handler(
  */
 
 void _CPU_ISR_install_vector(
-  uint32_t    vector,
-  proc_ptr    new_handler,
-  proc_ptr   *old_handler
+  uint32_t         vector,
+  CPU_ISR_handler  new_handler,
+  CPU_ISR_handler *old_handler
 );
+
+void *_CPU_Thread_Idle_body( uintptr_t ignored );
 
 /**
  * @brief SPARC specific context switch.
@@ -1100,10 +1045,6 @@ void _CPU_Context_restore(
   } while ( 0 )
 #endif
 
-void _CPU_Context_volatile_clobber( uintptr_t pattern );
-
-void _CPU_Context_validate( uintptr_t pattern );
-
 typedef struct {
   uint32_t trap;
   CPU_Interrupt_frame *isf;
@@ -1158,31 +1099,32 @@ static inline uint32_t CPU_swap_u32(
 
 typedef uint32_t CPU_Counter_ticks;
 
-typedef CPU_Counter_ticks ( *SPARC_Counter_read )( void );
+uint32_t _CPU_Counter_frequency( void );
 
-typedef CPU_Counter_ticks ( *SPARC_Counter_difference )(
-  CPU_Counter_ticks second,
-  CPU_Counter_ticks first
-);
+typedef CPU_Counter_ticks ( *SPARC_Counter_read )( void );
 
 /*
  * The SPARC processors supported by RTEMS have no built-in CPU counter
  * support.  We have to use some hardware counter module for this purpose, for
  * example the GPTIMER instance used by the clock driver.  The BSP must provide
- * an implementation of the CPU counter read and difference functions.  This
- * allows the use of dynamic hardware enumeration.
+ * an implementation of the CPU counter read function.  This allows the use of
+ * dynamic hardware enumeration.
  */
 typedef struct {
-  SPARC_Counter_read                counter_read;
-  SPARC_Counter_difference          counter_difference;
-  volatile const CPU_Counter_ticks *counter_address;
+  SPARC_Counter_read                read_isr_disabled;
+  SPARC_Counter_read                read;
+  volatile const CPU_Counter_ticks *counter_register;
+  volatile const uint32_t          *pending_register;
+  uint32_t                          pending_mask;
+  CPU_Counter_ticks                 accumulated;
+  CPU_Counter_ticks                 interval;
 } SPARC_Counter;
 
 extern const SPARC_Counter _SPARC_Counter;
 
 static inline CPU_Counter_ticks _CPU_Counter_read( void )
 {
-  return ( *_SPARC_Counter.counter_read )();
+  return ( *_SPARC_Counter.read )();
 }
 
 static inline CPU_Counter_ticks _CPU_Counter_difference(
@@ -1190,7 +1132,7 @@ static inline CPU_Counter_ticks _CPU_Counter_difference(
   CPU_Counter_ticks first
 )
 {
-  return ( *_SPARC_Counter.counter_difference )( second, first );
+  return second - first;
 }
 
 /** Type that can store a 32-bit integer or a pointer. */

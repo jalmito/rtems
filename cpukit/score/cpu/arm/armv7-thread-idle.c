@@ -8,7 +8,7 @@
  * Copyright (c) 2012 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
- *  Obere Lagerstr. 30
+ *  Dornierstr. 4
  *  82178 Puchheim
  *  Germany
  *  <rtems@embedded-brains.de>
@@ -24,13 +24,13 @@
 
 #include <rtems/score/cpu.h>
 
-#ifdef ARM_MULTILIB_HAS_WFI
 
 void *_CPU_Thread_Idle_body( uintptr_t ignored )
 {
   while ( true ) {
+#ifdef ARM_MULTILIB_HAS_WFI
     __asm__ volatile ("wfi");
+#endif /* ARM_MULTILIB_HAS_WFI */
   }
 }
 
-#endif /* ARM_MULTILIB_HAS_WFI */

@@ -1,9 +1,9 @@
 /**
  * @file
  *
- * @ingroup ClassicSem
+ * @ingroup ClassicSemImpl
  *
- * @brief Classic Semaphores Implementation
+ * @brief Classic Semaphore Manager Implementation
  */
 
 /*  COPYRIGHT (c) 1989-2008.
@@ -17,7 +17,7 @@
 #ifndef _RTEMS_RTEMS_SEMIMPL_H
 #define _RTEMS_RTEMS_SEMIMPL_H
 
-#include <rtems/rtems/sem.h>
+#include <rtems/rtems/semdata.h>
 #include <rtems/score/coremuteximpl.h>
 #include <rtems/score/coresemimpl.h>
 #include <rtems/score/mrspimpl.h>
@@ -25,6 +25,14 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * @defgroup ClassicSemImpl Semaphore Manager Implementation
+ *
+ * @ingroup ClassicSem
+ *
+ * @{
+ */
 
 /**
  * @brief Classic semaphore variants.
@@ -47,12 +55,6 @@ typedef enum {
   SEMAPHORE_DISCIPLINE_PRIORITY,
   SEMAPHORE_DISCIPLINE_FIFO
 } Semaphore_Discipline;
-
-/**
- *  The following defines the information control block used to manage
- *  this class of objects.
- */
-extern Objects_Information _Semaphore_Information;
 
 RTEMS_INLINE_ROUTINE const Thread_queue_Operations *_Semaphore_Get_operations(
   const Semaphore_Control *the_semaphore
@@ -107,6 +109,8 @@ RTEMS_INLINE_ROUTINE Semaphore_Control *_Semaphore_Get(
     &_Semaphore_Information
   );
 }
+
+/** @} */
 
 #ifdef __cplusplus
 }

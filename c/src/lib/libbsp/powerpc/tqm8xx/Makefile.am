@@ -32,6 +32,7 @@ librtemsbsp_a_SOURCES +=../../../../../../bsps/powerpc/shared/clock/clock.c
 librtemsbsp_a_SOURCES +=../../../../../../bsps/powerpc/tqm8xx/clock/p_clock.c
 
 # console
+librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/console-termios.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/tqm8xx/console/console.c
 # spi
 librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/tqm8xx/spi/spi.c
@@ -55,12 +56,10 @@ endif
 
 librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/cache/cache.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/shared/btimer/btimer-ppc-dec.c
-librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/tqm8xx/dev/console-generic.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/tqm8xx/start/cp.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/tqm8xx/start/dpram.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/powerpc/tqm8xx/start/mmu.c
 
-include $(top_srcdir)/../../../../automake/local.am
 include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
 include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
 include $(srcdir)/../../../../../../bsps/shared/irq-sources.am

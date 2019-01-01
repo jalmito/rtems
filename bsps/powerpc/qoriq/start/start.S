@@ -38,6 +38,7 @@
 #define START_STACK r15
 #define SAVED_LINK_REGISTER r16
 #define FDT_REGISTER r17
+#define CPU_SELF r18
 
 	.globl _start
 #ifdef RTEMS_SMP
@@ -55,7 +56,9 @@ _start:
 	bl	.Linitearly
 
 	/* Get start stack */
-	LA	START_STACK, start_stack_end
+	LA	START_STACK, _ISR_Stack_area_begin
+	LA	r3, _ISR_Stack_size
+	add	START_STACK, START_STACK, r3
 
 	bl	.Linitmore
 
@@ -193,7 +196,7 @@ _start:
 	LA	r13, _SDA_BASE_
 #endif
 
-	SET_SELF_CPU_CONTROL	r4, r5
+	SET_SELF_CPU_CONTROL	CPU_SELF, r5
 
 	blr
 
@@ -226,12 +229,10 @@ _start:
 	isync
 
 	/*
-	 * Initialize start stack.  Make sure that we do not share a cache line
-	 * with the heap block management, since initial stacks for the
-	 * secondary processors are allocated from the workspace.
+	 * Initialize start stack.  The stacks are statically allocated and
+	 * properly aligned.
 	 */
-	subi	r1, START_STACK, 2 * PPC_DEFAULT_CACHE_LINE_SIZE
-	clrrwi	r1, r1, PPC_DEFAULT_CACHE_LINE_POWER
+	subi	r1, START_STACK, PPC_DEFAULT_CACHE_LINE_SIZE
 	li	r0, 0
 	PPC_REG_STORE	r0, 0(r1)
 
@@ -316,8 +317,7 @@ _start_thread:
 	bl	.Linitearly
 
 	/* Initialize start stack */
-	GET_SELF_CPU_CONTROL	r3
-	PPC_REG_LOAD	r3, PER_CPU_INTERRUPT_STACK_HIGH(r3)
+	PPC_REG_LOAD	r3, PER_CPU_INTERRUPT_STACK_HIGH(CPU_SELF)
 	subi	r1, r3, PPC_MINIMUM_STACK_FRAME_SIZE
 	clrrwi	r1, r1, PPC_STACK_ALIGN_POWER
 	li	r0, 0
@@ -327,6 +327,7 @@ _start_thread:
 	bl	.Linitfpu
 #endif
 
+	mr	r3, CPU_SELF
 	b	qoriq_start_thread
 	PPC64_NOP_FOR_LINKER_TOC_POINTER_RESTORE
 #endif
@@ -339,6 +340,7 @@ _start_secondary_processor:
 	bl	.Linitmore
 	li	r3, 0
 	bl	.Linitmmu
+	mr	r3, CPU_SELF
 	b	bsp_start_on_secondary_processor
 	PPC64_NOP_FOR_LINKER_TOC_POINTER_RESTORE
 #endif /* RTEMS_SMP */
@@ -540,9 +542,3 @@ bsp_exc_vector_base:
 
 /* Symbol provided for debugging and tracing */
 bsp_exc_vector_end:
-
-	/* Start stack area */
-	.section ".bsp_rwextra", "aw", @nobits
-	.align 4
-	.space 4096
-start_stack_end:

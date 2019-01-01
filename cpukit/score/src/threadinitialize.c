@@ -73,7 +73,7 @@ bool _Thread_Initialize(
   memset(
     &the_thread->Join_queue,
     0,
-    information->Objects.size - offsetof( Thread_Control, Join_queue )
+    information->Objects.object_size - offsetof( Thread_Control, Join_queue )
   );
 
   for ( i = 0 ; i < _Thread_Control_add_on_count ; ++i ) {
@@ -145,10 +145,10 @@ bool _Thread_Initialize(
    *  Get thread queue heads
    */
   the_thread->Wait.spare_heads = _Freechain_Get(
-    &information->Free_thread_queue_heads,
+    &information->Thread_queue_heads.Free,
     _Workspace_Allocate,
     _Objects_Extend_size( &information->Objects ),
-    THREAD_QUEUE_HEADS_SIZE( _Scheduler_Count )
+    _Thread_queue_Heads_size
   );
   if ( the_thread->Wait.spare_heads == NULL ) {
     goto failed;
@@ -245,7 +245,7 @@ bool _Thread_Initialize(
 
 #if defined(RTEMS_SMP)
   RTEMS_STATIC_ASSERT( THREAD_SCHEDULER_BLOCKED == 0, Scheduler_state );
-  the_thread->Scheduler.home = scheduler;
+  the_thread->Scheduler.home_scheduler = scheduler;
   _ISR_lock_Initialize( &the_thread->Scheduler.Lock, "Thread Scheduler" );
   _Processor_mask_Assign(
     &the_thread->Scheduler.Affinity,
@@ -308,7 +308,7 @@ failed:
   _Workspace_Free( the_thread->Start.tls_area );
 
   _Freechain_Put(
-    &information->Free_thread_queue_heads,
+    &information->Thread_queue_heads.Free,
     the_thread->Wait.spare_heads
   );
 

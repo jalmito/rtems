@@ -395,7 +395,7 @@ rtems_cpuusage_top_thread (rtems_task_argument arg)
     }
     else
     {
-      region_information_block libc_heap;
+      Heap_Information_block libc_heap;
       malloc_info(&libc_heap);
       rtems_printf(data->printer, "\nMem: Wksp: ");
       print_memsize(data, wksp.Free.total, "free");
@@ -495,7 +495,7 @@ rtems_cpuusage_top_thread (rtems_task_argument arg)
 
   data->thread_active = false;
 
-  rtems_task_delete (RTEMS_SELF);
+  rtems_task_exit();
 }
 
 void rtems_cpu_usage_top_with_plugin(

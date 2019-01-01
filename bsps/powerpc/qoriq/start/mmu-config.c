@@ -131,7 +131,7 @@ static entry DATA config[] = {
 	ENTRY_RW(bsp_section_data_begin, bsp_section_data_size),
 	ENTRY_RW(bsp_section_sbss_begin, bsp_section_sbss_size),
 	ENTRY_RW(bsp_section_bss_begin, bsp_section_bss_size),
-	ENTRY_RW(bsp_section_rwextra_begin, bsp_section_rwextra_size),
+	ENTRY_RW(bsp_section_rtemsstack_begin, bsp_section_rtemsstack_size),
 	ENTRY_RW(bsp_section_stack_begin, bsp_section_stack_size),
 	ENTRY_IO(bsp_section_nocache_begin, bsp_section_nocache_size),
 	ENTRY_IO(bsp_section_nocachenoload_begin, bsp_section_nocachenoload_size),
@@ -343,10 +343,6 @@ void TEXT bsp_work_area_initialize(void)
 	const entry *we = &config[WORKSPACE_ENTRY_INDEX];
 	uintptr_t begin = we->begin;
 	uintptr_t end = begin + we->size;
-
-#ifdef BSP_INTERRUPT_STACK_AT_WORK_AREA_BEGIN
-	begin += rtems_configuration_get_interrupt_stack_size();
-#endif
 
 	bsp_work_area_initialize_default((void *) begin, end - begin);
 }

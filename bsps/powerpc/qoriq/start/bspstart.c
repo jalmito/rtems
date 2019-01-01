@@ -54,6 +54,15 @@ uint32_t bsp_time_base_frequency;
 
 uint32_t qoriq_clock_frequency;
 
+uint32_t _CPU_Counter_frequency(void)
+{
+#ifdef __PPC_CPU_E6500__
+  return qoriq_clock_frequency;
+#else
+  return bsp_time_base_frequency;
+#endif
+}
+
 static void initialize_frequency_parameters(void)
 {
   const void *fdt = bsp_fdt_get();
@@ -82,7 +91,6 @@ static void initialize_frequency_parameters(void)
     }
     qoriq_clock_frequency = fdt32_to_cpu(*val_fdt);
   #endif
-  rtems_counter_initialize_converter(fdt32_to_cpu(*val_fdt));
 }
 
 #define MTIVPR(base) \
@@ -105,8 +113,7 @@ void qoriq_initialize_exceptions(void *interrupt_stack_begin)
   uintptr_t addr;
 
   ppc_exc_initialize_interrupt_stack(
-    (uintptr_t) interrupt_stack_begin,
-    rtems_configuration_get_interrupt_stack_size()
+    (uintptr_t) interrupt_stack_begin
   );
 
   addr = (uintptr_t) bsp_exc_vector_base;
@@ -161,7 +168,9 @@ void bsp_start(void)
 
   initialize_frequency_parameters();
 
-  qoriq_initialize_exceptions(bsp_section_work_begin);
+  qoriq_initialize_exceptions(
+    (uintptr_t) _ISR_Stack_area_begin
+  );
   bsp_interrupt_initialize();
 
   rtems_cache_coherent_add_area(

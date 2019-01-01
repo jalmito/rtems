@@ -17,7 +17,7 @@
 #ifndef _RTEMS_RTEMS_PARTIMPL_H
 #define _RTEMS_RTEMS_PARTIMPL_H
 
-#include <rtems/rtems/part.h>
+#include <rtems/rtems/partdata.h>
 #include <rtems/score/chainimpl.h>
 #include <rtems/score/objectimpl.h>
 
@@ -32,12 +32,6 @@ extern "C" {
  *
  * @{
  */
-
-/**
- *  The following defines the information control block used to
- *  manage this class of objects.
- */
-extern Objects_Information _Partition_Information;
 
 /**
  *  @brief Allocate a buffer from the_partition.
@@ -77,9 +71,9 @@ RTEMS_INLINE_ROUTINE bool _Partition_Is_buffer_on_boundary (
   Partition_Control *the_partition
 )
 {
-  uint32_t     offset;
+  intptr_t offset;
 
-  offset = (uint32_t) _Addresses_Subtract(
+  offset = _Addresses_Subtract(
     the_buffer,
     the_partition->starting_address
   );
@@ -110,18 +104,18 @@ RTEMS_INLINE_ROUTINE bool _Partition_Is_buffer_valid (
   );
 }
 
-/**
- *  @brief Checks if partition is buffer size aligned.
- *
- *  This function returns TRUE if the use of the specified buffer_size
- *  will result in the allocation of buffers whose first byte is
- *  properly aligned, and FALSE otherwise.
- */
-RTEMS_INLINE_ROUTINE bool _Partition_Is_buffer_size_aligned (
-   uint32_t   buffer_size
+RTEMS_INLINE_ROUTINE bool _Partition_Is_buffer_size_aligned(
+  uint32_t buffer_size
 )
 {
-  return ((buffer_size % CPU_PARTITION_ALIGNMENT) == 0);
+  return (buffer_size % CPU_SIZEOF_POINTER) == 0;
+}
+
+RTEMS_INLINE_ROUTINE bool _Partition_Is_buffer_area_aligned(
+  const void *starting_address
+)
+{
+  return (((uintptr_t) starting_address) % CPU_SIZEOF_POINTER) == 0;
 }
 
 /**

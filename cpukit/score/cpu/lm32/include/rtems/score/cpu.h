@@ -29,35 +29,6 @@ extern "C" {
 /* conditional compilation parameters */
 
 /**
- * Does RTEMS manage a dedicated interrupt stack in software?
- *
- * If TRUE, then a stack is allocated in @ref _ISR_Handler_initialization.
- * If FALSE, nothing is done.
- *
- * If the CPU supports a dedicated interrupt stack in hardware,
- * then it is generally the responsibility of the BSP to allocate it
- * and set it up.
- *
- * If the CPU does not support a dedicated interrupt stack, then
- * the porter has two options: (1) execute interrupts on the
- * stack of the interrupted task, and (2) have RTEMS manage a dedicated
- * interrupt stack.
- *
- * If this is TRUE, @ref CPU_ALLOCATE_INTERRUPT_STACK should also be TRUE.
- *
- * Only one of @ref CPU_HAS_SOFTWARE_INTERRUPT_STACK and
- * @ref CPU_HAS_HARDWARE_INTERRUPT_STACK should be set to TRUE.  It is
- * possible that both are FALSE for a particular CPU.  Although it
- * is unclear what that would imply about the interrupt processing
- * procedure on that CPU.
- *
- * Port Specific Information:
- *
- * XXX document implementation including references if appropriate
- */
-#define CPU_HAS_SOFTWARE_INTERRUPT_STACK TRUE
-
-/**
  * Does the CPU follow the simple vectored interrupt model?
  *
  * If TRUE, then RTEMS allocates the vector table it internally manages.
@@ -69,40 +40,6 @@ extern "C" {
  * XXX document implementation including references if appropriate
  */
 #define CPU_SIMPLE_VECTORED_INTERRUPTS TRUE
-
-/**
- * Does this CPU have hardware support for a dedicated interrupt stack?
- *
- * If TRUE, then it must be installed during initialization.
- * If FALSE, then no installation is performed.
- *
- * If this is TRUE, @ref CPU_ALLOCATE_INTERRUPT_STACK should also be TRUE.
- *
- * Only one of @ref CPU_HAS_SOFTWARE_INTERRUPT_STACK and
- * @ref CPU_HAS_HARDWARE_INTERRUPT_STACK should be set to TRUE.  It is
- * possible that both are FALSE for a particular CPU.  Although it
- * is unclear what that would imply about the interrupt processing
- * procedure on that CPU.
- *
- * Port Specific Information:
- *
- * XXX document implementation including references if appropriate
- */
-#define CPU_HAS_HARDWARE_INTERRUPT_STACK FALSE
-
-/**
- * Does RTEMS allocate a dedicated interrupt stack in the Interrupt Manager?
- *
- * If TRUE, then the memory is allocated during initialization.
- * If FALSE, then the memory is allocated during initialization.
- *
- * This should be TRUE is CPU_HAS_SOFTWARE_INTERRUPT_STACK is TRUE.
- *
- * Port Specific Information:
- *
- * XXX document implementation including references if appropriate
- */
-#define CPU_ALLOCATE_INTERRUPT_STACK TRUE
 
 /**
  * Does the RTEMS invoke the user's ISR with the vector number and
@@ -228,32 +165,6 @@ extern "C" {
 #define CPU_USE_DEFERRED_FP_SWITCH       TRUE
 
 #define CPU_ENABLE_ROBUST_THREAD_DISPATCH FALSE
-
-/**
- * Does this port provide a CPU dependent IDLE task implementation?
- *
- * If TRUE, then the routine @ref _CPU_Thread_Idle_body
- * must be provided and is the default IDLE thread body instead of
- * @ref _CPU_Thread_Idle_body.
- *
- * If FALSE, then use the generic IDLE thread body if the BSP does
- * not provide one.
- *
- * This is intended to allow for supporting processors which have
- * a low power or idle mode.  When the IDLE thread is executed, then
- * the CPU can be powered down.
- *
- * The order of precedence for selecting the IDLE thread body is:
- *
- *   -#  BSP provided
- *   -#  CPU dependent (if provided)
- *   -#  generic (if no BSP and no CPU dependent)
- *
- * Port Specific Information:
- *
- * XXX document implementation including references if appropriate
- */
-#define CPU_PROVIDES_IDLE_THREAD_BODY    TRUE
 
 /**
  * Does the stack grow up (toward higher addresses) or down
@@ -426,21 +337,6 @@ extern Context_Control_fp _CPU_Null_fp_context;
 
 /**
  * @defgroup CPUInterrupt Processor Dependent Interrupt Management
- *
- * On some CPUs, RTEMS supports a software managed interrupt stack.
- * This stack is allocated by the Interrupt Manager and the switch
- * is performed in @ref _ISR_Handler.  These variables contain pointers
- * to the lowest and highest addresses in the chunk of memory allocated
- * for the interrupt stack.  Since it is unknown whether the stack
- * grows up or down (in general), this give the CPU dependent
- * code the option of picking the version it wants to use.
- *
- * NOTE: These two variables are required if the macro
- *       @ref CPU_HAS_SOFTWARE_INTERRUPT_STACK is defined as TRUE.
- *
- * Port Specific Information:
- *
- * XXX document implementation including references if appropriate
  */
 /**@{**/
 
@@ -552,24 +448,6 @@ extern Context_Control_fp _CPU_Null_fp_context;
 #define CPU_HEAP_ALIGNMENT         CPU_ALIGNMENT
 
 /**
- * This number corresponds to the byte alignment requirement for memory
- * buffers allocated by the partition manager.  This alignment requirement
- * may be stricter than that for the data types alignment specified by
- * @ref CPU_ALIGNMENT.  It is common for the partition to follow the same
- * alignment requirement as @ref CPU_ALIGNMENT.  If the @ref CPU_ALIGNMENT is
- * strict enough for the partition, then this should be set to
- * @ref CPU_ALIGNMENT.
- *
- * NOTE:  This does not have to be a power of 2.  It does have to
- *        be greater or equal to than @ref CPU_ALIGNMENT.
- *
- * Port Specific Information:
- *
- * XXX document implementation including references if appropriate
- */
-#define CPU_PARTITION_ALIGNMENT    CPU_ALIGNMENT
-
-/**
  * This number corresponds to the byte alignment requirement for the
  * stack.  This alignment requirement may be stricter than that for the
  * data types alignment specified by @ref CPU_ALIGNMENT.
@@ -580,6 +458,8 @@ extern Context_Control_fp _CPU_Null_fp_context;
  * Stack is software-managed
  */
 #define CPU_STACK_ALIGNMENT        CPU_ALIGNMENT
+
+#define CPU_INTERRUPT_STACK_ALIGNMENT CPU_CACHE_LINE_BYTES
 
 /*
  *  ISR handler macros
@@ -810,65 +690,27 @@ void _CPU_Initialize(void);
  */
 /**@{**/
 
-/**
- * This routine installs a "raw" interrupt handler directly into the
- * processor's vector table.
- *
- * @param[in] vector is the vector number
- * @param[in] new_handler is the raw ISR handler to install
- * @param[in] old_handler is the previously installed ISR Handler
- *
- * Port Specific Information:
- *
- * XXX document implementation including references if appropriate
- */
-void _CPU_ISR_install_raw_handler(
-  uint32_t    vector,
-  proc_ptr    new_handler,
-  proc_ptr   *old_handler
-);
+typedef void ( *CPU_ISR_raw_handler )( void );
 
-/**
- * This routine installs an interrupt vector.
- *
- * @param[in] vector is the vector number
- * @param[in] new_handler is the RTEMS ISR handler to install
- * @param[in] old_handler is the previously installed ISR Handler
- *
- * Port Specific Information:
- *
- * XXX document implementation including references if appropriate
- */
+RTEMS_INLINE_ROUTINE void _CPU_ISR_install_raw_handler(
+  uint32_t             vector,
+  CPU_ISR_raw_handler  new_handler,
+  CPU_ISR_raw_handler *old_handler
+)
+{
+  /* TODO */
+}
+
+typedef void ( *CPU_ISR_handler )( uint32_t );
+
 void _CPU_ISR_install_vector(
-  uint32_t    vector,
-  proc_ptr    new_handler,
-  proc_ptr   *old_handler
+  uint32_t         vector,
+  CPU_ISR_handler  new_handler,
+  CPU_ISR_handler *old_handler
 );
-
-/**
- * This routine installs the hardware interrupt stack pointer.
- *
- * NOTE:  It need only be provided if @ref CPU_HAS_HARDWARE_INTERRUPT_STACK
- *        is TRUE.
- *
- * Port Specific Information:
- *
- * XXX document implementation including references if appropriate
- */
-void _CPU_Install_interrupt_stack( void );
 
 /** @} */
 
-/**
- * This routine is the CPU dependent IDLE thread body.
- *
- * NOTE:  It need only be provided if @ref CPU_PROVIDES_IDLE_THREAD_BODY
- *        is TRUE.
- *
- * Port Specific Information:
- *
- * XXX document implementation including references if appropriate
- */
 void *_CPU_Thread_Idle_body( uintptr_t ignored );
 
 /**
@@ -942,18 +784,6 @@ void _CPU_Context_restore_fp(
   Context_Control_fp **fp_context_ptr
 );
 
-static inline void _CPU_Context_volatile_clobber( uintptr_t pattern )
-{
-  /* TODO */
-}
-
-static inline void _CPU_Context_validate( uintptr_t pattern )
-{
-  while (1) {
-    /* TODO */
-  }
-}
-
 /** @} */
 
 /* FIXME */
@@ -1017,6 +847,8 @@ static inline uint16_t CPU_swap_u16(uint16_t v)
 }
 
 typedef uint32_t CPU_Counter_ticks;
+
+uint32_t _CPU_Counter_frequency( void );
 
 CPU_Counter_ticks _CPU_Counter_read( void );
 

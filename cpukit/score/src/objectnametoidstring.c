@@ -22,7 +22,6 @@
 
 #include <string.h>
 
-#if defined(RTEMS_SCORE_OBJECT_ENABLE_STRING_NAMES)
 Objects_Control *_Objects_Get_by_name(
   const Objects_Information *information,
   const char                *name,
@@ -30,11 +29,12 @@ Objects_Control *_Objects_Get_by_name(
   Objects_Get_by_name_error *error
 )
 {
-  size_t   name_length;
-  size_t   max_name_length;
-  uint32_t index;
+  size_t          name_length;
+  size_t          max_name_length;
+  Objects_Maximum maximum;
+  Objects_Maximum index;
 
-  _Assert( information->is_string );
+  _Assert( _Objects_Has_string_name( information ) );
   _Assert( _Objects_Allocator_is_owner() );
 
   if ( name == NULL ) {
@@ -53,7 +53,9 @@ Objects_Control *_Objects_Get_by_name(
     *name_length_p = name_length;
   }
 
-  for ( index = 1; index <= information->maximum; index++ ) {
+  maximum = _Objects_Get_maximum_index( information );
+
+  for ( index = 0; index < maximum; ++index ) {
     Objects_Control *the_object;
 
     the_object = information->local_table[ index ];
@@ -72,4 +74,3 @@ Objects_Control *_Objects_Get_by_name(
   *error = OBJECTS_GET_BY_NAME_NO_OBJECT;
   return NULL;
 }
-#endif

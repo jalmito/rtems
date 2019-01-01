@@ -3,7 +3,6 @@ OUTPUT_FORMAT("elf32-powerpc", "elf32-powerpc",
 OUTPUT_ARCH(powerpc)
 /* Do we need any of these for elf?
    __DYNAMIC = 0;    */
-PROVIDE (__stack = 0);
 MEMORY {
 	VECTORS	: ORIGIN = 0x0 ,  LENGTH = 0x3000
 	CODE : ORIGIN = 0x3000 , LENGTH = 32M - 0x3000
@@ -97,6 +96,10 @@ SECTIONS
   _TLS_BSS_size = _TLS_BSS_end - _TLS_BSS_begin;
   _TLS_Size = _TLS_BSS_end - _TLS_Data_begin;
   _TLS_Alignment = MAX (ALIGNOF (.tdata), ALIGNOF (.tbss));
+
+  .rtemsstack (NOLOAD) : {
+    *(SORT(.rtemsstack.*))
+  } >CODE
 
   /* Adjust the address for the data segment.  We want to adjust up to
      the same address within the page on the next page up.  */
@@ -243,8 +246,6 @@ SECTIONS
    PROVIDE (__bss_end = .);
   } > CODE
   . = ALIGN(16);
-  . += 0x1000;
-  __stack = .;
   _end = . ;
   __rtems_end = . ;
   PROVIDE (end = .);

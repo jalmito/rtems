@@ -1148,6 +1148,55 @@ static void test_rtems_heap_allocate_aligned_with_boundary(void)
   rtems_test_assert( p == NULL );
 }
 
+static void test_rtems_malloc(void)
+{
+  void *p;
+
+  p = rtems_malloc(0);
+  rtems_test_assert(p == NULL);
+
+  errno = 0;
+  p = rtems_malloc(SIZE_MAX / 2);
+  rtems_test_assert(p == NULL);
+  rtems_test_assert(errno == 0);
+
+  p = rtems_malloc(1);
+  rtems_test_assert(p != NULL);
+
+  free(p);
+}
+
+static void test_rtems_calloc(void)
+{
+  void *p;
+  int *i;
+
+  p = rtems_calloc(0, 0);
+  rtems_test_assert(p == NULL);
+
+  p = rtems_calloc(0, 1);
+  rtems_test_assert(p == NULL);
+
+  p = rtems_calloc(1, 0);
+  rtems_test_assert(p == NULL);
+
+  errno = 0;
+  p = rtems_calloc(1, SIZE_MAX / 2);
+  rtems_test_assert(p == NULL);
+  rtems_test_assert(errno == 0);
+
+  errno = 0;
+  p = rtems_calloc(SIZE_MAX / 2, 1);
+  rtems_test_assert(p == NULL);
+  rtems_test_assert(errno == 0);
+
+  i = rtems_calloc(1, sizeof(*i));
+  rtems_test_assert(i != NULL);
+  rtems_test_assert(*i == 0);
+
+  free(i);
+}
+
 static void test_heap_size_with_overhead(void)
 {
   uintptr_t s;
@@ -1173,21 +1222,20 @@ static void test_heap_size_with_overhead(void)
 static void test_posix_memalign(void)
 {
   void *p1;
+  void **p2;
   size_t i;
   int sc;
   int maximumShift;
 
   /*
    * posix_memalign() is declared as never having a NULL first parameter.
-   * We need to explicitly disable this compiler warning to make this code
-   * warning free.
+   * We need to hide the NULL value from the compiler.
    */
-  COMPILER_DIAGNOSTIC_SETTINGS_PUSH
-  COMPILER_DIAGNOSTIC_SETTINGS_DISABLE_NONNULL
   puts( "posix_memalign - NULL return pointer -- EINVAL" );
-  sc = posix_memalign( NULL, 32, 8 );
+  p2 = NULL;
+  RTEMS_OBFUSCATE_VARIABLE( p2 );
+  sc = posix_memalign( p2, 32, 8 );
   fatal_posix_service_status( sc, EINVAL, "posix_memalign NULL pointer" );
-  COMPILER_DIAGNOSTIC_SETTINGS_POP
 
   puts( "posix_memalign - alignment of 0 -- EINVAL" );
   sc = posix_memalign( &p1, 0, 8 );
@@ -1297,6 +1345,8 @@ rtems_task Init(
   test_heap_size_with_overhead();
   test_protected_heap_info();
   test_rtems_heap_allocate_aligned_with_boundary();
+  test_rtems_malloc();
+  test_rtems_calloc();
   test_greedy_allocate();
 
   test_posix_memalign();
@@ -1372,8 +1422,7 @@ rtems_task Init(
   status = rtems_task_start( Task_id[ 5 ], Task_1_through_5, 0 );
   directive_failed( status, "rtems_task_start of TA5" );
 
-  status = rtems_task_delete( RTEMS_SELF );
-  directive_failed( status, "rtems_task_delete of RTEMS_SELF" );
+  rtems_task_exit();
 }
 
 static void test_early_malloc( void )

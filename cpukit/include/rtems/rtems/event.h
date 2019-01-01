@@ -1,20 +1,9 @@
 /**
- * @file rtems/rtems/event.h
+ * @file
  *
- * @defgroup ClassicEvent Events
+ * @ingroup ClassicEvent
  *
- * @ingroup ClassicRTEMS
- * @brief Information Related to Event Manager
- *
- * This include file contains the information pertaining to the Event
- * Manager. This manager provides a high performance method of communication
- * and synchronization.
- *
- * Directives provided are:
- *
- * - send an event set to a task
- * - receive event condition
- *
+ * @brief Classic Event Manager API
  */
 
 /* COPYRIGHT (c) 1989-2008.
@@ -28,9 +17,9 @@
 #ifndef _RTEMS_RTEMS_EVENT_H
 #define _RTEMS_RTEMS_EVENT_H
 
+#include <rtems/rtems/options.h>
 #include <rtems/rtems/status.h>
 #include <rtems/rtems/types.h>
-#include <rtems/rtems/options.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -428,8 +417,7 @@ rtems_status_code rtems_event_system_receive(
  *   sc = rtems_event_transient_send(req->task_id);
  *   assert(sc == RTEMS_SUCCESSFUL);
  *
- *   sc = rtems_task_delete(RTEMS_SELF);
- *   assert(sc == RTEMS_SUCCESSFUL);
+ *   rtems_task_exit();
  * }
  *
  * void issue_request_and_wait_for_completion(void)
@@ -513,10 +501,6 @@ RTEMS_INLINE_ROUTINE void rtems_event_transient_clear( void )
 }
 
 /** @} */
-
-typedef struct {
-  rtems_event_set pending_events;
-} Event_Control;
 
 #ifdef __cplusplus
 }

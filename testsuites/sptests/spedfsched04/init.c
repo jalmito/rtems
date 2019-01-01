@@ -65,6 +65,8 @@ static rtems_task Task(
   status = rtems_rate_monotonic_create( Task_name[ argument ], &RM_period );
   directive_failed( status, "rtems_rate_monotonic_create" );
 
+  rtems_test_spin_until_next_tick();
+
   while ( FOREVER ) {
     status = rtems_rate_monotonic_period( RM_period, Periods[ argument ] );
 
@@ -135,8 +137,7 @@ static rtems_task Init(
     status = rtems_task_start( Task_id[ index ], Task, index);
     directive_failed( status, "rtems_task_start loop");
   }
-  status = rtems_task_delete( RTEMS_SELF );
-  directive_failed( status, "rtems_task_delete of RTEMS_SELF" );
+  rtems_task_exit();
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER

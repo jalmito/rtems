@@ -43,38 +43,6 @@ const char rtems_test_name[] = "FILE I/O";
  */
 #define RTEMS_DRIVER_AUTO_MAJOR (0)
 
-/*
- * RAM disk driver so you can create a RAM disk from the shell prompt.
- */
-/**
- * The RAM Disk configuration.
- */
-rtems_ramdisk_config rtems_ramdisk_configuration[] =
-{
-  {
-    block_size: 512,
-    block_num:  1024,
-    location:   NULL
-  }
-};
-
-/**
- * The number of RAM Disk configurations.
- */
-size_t rtems_ramdisk_configuration_size = 1;
-
-/**
- * Create the RAM Disk Driver entry.
- */
-rtems_driver_address_table rtems_ramdisk_io_ops = {
-  initialization_entry: ramdisk_initialize,
-  open_entry:           rtems_blkdev_generic_open,
-  close_entry:          rtems_blkdev_generic_close,
-  read_entry:           rtems_blkdev_generic_read,
-  write_entry:          rtems_blkdev_generic_write,
-  control_entry:        rtems_blkdev_generic_ioctl
-};
-
 /**
  * The NV Device descriptor. For this test it is just DRAM.
  */
@@ -106,58 +74,6 @@ const rtems_nvdisk_config rtems_nvdisk_configuration[] =
  * The number of NV Disk configurations.
  */
 uint32_t rtems_nvdisk_configuration_size = 1;
-
-/**
- * Create the NV Disk Driver entry.
- */
-rtems_driver_address_table rtems_nvdisk_io_ops = {
-  initialization_entry: rtems_nvdisk_initialize,
-  open_entry:           rtems_blkdev_generic_open,
-  close_entry:          rtems_blkdev_generic_close,
-  read_entry:           rtems_blkdev_generic_read,
-  write_entry:          rtems_blkdev_generic_write,
-  control_entry:        rtems_blkdev_generic_ioctl
-};
-
-#if 0
-int
-setup_nvdisk (const char* mntpath)
-{
-  rtems_device_major_number major;
-  rtems_status_code         sc;
-
-  /*
-   * For our test we do not have any static RAM or EEPROM devices so
-   * we allocate the memory from the heap.
-   */
-  rtems_nv_heap_device_descriptor[0].base =
-    malloc (rtems_nv_heap_device_descriptor[0].size);
-
-  if (!rtems_nv_heap_device_descriptor[0].base)
-  {
-    printf ("error: no memory for NV disk\n");
-    return 1;
-  }
-  
-  /*
-   * Register the NV Disk driver.
-   */
-  printf ("Register NV Disk Driver: ");
-  sc = rtems_io_register_driver (RTEMS_DRIVER_AUTO_MAJOR,
-                                 &rtems_nvdisk_io_ops,
-                                 &major);
-  if (sc != RTEMS_SUCCESSFUL)
-  {
-    printf ("error: nvdisk driver not initialised: %s\n",
-            rtems_status_text (sc));
-    return 1;
-  }
-  
-  printf ("successful\n");
-
-  return 0;
-}
-#endif
 
 /*
  * Table of FAT file systems that will be mounted
@@ -320,7 +236,7 @@ disk_test_set_block_size (rtems_disk_device *dd, size_t size)
 }
 
 static int
-disk_test_write_blocks (dev_t dev, int start, int count, size_t size)
+disk_test_write_blocks (const char *name, int start, int count, size_t size)
 {
   int                 block;
   uint32_t*           ip;
@@ -329,15 +245,27 @@ disk_test_write_blocks (dev_t dev, int start, int count, size_t size)
   rtems_bdbuf_buffer* bd;
   rtems_status_code   sc;
   int                 rv = 0;
-  rtems_disk_device* dd;
-  
-  dd = rtems_disk_obtain (dev);
-  if (!dd)
+  rtems_disk_device*  dd;
+  int                 fd;
+
+  fd = open(name, O_RDWR);
+  if (fd < 0) {
+    printf ("error: cannot open disk\n");
+    rv = 1;
+  }
+
+  if (rv == 0 && rtems_disk_fd_get_disk_device(fd, &dd) != 0)
   {
     printf ("error: cannot obtain disk\n");
     rv = 1;
   }
-  
+
+  if (fd >= 0 && close (fd) != 0)
+  {
+    printf ("error: close disk failed\n");
+    rv = 1;
+  }
+
   if (rv == 0 && disk_test_set_block_size (dd, size) < 0)
   {
     printf ("error: set block size failed: %s\n", strerror (errno));
@@ -369,20 +297,17 @@ disk_test_write_blocks (dev_t dev, int start, int count, size_t size)
     }
   }
 
-  rtems_disk_release (dd);
-
   return rv;
 }
 
 static int
 disk_test_block_sizes (int argc, char *argv[])
 {
-  struct stat st;
-  char*       name;
-  int         start;
-  int         count;
-  int         size;
-  
+  char* name;
+  int   start;
+  int   count;
+  int   size;
+
   if (argc != (4 + 1))
   {
     printf ("error: need to supply a device path, start, block and size\n");
@@ -390,31 +315,28 @@ disk_test_block_sizes (int argc, char *argv[])
   }
 
   name = argv[1];
-  
-  if (stat (name, &st) < 0)
-  {
-    printf ("error: stat '%s' failed: %s\n", name, strerror (errno));
-    return 1;
-  }
 
   start = strtoul (argv[2], 0, 0);
   count = strtoul (argv[3], 0, 0);
   size  = strtoul (argv[4], 0, 0);
-  
-  return disk_test_write_blocks (st.st_rdev, start, count, size);
+
+  return disk_test_write_blocks (name, start, count, size);
 }
 
-static size_t
+static uint32_t
 parse_size_arg (const char* arg)
 {
-  size_t size;
-  size_t scalar = 1;
-  
+  uint32_t size;
+  uint32_t scalar = 1;
+
   size = strtoul (arg, 0, 0);
   switch (arg[strlen (arg) - 1])
   {
+    case 'b':
+      scalar = 1;
+      break;
     case 'M':
-      scalar = (size_t) 1000 * 1024;
+      scalar = 1024000;
       break;
     case 'm':
       scalar = 1000000;
@@ -426,26 +348,26 @@ parse_size_arg (const char* arg)
       scalar = 1000;
       break;
     default:
-      printf ("error: invalid scalar (M/m/K/k): %c\n", arg[strlen (arg) - 1]);
+      printf ("error: invalid scalar (b,M/m/K/k): %c\n", arg[strlen (arg) - 1]);
       return 0;
   }
   return size * scalar;
- }
+}
 
 static int
 create_ramdisk (int argc, char *argv[])
 {
-  rtems_device_major_number major;
   rtems_status_code         sc;
   int                       arg;
-  size_t                    size = 0;
-  size_t                    block_size = 0;
+  uint32_t                  size = 524288;
+  uint32_t                  block_size = 512;
+  uint32_t                  block_count;
 
   for (arg = 0; arg < argc; ++arg)
   {
     if (argv[arg][0] == '-')
     {
-      switch (argv[arg][0])
+      switch (argv[arg][1])
       {
         case 's':
           ++arg;
@@ -476,30 +398,24 @@ create_ramdisk (int argc, char *argv[])
     }
   }
 
-  if (block_size)
-    rtems_ramdisk_configuration[0].block_size = block_size;
-  if (size)
-    rtems_ramdisk_configuration[0].block_num =
-      size / rtems_ramdisk_configuration[0].block_size;
-    
+  block_count = size / block_size;
+
   /*
    * Register the RAM Disk driver.
    */
   printf ("Register RAM Disk Driver [blocks=%" PRIu32 \
-          " block-size=%" PRIu32"]:",
-          rtems_ramdisk_configuration[0].block_num,
-          rtems_ramdisk_configuration[0].block_size);
-  
-  sc = rtems_io_register_driver (RTEMS_DRIVER_AUTO_MAJOR,
-                                 &rtems_ramdisk_io_ops,
-                                 &major);
+          " block-size=%" PRIu32 "]:",
+          block_count,
+          block_size);
+
+  sc = ramdisk_register(block_size, block_count, false, "/dev/rda");
   if (sc != RTEMS_SUCCESSFUL)
   {
     printf ("error: ramdisk driver not initialised: %s\n",
             rtems_status_text (sc));
     return 1;
   }
-  
+
   printf ("successful\n");
 
   return 0;
@@ -508,19 +424,18 @@ create_ramdisk (int argc, char *argv[])
 static int
 create_nvdisk (int argc, char *argv[])
 {
-  rtems_device_major_number major;
   rtems_status_code         sc;
   int                       arg;
-  size_t                    size = 0;
+  uint32_t                  size = 0;
 #if ADD_WHEN_NVDISK_HAS_CHANGED
-  size_t                    block_size = 0;
+  uint32_t                  block_size = 0;
 #endif
   
   for (arg = 0; arg < argc; ++arg)
   {
     if (argv[arg][0] == '-')
     {
-      switch (argv[arg][0])
+      switch (argv[arg][1])
       {
         case 's':
           ++arg;
@@ -580,10 +495,8 @@ create_nvdisk (int argc, char *argv[])
           " block-size=%" PRIu32"]:",
           rtems_nv_heap_device_descriptor[0].size,
           rtems_nvdisk_configuration[0].block_size);
-  
-  sc = rtems_io_register_driver (RTEMS_DRIVER_AUTO_MAJOR,
-                                 &rtems_nvdisk_io_ops,
-                                 &major);
+
+  sc = rtems_nvdisk_initialize (0, 0, NULL);
   if (sc != RTEMS_SUCCESSFUL)
   {
     printf ("error: nvdisk driver not initialised: %s\n",
@@ -808,7 +721,7 @@ static void fileio_list_file(void)
     printf("\n Trying to open file \"%s\" for read\n",fname);
     fd = open(fname,O_RDONLY);
     if (fd < 0) {
-      printf("*** file open failed, errno = %d(%s)\n",errno,strerror(errno));
+      printf("*** file failed to open, errno = %d(%s)\n",errno,strerror(errno));
     }
   }
 
@@ -1101,7 +1014,7 @@ static void fileio_read_file(void)
     printf("... opening file \"%s\"\n",fname);
     fd = open(fname,O_RDONLY);
     if (fd < 0) {
-      printf("*** file open failed, errno = %d(%s)\n",errno,strerror(errno));
+      printf("*** failed to open file, errno = %d(%s)\n",errno,strerror(errno));
       failed = true;
     }
   }
@@ -1258,8 +1171,7 @@ Init (rtems_task_argument ignored)
     status = rtems_task_start( Task_id, fileio_task, 1 );
     directive_failed( status, "start" ); 
 
-    status = rtems_task_delete( RTEMS_SELF );
-    directive_failed( status, "delete" ); 
+    rtems_task_exit();
   } else {
     TEST_END();
 

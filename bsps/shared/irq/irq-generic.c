@@ -27,9 +27,7 @@
 
 #include <stdlib.h>
 
-#include <rtems/score/apimutex.h>
 #include <rtems/score/processormask.h>
-#include <rtems/score/sysstate.h>
 #include <rtems/malloc.h>
 
 #ifdef BSP_INTERRUPT_USE_INDEX_TABLE
@@ -134,16 +132,21 @@ static inline bool bsp_interrupt_allocate_handler_index(
 
 static bsp_interrupt_handler_entry *bsp_interrupt_allocate_handler_entry(void)
 {
+  bsp_interrupt_handler_entry *e;
+
   #ifdef BSP_INTERRUPT_NO_HEAP_USAGE
     rtems_vector_number index = 0;
+
     if (bsp_interrupt_allocate_handler_index(0, &index)) {
-      return &bsp_interrupt_handler_table [index];
+      e = &bsp_interrupt_handler_table [index];
     } else {
-      return NULL;
+      e = NULL;
     }
   #else
-    return rtems_heap_allocate_aligned_with_boundary(sizeof(bsp_interrupt_handler_entry), 0, 0);
+    e = rtems_malloc(sizeof(*e));
   #endif
+
+  return e;
 }
 
 static void bsp_interrupt_free_handler_entry(bsp_interrupt_handler_entry *e)
@@ -153,20 +156,6 @@ static void bsp_interrupt_free_handler_entry(bsp_interrupt_handler_entry *e)
   #else
     free(e);
   #endif
-}
-
-void bsp_interrupt_lock(void)
-{
-  if (_System_state_Is_up(_System_state_Get())) {
-    _RTEMS_Lock_allocator();
-  }
-}
-
-void bsp_interrupt_unlock(void)
-{
-  if (_System_state_Is_up(_System_state_Get())) {
-    _RTEMS_Unlock_allocator();
-  }
 }
 
 void bsp_interrupt_initialize(void)

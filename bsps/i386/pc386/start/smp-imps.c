@@ -755,7 +755,7 @@ static void bsp_inter_processor_interrupt(void *arg)
 
   smp_apic_ack();
 
-  message = _SMP_Inter_processor_interrupt_handler();
+  message = _SMP_Inter_processor_interrupt_handler(_Per_CPU_Get());
 
   if ((message & SMP_MESSAGE_CLOCK_TICK) != 0) {
     Clock_isr(NULL);
@@ -794,7 +794,7 @@ static void secondary_cpu_initialize(void)
   enable_sse();
 #endif
 
-  _SMP_Start_multitasking_on_secondary_processor();
+  _SMP_Start_multitasking_on_secondary_processor( _Per_CPU_Get() );
 }
 
 uint32_t _CPU_SMP_Initialize( void )

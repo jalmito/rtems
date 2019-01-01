@@ -238,6 +238,17 @@ endif
 endif
 
 if HAS_SMP
+if TEST_smpfatal09
+smp_tests += smpfatal09
+smp_screens += smpfatal09/smpfatal09.scn
+smp_docs += smpfatal09/smpfatal09.doc
+smpfatal09_SOURCES = smpfatal09/init.c
+smpfatal09_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_FLAGS_smpfatal09) \
+	$(support_includes)
+endif
+endif
+
+if HAS_SMP
 if TEST_smpipi01
 smp_tests += smpipi01
 smp_screens += smpipi01/smpipi01.scn
@@ -338,7 +349,6 @@ endif
 endif
 
 if HAS_SMP
-if HAS_POSIX
 if TEST_smppsxaffinity01
 smp_tests += smppsxaffinity01
 smp_screens += smppsxaffinity01/smppsxaffinity01.scn
@@ -349,10 +359,8 @@ smppsxaffinity01_CPPFLAGS = $(AM_CPPFLAGS) \
 	-I$(top_srcdir)/include
 endif
 endif
-endif
 
 if HAS_SMP
-if HAS_POSIX
 if TEST_smppsxaffinity02
 smp_tests += smppsxaffinity02
 smp_screens += smppsxaffinity02/smppsxaffinity02.scn
@@ -362,10 +370,8 @@ smppsxaffinity02_CPPFLAGS = $(AM_CPPFLAGS) \
 	$(TEST_FLAGS_smppsxaffinity02) $(support_includes)
 endif
 endif
-endif
 
 if HAS_SMP
-if HAS_POSIX
 if TEST_smppsxmutex01
 smp_tests += smppsxmutex01
 smp_screens += smppsxmutex01/smppsxmutex01.scn
@@ -373,7 +379,6 @@ smp_docs += smppsxmutex01/smppsxmutex01.doc
 smppsxmutex01_SOURCES = smppsxmutex01/init.c
 smppsxmutex01_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_FLAGS_smppsxmutex01) \
 	$(support_includes)
-endif
 endif
 endif
 
@@ -474,6 +479,17 @@ smp_screens += smpschededf03/smpschededf03.scn
 smp_docs += smpschededf03/smpschededf03.doc
 smpschededf03_SOURCES = smpschededf03/init.c
 smpschededf03_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_FLAGS_smpschededf03) \
+	$(support_includes)
+endif
+endif
+
+if HAS_SMP
+if TEST_smpschededf04
+smp_tests += smpschededf04
+smp_screens += smpschededf04/smpschededf04.scn
+smp_docs += smpschededf04/smpschededf04.doc
+smpschededf04_SOURCES = smpschededf04/init.c
+smpschededf04_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_FLAGS_smpschededf04) \
 	$(support_includes)
 endif
 endif
@@ -611,6 +627,17 @@ endif
 endif
 
 if HAS_SMP
+if TEST_smpthreadpin01
+smp_tests += smpthreadpin01
+smp_screens += smpthreadpin01/smpthreadpin01.scn
+smp_docs += smpthreadpin01/smpthreadpin01.doc
+smpthreadpin01_SOURCES = smpthreadpin01/init.c
+smpthreadpin01_CPPFLAGS = $(AM_CPPFLAGS) \
+	$(TEST_FLAGS_smpthreadpin01) $(support_includes)
+endif
+endif
+
+if HAS_SMP
 if TEST_smpunsupported01
 smp_tests += smpunsupported01
 smp_screens += smpunsupported01/smpunsupported01.scn
@@ -635,4 +662,3 @@ endif
 rtems_tests_PROGRAMS = $(smp_tests)
 dist_rtems_tests_DATA = $(smp_screens) $(smp_docs)
 
-include $(top_srcdir)/../automake/local.am

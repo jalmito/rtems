@@ -42,20 +42,6 @@ extern "C" {
 #define CPU_SIMPLE_VECTORED_INTERRUPTS TRUE
 
 /*
- *  Use the m68k's hardware interrupt stack support and have the
- *  interrupt manager allocate the memory for it.
- */
-
-#if ( M68K_HAS_SEPARATE_STACKS == 1)
-#define CPU_HAS_SOFTWARE_INTERRUPT_STACK 0
-#define CPU_HAS_HARDWARE_INTERRUPT_STACK 1
-#else
-#define CPU_HAS_SOFTWARE_INTERRUPT_STACK 1
-#define CPU_HAS_HARDWARE_INTERRUPT_STACK 0
-#endif
-#define CPU_ALLOCATE_INTERRUPT_STACK     1
-
-/*
  *  Does the RTEMS invoke the user's ISR with the vector number and
  *  a pointer to the saved interrupt frame (1) or just the vector
  *  number (0)?
@@ -96,7 +82,6 @@ extern "C" {
 #define CPU_USE_DEFERRED_FP_SWITCH       TRUE
 #define CPU_ENABLE_ROBUST_THREAD_DISPATCH FALSE
 
-#define CPU_PROVIDES_IDLE_THREAD_BODY    TRUE
 #define CPU_STACK_GROWS_UP               FALSE
 
 /* FIXME: Is this the right value? */
@@ -298,7 +283,6 @@ extern void*                     _VBR;
  *  bits out of a thread mode.
  */
 
-#define CPU_MODES_INTERRUPT_LEVEL  0x00000007 /* interrupt level in mode */
 #define CPU_MODES_INTERRUPT_MASK   0x00000007 /* interrupt level in mode */
 
 /*
@@ -346,7 +330,6 @@ extern void*                     _VBR;
 
 #define CPU_ALIGNMENT                    4
 #define CPU_HEAP_ALIGNMENT               CPU_ALIGNMENT
-#define CPU_PARTITION_ALIGNMENT          CPU_ALIGNMENT
 
 /*
  *  On m68k thread stacks require no further alignment after allocation
@@ -354,6 +337,8 @@ extern void*                     _VBR;
  */
 
 #define CPU_STACK_ALIGNMENT        0
+
+#define CPU_INTERRUPT_STACK_ALIGNMENT CPU_CACHE_LINE_BYTES
 
 #ifndef ASM
 
@@ -414,15 +399,6 @@ void _CPU_Context_Initialize(
 );
 
 /* end of Context handler macros */
-
-/*
- *  _CPU_Thread_Idle_body
- *
- *  This routine is the CPU dependent IDLE thread body.
- *
- *  NOTE:  It need only be provided if CPU_PROVIDES_IDLE_THREAD_BODY
- *         is TRUE.
- */
 
 void *_CPU_Thread_Idle_body( uintptr_t ignored );
 
@@ -588,38 +564,21 @@ extern const unsigned char _CPU_m68k_BFFFO_table[256];
 
 void _CPU_Initialize(void);
 
-/*
- *  _CPU_ISR_install_raw_handler
- *
- *  This routine installs a "raw" interrupt handler directly into the
- *  processor's vector table.
- */
+typedef void ( *CPU_ISR_raw_handler )( void );
 
 void _CPU_ISR_install_raw_handler(
-  uint32_t    vector,
-  proc_ptr    new_handler,
-  proc_ptr   *old_handler
+  uint32_t             vector,
+  CPU_ISR_raw_handler  new_handler,
+  CPU_ISR_raw_handler *old_handler
 );
 
-/*
- *  _CPU_ISR_install_vector
- *
- *  This routine installs an interrupt vector.
- */
+typedef void ( *CPU_ISR_handler )( uint32_t );
 
 void _CPU_ISR_install_vector(
   uint32_t         vector,
-  proc_ptr         new_handler,
-  proc_ptr        *old_handler
+  CPU_ISR_handler  new_handler,
+  CPU_ISR_handler *old_handler
 );
-
-/*
- *  _CPU_Install_interrupt_stack
- *
- *  This routine installs the hardware interrupt stack pointer.
- */
-
-void _CPU_Install_interrupt_stack( void );
 
 /*
  *  _CPU_Context_switch
@@ -656,18 +615,6 @@ void _CPU_Context_restore_fp(
   Context_Control_fp **fp_context_ptr
 );
 
-static inline void _CPU_Context_volatile_clobber( uintptr_t pattern )
-{
-  /* TODO */
-}
-
-static inline void _CPU_Context_validate( uintptr_t pattern )
-{
-  while (1) {
-    /* TODO */
-  }
-}
-
 /**
  *  This method prints the CPU exception frame.
  *
@@ -678,6 +625,8 @@ void _CPU_Exception_frame_print(
 );
 
 typedef uint32_t CPU_Counter_ticks;
+
+uint32_t _CPU_Counter_frequency( void );
 
 CPU_Counter_ticks _CPU_Counter_read( void );
 
@@ -719,8 +668,8 @@ void M68KFPSPInstallExceptionHandlers (void);
 
 extern int (*_FPSP_install_raw_handler)(
   uint32_t   vector,
-  proc_ptr new_handler,
-  proc_ptr *old_handler
+  CPU_ISR_raw_handler new_handler,
+  CPU_ISR_raw_handler *old_handler
 );
 
 #endif

@@ -51,6 +51,11 @@ static int mpc83xx_decrementer_exception_handler( BSP_Exception_frame *frame, un
   return 0;
 }
 
+uint32_t _CPU_Counter_frequency(void)
+{
+  return bsp_time_base_frequency;
+}
+
 void bsp_start( void)
 {
   rtems_status_code sc = RTEMS_SUCCESSFUL;
@@ -92,7 +97,6 @@ void bsp_start( void)
 #endif /* HAS_UBOOT */
   bsp_time_base_frequency = BSP_bus_frequency / 4;
   bsp_clicks_per_usec = bsp_time_base_frequency / 1000000;
-  rtems_counter_initialize_converter(bsp_time_base_frequency);
 
   /* Initialize some console parameters */
   for (i = 0; i < console_device_count; ++i) {
@@ -109,10 +113,7 @@ void bsp_start( void)
 #ifndef BSP_DATA_CACHE_ENABLED
   ppc_exc_cache_wb_check = 0;
 #endif
-  ppc_exc_initialize(
-    (uintptr_t) bsp_section_work_begin,
-    rtems_configuration_get_interrupt_stack_size()
-  );
+  ppc_exc_initialize();
 
   /* Install default handler for the decrementer exception */
   sc = ppc_exc_set_handler( ASM_DEC_VECTOR, mpc83xx_decrementer_exception_handler);

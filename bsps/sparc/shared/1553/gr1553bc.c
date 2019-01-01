@@ -17,40 +17,7 @@
 #include <bsp/gr1553b.h>
 #include <bsp/gr1553bc.h>
 
-/* Use interrupt lock privmitives compatible with SMP defined in
- * RTEMS 4.11.99 and higher.
- */
-#if (((__RTEMS_MAJOR__ << 16) | (__RTEMS_MINOR__ << 8) | __RTEMS_REVISION__) >= 0x040b63)
-
-/* map via rtems_interrupt_lock_* API: */
-#define SPIN_DECLARE(lock) RTEMS_INTERRUPT_LOCK_MEMBER(lock)
-#define SPIN_INIT(lock, name) rtems_interrupt_lock_initialize(lock, name)
-#define SPIN_LOCK(lock, level) rtems_interrupt_lock_acquire_isr(lock, &level)
-#define SPIN_LOCK_IRQ(lock, level) rtems_interrupt_lock_acquire(lock, &level)
-#define SPIN_UNLOCK(lock, level) rtems_interrupt_lock_release_isr(lock, &level)
-#define SPIN_UNLOCK_IRQ(lock, level) rtems_interrupt_lock_release(lock, &level)
-#define SPIN_IRQFLAGS(k) rtems_interrupt_lock_context k
-#define SPIN_ISR_IRQFLAGS(k) SPIN_IRQFLAGS(k)
-#define SPIN_FREE(lock) rtems_interrupt_lock_destroy(lock)
-
-#else
-
-/* maintain single-core compatibility with older versions of RTEMS: */
-#define SPIN_DECLARE(name)
-#define SPIN_INIT(lock, name)
-#define SPIN_LOCK(lock, level)
-#define SPIN_LOCK_IRQ(lock, level) rtems_interrupt_disable(level)
-#define SPIN_UNLOCK(lock, level)
-#define SPIN_UNLOCK_IRQ(lock, level) rtems_interrupt_enable(level)
-#define SPIN_IRQFLAGS(k) rtems_interrupt_level k
-#define SPIN_ISR_IRQFLAGS(k)
-#define SPIN_FREE(lock)
-
-#ifdef RTEMS_SMP
-#error SMP mode not compatible with these interrupt lock primitives
-#endif
-
-#endif
+#include <grlib_impl.h>
 
 #define GR1553BC_WRITE_MEM(adr, val) *(volatile uint32_t *)(adr) = (uint32_t)(val)
 #define GR1553BC_READ_MEM(adr) (*(volatile uint32_t *)(adr))
@@ -123,14 +90,13 @@ struct gr1553bc_list_cfg gr1553bc_def_cfg =
 
 int gr1553bc_list_alloc(struct gr1553bc_list **list, int max_major)
 {
-	int size;
+	size_t size;
 	struct gr1553bc_list *l;
 
-	size = sizeof(struct gr1553bc_list) + max_major * sizeof(void *);
-	l = malloc(size);
+	size = sizeof(*l) + max_major * sizeof(void *);
+	l = grlib_calloc(1, size);
 	if ( l == NULL )
 		return -1;
-	memset(l, 0, size);
 
 	l->major_cnt = max_major;
 	*list = l;
@@ -343,7 +309,7 @@ int gr1553bc_list_table_alloc
 	} else {
 		if (bdtab_custom == NULL) {
 			/* Allocate descriptors */
-			list->_table = malloc(size + (GR1553BC_BD_ALIGN-1));
+			list->_table = grlib_malloc(size + (GR1553BC_BD_ALIGN-1));
 			if ( list->_table == NULL )
 				return -1;
 		} else {
@@ -541,15 +507,16 @@ int gr1553bc_major_alloc_skel
 {
 	struct gr1553bc_major *maj;
 	struct gr1553bc_minor *minor;
-	int size, i;
+	size_t size;
+	int i;
 
 	if ( (cfg == NULL) || (major == NULL) || (cfg->minor_cnt <= 0) )
 		return -1;
 
 	/* Allocate Major Frame description, but no descriptors */
-	size = sizeof(struct gr1553bc_major) + cfg->minor_cnt * 
-		(sizeof(struct gr1553bc_minor) + sizeof(void *));
-	maj = (struct gr1553bc_major *)malloc(size);
+	size = sizeof(*maj) + cfg->minor_cnt *
+		(sizeof(*minor) + sizeof(void *));
+	maj = grlib_malloc(size);
 	if ( maj == NULL )
 		return -1;
 
@@ -1281,14 +1248,13 @@ void *gr1553bc_open(int minor)
 	if ( pdev == NULL )
 		goto fail;
 
-	irq_log_p = malloc(GR1553BC_IRQLOG_SIZE*2);
+	irq_log_p = grlib_malloc(GR1553BC_IRQLOG_SIZE*2);
 	if ( irq_log_p == NULL )
 		goto fail;
 
-	priv = malloc(sizeof(struct gr1553bc_priv));
+	priv = grlib_calloc(1, sizeof(*priv));
 	if ( priv == NULL )
 		goto fail;
-	memset(priv, 0, sizeof(struct gr1553bc_priv));
 
 	/* Init BC device */
 	priv->pdev = pdev;

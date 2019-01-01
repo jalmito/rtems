@@ -19,12 +19,12 @@
 #define _RTEMS_SCORE_USEREXT_H
 
 #include <rtems/score/interr.h>
-#include <rtems/score/chain.h>
-#include <rtems/score/thread.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct _Thread_Control;
 
 typedef void User_extensions_routine RTEMS_DEPRECATED;
 
@@ -69,8 +69,8 @@ typedef void User_extensions_routine RTEMS_DEPRECATED;
  * return @a false and the entire thread create operation will fail.
  */
 typedef bool ( *User_extensions_thread_create_extension )(
-  Thread_Control *executing,
-  Thread_Control *created
+  struct _Thread_Control *executing,
+  struct _Thread_Control *created
 );
 
 /**
@@ -89,8 +89,8 @@ typedef bool ( *User_extensions_thread_create_extension )(
  * @param[in] deleted The deleted thread.
  */
 typedef void( *User_extensions_thread_delete_extension )(
-  Thread_Control *executing,
-  Thread_Control *deleted
+  struct _Thread_Control *executing,
+  struct _Thread_Control *deleted
 );
 
 /**
@@ -109,8 +109,8 @@ typedef void( *User_extensions_thread_delete_extension )(
  * @param[in] started The started thread.
  */
 typedef void( *User_extensions_thread_start_extension )(
-  Thread_Control *executing,
-  Thread_Control *started
+  struct _Thread_Control *executing,
+  struct _Thread_Control *started
 );
 
 /**
@@ -131,8 +131,8 @@ typedef void( *User_extensions_thread_start_extension )(
  * @param[in] restarted The executing thread.  Yes, the executing thread.
  */
 typedef void( *User_extensions_thread_restart_extension )(
-  Thread_Control *executing,
-  Thread_Control *restarted
+  struct _Thread_Control *executing,
+  struct _Thread_Control *restarted
 );
 
 /**
@@ -154,8 +154,8 @@ typedef void( *User_extensions_thread_restart_extension )(
  * @param[in] heir The heir thread.
  */
 typedef void( *User_extensions_thread_switch_extension )(
-  Thread_Control *executing,
-  Thread_Control *heir
+  struct _Thread_Control *executing,
+  struct _Thread_Control *heir
 );
 
 /**
@@ -169,7 +169,7 @@ typedef void( *User_extensions_thread_switch_extension )(
  * @param[in] executing The executing thread.
  */
 typedef void( *User_extensions_thread_begin_extension )(
-  Thread_Control *executing
+  struct _Thread_Control *executing
 );
 
 /**
@@ -183,7 +183,7 @@ typedef void( *User_extensions_thread_begin_extension )(
  * @param[in] executing The executing thread.
  */
 typedef void( *User_extensions_thread_exitted_extension )(
-  Thread_Control *executing
+  struct _Thread_Control *executing
 );
 
 /**
@@ -223,7 +223,7 @@ typedef void( *User_extensions_fatal_extension )(
  * @param[in] terminated The terminated thread.
  */
 typedef void( *User_extensions_thread_terminate_extension )(
-  Thread_Control *terminated
+  struct _Thread_Control *terminated
 );
 
 /**
@@ -240,28 +240,6 @@ typedef struct {
   User_extensions_fatal_extension          fatal;
   User_extensions_thread_terminate_extension thread_terminate;
 }   User_extensions_Table;
-
-/**
- * @brief Manages the switch callouts.
- *
- * They are managed separately from other extensions for performance reasons.
- */
-typedef struct {
-  Chain_Node                              Node;
-  User_extensions_thread_switch_extension thread_switch;
-}   User_extensions_Switch_control;
-
-/**
- * @brief Manages each user extension set.
- *
- * The switch control is part of the extensions control even if not used due to
- * the extension not having a switch handler.
- */
-typedef struct {
-  Chain_Node                     Node;
-  User_extensions_Switch_control Switch;
-  User_extensions_Table          Callouts;
-}   User_extensions_Control;
 
 /** @} */
 

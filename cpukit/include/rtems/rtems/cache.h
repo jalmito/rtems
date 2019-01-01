@@ -15,12 +15,15 @@
 #ifndef _RTEMS_RTEMS_CACHE_H
 #define _RTEMS_RTEMS_CACHE_H
 
+#include <rtems/score/basedefs.h>
+
+#if defined( RTEMS_SMP )
+#include <sys/cpuset.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <rtems/system.h>
-#include <sys/types.h>
 
 /**
  * @defgroup ClassicCache Cache
@@ -280,85 +283,6 @@ void rtems_cache_coherent_add_area(
   void *area_begin,
   uintptr_t area_size
 );
-
-#if defined( RTEMS_SMP )
-
-/**
- * @brief Flushes multiple data cache lines for a set of processors
- *
- * Dirty cache lines covering the area are transferred to memory.
- * Depending on the cache implementation this may mark the lines as invalid.
- *
- * This operation should not be called from interrupt context.
- *
- * @param[in] addr The start address of the area to flush.
- * @param[in] size The size in bytes of the area to flush.
- * @param[in] setsize The size of the processor set.
- * @param[in] set The target processor set.
- */
-void rtems_cache_flush_multiple_data_lines_processor_set(
-  const void *addr,
-  size_t size,
-  const size_t setsize,
-  const cpu_set_t *set
-);
-
-/**
- * @brief Invalidates multiple data cache lines for a set of processors
- *
- * The cache lines covering the area are marked as invalid.  A later read
- * access in the area will load the data from memory.
- *
- * In case the area is not aligned on cache line boundaries, then this
- * operation may destroy unrelated data.
- *
- * This operation should not be called from interrupt context.
- *
- * @param[in] addr The start address of the area to invalidate.
- * @param[in] size The size in bytes of the area to invalidate.
- * @param[in] setsize The size of the processor set.
- * @param[in] set The target processor set.
- */
-void rtems_cache_invalidate_multiple_data_lines_processor_set(
-  const void *addr,
-  size_t size,
-  const size_t setsize,
-  const cpu_set_t *set
-);
-
-/**
- * @brief Flushes the entire data cache for a set of processors
- *
- * This operation should not be called from interrupt context.
- *
- * @see rtems_cache_flush_multiple_data_lines().
- *
- * @param[in] setsize The size of the processor set.
- * @param[in] set The target processor set.
- */
-void rtems_cache_flush_entire_data_processor_set(
-  const size_t setsize,
-  const cpu_set_t *set
-);
-
-/**
- * @brief Invalidates the entire cache for a set of processors
- *
- * This function is responsible for performing a data cache
- * invalidate. It invalidates the entire cache for a set of
- * processors.
- *
- * This operation should not be called from interrupt context.
- *
- * @param[in] setsize The size of the processor set.
- * @param[in] set The target processor set.
- */
-void rtems_cache_invalidate_entire_data_processor_set(
-  const size_t setsize,
-  const cpu_set_t *set
-);
-
-#endif
 
 /**@}*/
 

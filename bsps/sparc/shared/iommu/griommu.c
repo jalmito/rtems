@@ -15,8 +15,11 @@
 #include <drvmgr/ambapp_bus.h>
 #include <ambapp.h>
 #include <rtems.h>
+#include <rtems/bspIo.h>
 #include <bsp.h>
 #include <bsp/griommu.h>
+
+#include <grlib_impl.h>
 
 /*#define STATIC*/
 #define STATIC static
@@ -371,7 +374,7 @@ int griommu_init1(struct drvmgr_dev *dev)
 	/* Initialize GRIOMMU Hardware */
 	status = griommu_init(priv);
 	if (status) {
-		printf("Failed to initialize griommu driver %d\n", status);
+		printk("Failed to initialize griommu driver %d\n", status);
 		return -1;
 	}
 
@@ -1026,7 +1029,7 @@ void * griommu_apv_new(void)
 	}
 
 	/* Allocate APV */
-	unsigned int * orig_ptr = (unsigned int *) malloc(
+	unsigned int * orig_ptr = grlib_malloc(
 			(GRIOMMU_APV_SIZE/priv->pagesize) + GRIOMMU_APV_ALIGN);
 	if (orig_ptr == NULL) return NULL;
 

@@ -192,6 +192,11 @@ BSP_calc_freqs( void )
   printk("CPU Clock Freq:                    %10u Hz\n", BSP_processor_frequency);
 }
 
+uint32_t _CPU_Counter_frequency(void)
+{
+  return BSP_bus_frequency / (BSP_time_base_divisor / 1000);
+}
+
 /*
  *  bsp_start
  *
@@ -205,8 +210,6 @@ SPR_RW(HID1)
 void bsp_start( void )
 {
   unsigned char       *stack;
-  uintptr_t            intrStackStart;
-  uintptr_t            intrStackSize;
   char                *chpt;
   int                  i;
   ppc_cpu_id_t         myCpu;
@@ -247,23 +250,13 @@ VpdBufRec          vpdData [] = {
   /* tag the bottom */
   *((uint32_t*)stack) = 0;
 
-  /*
-   * Initialize the interrupt related settings.
-   */
-  intrStackStart = (uintptr_t) __rtems_end;
-  intrStackSize = rtems_configuration_get_interrupt_stack_size();
-
-  /*
-   * Initialize default raw exception handlers.
-   */
-  ppc_exc_initialize(intrStackStart, intrStackSize);
+  ppc_exc_initialize();
 
   printk("CPU 0x%x - rev 0x%x\n", myCpu, myCpuRevision);
 
 #ifdef SHOW_MORE_INIT_SETTINGS
   printk("Additionnal boot options are %s\n", BSP_commandline_string);
   printk("Initial system stack at %" PRIxPTR "\n", (uintptr_t) stack);
-  printk("Software IRQ stack starts at %x with size %u\n", intrStackStart, intrStackSize);
 #endif
 
 #ifdef SHOW_MORE_INIT_SETTINGS
@@ -367,9 +360,6 @@ VpdBufRec          vpdData [] = {
   _BSP_clear_hostbridge_errors(0 /* enableMCP */, 0/*quiet*/);
 
   bsp_clicks_per_usec = BSP_bus_frequency/(BSP_time_base_divisor * 1000);
-  rtems_counter_initialize_converter(
-    BSP_bus_frequency / (BSP_time_base_divisor / 1000)
-  );
 
   /*
    * Initalize RTEMS IRQ system

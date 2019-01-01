@@ -708,6 +708,24 @@ spclock_err02_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_FLAGS_spclock_err02) \
 	$(support_includes)
 endif
 
+if TEST_spconfig01
+sp_tests += spconfig01
+sp_screens += spconfig01/spconfig01.scn
+sp_docs += spconfig01/spconfig01.doc
+spconfig01_SOURCES = spconfig01/init.c
+spconfig01_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_FLAGS_spconfig01) \
+	$(support_includes)
+endif
+
+if TEST_spconfig02
+sp_tests += spconfig02
+sp_screens += spconfig02/spconfig02.scn
+sp_docs += spconfig02/spconfig02.doc
+spconfig02_SOURCES = spconfig02/init.c
+spconfig02_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_FLAGS_spconfig02) \
+	$(support_includes)
+endif
+
 if TEST_spconsole01
 sp_tests += spconsole01
 sp_screens += spconsole01/spconsole01.scn
@@ -752,6 +770,18 @@ sp_docs += spcpuset01/spcpuset01.doc
 spcpuset01_SOURCES = spcpuset01/test.c spcpuset01/init.c
 spcpuset01_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_FLAGS_spcpuset01) \
 	$(support_includes) -DSMPTEST
+endif
+
+if HAS_CPLUSPLUS
+if TEST_spcxx01
+sp_tests += spcxx01
+sp_screens += spcxx01/spcxx01.scn
+sp_docs += spcxx01/spcxx01.doc
+spcxx01_SOURCES = spcxx01/init.cc
+spcxx01_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_FLAGS_spcxx01) \
+	$(support_includes)
+spcxx01_CXXFLAGS = $(AM_CXXFLAGS) -std=gnu++17
+endif
 endif
 
 if TEST_spedfsched01
@@ -917,16 +947,6 @@ spfatal06_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_FLAGS_spfatal06) \
 	$(support_includes) -I$(top_srcdir)/spfatal06
 endif
 
-if TEST_spfatal07
-sp_tests += spfatal07
-sp_screens += spfatal07/spfatal07.scn
-sp_docs += spfatal07/spfatal07.doc
-spfatal07_SOURCES = spfatal_support/init.c spfatal_support/system.h \
-	spfatal07/testcase.h
-spfatal07_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_FLAGS_spfatal07) \
-	$(support_includes) -I$(top_srcdir)/spfatal07
-endif
-
 if TEST_spfatal08
 sp_tests += spfatal08
 sp_screens += spfatal08/spfatal08.scn
@@ -975,16 +995,6 @@ spfatal12_SOURCES = spfatal_support/init.c spfatal_support/system.h \
 	spfatal12/testcase.h
 spfatal12_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_FLAGS_spfatal12) \
 	$(support_includes) -I$(top_srcdir)/spfatal12
-endif
-
-if TEST_spfatal13
-sp_tests += spfatal13
-sp_screens += spfatal13/spfatal13.scn
-sp_docs += spfatal13/spfatal13.doc
-spfatal13_SOURCES = spfatal_support/init.c spfatal_support/system.h \
-	spfatal13/testcase.h
-spfatal13_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_FLAGS_spfatal13) \
-	$(support_includes) -I$(top_srcdir)/spfatal13
 endif
 
 if TEST_spfatal14
@@ -1493,6 +1503,15 @@ spmkdir_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_FLAGS_spmkdir) \
 	$(support_includes)
 endif
 
+if TEST_spmisc01
+sp_tests += spmisc01
+sp_screens += spmisc01/spmisc01.scn
+sp_docs += spmisc01/spmisc01.doc
+spmisc01_SOURCES = spmisc01/init.c
+spmisc01_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_FLAGS_spmisc01) \
+	$(support_includes)
+endif
+
 if TEST_spmountmgr01
 sp_tests += spmountmgr01
 sp_screens += spmountmgr01/spmountmgr01.scn
@@ -1574,6 +1593,15 @@ sppartition_err01_SOURCES = sppartition_err01/init.c \
 	sppartition_err01/system.h
 sppartition_err01_CPPFLAGS = $(AM_CPPFLAGS) \
 	$(TEST_FLAGS_sppartition_err01) $(support_includes)
+endif
+
+if TEST_sppercpudata01
+sp_tests += sppercpudata01
+sp_screens += sppercpudata01/sppercpudata01.scn
+sp_docs += sppercpudata01/sppercpudata01.doc
+sppercpudata01_SOURCES = sppercpudata01/init.c sppercpudata01/item.c
+sppercpudata01_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_FLAGS_sppercpudata01) \
+	$(support_includes)
 endif
 
 if TEST_spport_err01
@@ -2039,4 +2067,3 @@ rtems_tests_PROGRAMS = $(sp_tests)
 noinst_LIBRARIES = $(sp_libs)
 dist_rtems_tests_DATA = $(sp_screens) $(sp_docs)
 
-include $(top_srcdir)/../automake/local.am

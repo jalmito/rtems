@@ -25,11 +25,13 @@
 #include <rtems/score/priority.h>
 #include <rtems/score/rbtree.h>
 #include <rtems/score/states.h>
-#include <rtems/score/watchdog.h>
+#include <rtems/score/watchdogticks.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct Per_CPU_Control;
 
 struct Scheduler_Node;
 
@@ -391,15 +393,6 @@ typedef struct _Thread_queue_Heads {
   Thread_queue_Priority_queue Priority[ RTEMS_ZERO_LENGTH_ARRAY ];
 #endif
 } Thread_queue_Heads;
-
-#if defined(RTEMS_SMP)
-  #define THREAD_QUEUE_HEADS_SIZE( scheduler_count ) \
-    ( sizeof( Thread_queue_Heads ) \
-      + ( scheduler_count ) * sizeof( Thread_queue_Priority_queue ) )
-#else
-  #define THREAD_QUEUE_HEADS_SIZE( scheduler_count ) \
-    sizeof( Thread_queue_Heads )
-#endif
 
 struct Thread_queue_Queue {
   /**

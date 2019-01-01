@@ -22,31 +22,7 @@
 #include <drvmgr/ambapp_bus.h>
 #include <ambapp.h>
 
-#if (((__RTEMS_MAJOR__ << 16) | (__RTEMS_MINOR__ << 8) | __RTEMS_REVISION__) >= 0x040b63)
-
-/* Spin locks mapped via rtems_interrupt_lock_* API: */
-#define SPIN_DECLARE(lock) RTEMS_INTERRUPT_LOCK_MEMBER(lock)
-#define SPIN_INIT(lock, name) rtems_interrupt_lock_initialize(lock, name)
-#define SPIN_LOCK(lock, level) rtems_interrupt_lock_acquire_isr(lock, &level)
-#define SPIN_LOCK_IRQ(lock, level) rtems_interrupt_lock_acquire(lock, &level)
-#define SPIN_UNLOCK(lock, level) rtems_interrupt_lock_release_isr(lock, &level)
-#define SPIN_UNLOCK_IRQ(lock, level) rtems_interrupt_lock_release(lock, &level)
-#define SPIN_IRQFLAGS(k) rtems_interrupt_lock_context k
-#define SPIN_ISR_IRQFLAGS(k) SPIN_IRQFLAGS(k)
-
-#else
-
-/* maintain compatibility with older versions of RTEMS: */
-#define SPIN_DECLARE(name)
-#define SPIN_INIT(lock, name)
-#define SPIN_LOCK(lock, level)
-#define SPIN_LOCK_IRQ(lock, level) rtems_interrupt_disable(level)
-#define SPIN_UNLOCK(lock, level)
-#define SPIN_UNLOCK_IRQ(lock, level) rtems_interrupt_enable(level)
-#define SPIN_IRQFLAGS(k) rtems_interrupt_level k
-#define SPIN_ISR_IRQFLAGS(k)
-
-#endif
+#include <grlib_impl.h>
 
 /* Maximum number of GRCAN devices supported by driver */
 #define GRCAN_COUNT_MAX 8
@@ -280,10 +256,9 @@ int grcan_init2(struct drvmgr_dev *dev)
 	DBG("GRCAN[%d] on bus %s\n", dev->minor_drv, dev->parent->dev->name);
 	if (GRCAN_COUNT_MAX <= grcan_count)
 		return DRVMGR_ENORES;
-	priv = dev->priv = malloc(sizeof(struct grcan_priv));
+	priv = dev->priv = grlib_calloc(1, sizeof(*priv));
 	if ( !priv )
 		return DRVMGR_NOMEM;
-	memset(priv, 0, sizeof(*priv));
 	priv->dev = dev;
 
 	/* This core will not find other cores, so we wait for init2() */
@@ -1137,7 +1112,7 @@ static int grcan_alloc_buffers(struct grcan_priv *pDev, int rx, int tx)
 			pDev->tx = (struct grcan_msg *)pDev->_tx;
 		} else {
 			if (adr == 0) {
-				pDev->_tx = malloc(pDev->txbuf_size +
+				pDev->_tx = grlib_malloc(pDev->txbuf_size +
 				                   BUFFER_ALIGNMENT_NEEDS);
 				if (!pDev->_tx)
 					return -1;
@@ -1181,7 +1156,7 @@ static int grcan_alloc_buffers(struct grcan_priv *pDev, int rx, int tx)
 			pDev->rx = (struct grcan_msg *)pDev->_rx;
 		} else {
 			if (adr == 0) {
-				pDev->_rx = malloc(pDev->rxbuf_size +
+				pDev->_rx = grlib_malloc(pDev->rxbuf_size +
 				                   BUFFER_ALIGNMENT_NEEDS);
 				if (!pDev->_rx)
 					return -1;

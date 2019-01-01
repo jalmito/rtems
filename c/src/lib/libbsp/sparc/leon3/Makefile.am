@@ -68,6 +68,8 @@ librtemsbsp_a_SOURCES += ../../../../../../bsps/shared/dev/serial/console-termio
 librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/leon3/console/console.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/uart/cons.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/uart/apbuart_cons.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/uart/apbuart_polled.c
+librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/uart/apbuart_termios.c
 # debugio
 librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/leon3/console/printk_support.c
 
@@ -117,9 +119,6 @@ endif
 librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/spw/grspw_pkt.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/spw/grspw_router.c
 
-# UART
-librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/uart/apbuart_termios.c
-
 # I2CMST
 librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/i2c/i2cmst.c
 
@@ -163,8 +162,13 @@ librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/tmtc/grtm.c
 
 # MEMSCRUB
 librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/scrub/memscrub.c
+
 # L4STAT
 librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/stat/l4stat.c
+
+# SPWTDP
+librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/spw/spwtdp.c
+
 # Driver Manager 
 librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/drvmgr/ambapp_bus.c
 librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/drvmgr/ambapp_bus_grlib.c
@@ -193,7 +197,6 @@ librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/leon3/mpci/mpisr.c
 endif
 
 
-include $(top_srcdir)/../../../../automake/local.am
 include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
 include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
 include $(srcdir)/../../../../../../bsps/sparc/leon3/headers.am

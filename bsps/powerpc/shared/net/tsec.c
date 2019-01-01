@@ -17,7 +17,7 @@
 | this file contains the MPC83xx TSEC networking driver           |
 \*===============================================================*/
 
-#define __INSIDE_RTEMS_BSD_TCPIP_STACK__
+#include <machine/rtems-bsd-kernel-space.h>
 
 #include <stdlib.h>
 #include <bsp.h>
@@ -776,7 +776,7 @@ static void tsec_rxDaemon
    * terminate daemon
    */
   sc->rxDaemonTid = 0;
-  rtems_task_delete(RTEMS_SELF);
+  rtems_task_exit();
 }
 
 /***************************************************************************\
@@ -1126,7 +1126,7 @@ static void tsec_txDaemon
    * terminate daemon
    */
   sc->txDaemonTid = 0;
-  rtems_task_delete(RTEMS_SELF);
+  rtems_task_exit();
 }
 
 /***************************************************************************\

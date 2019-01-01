@@ -370,11 +370,6 @@ static void execute_test(unsigned i)
   ASSERT_SC(sc);
 }
 
-static const rtems_driver_address_table disk_ops = {
-  .initialization_entry = NULL,
-  RTEMS_GENERIC_BLOCK_DEVICE_DRIVER_ENTRIES
-};
-
 static int disk_ioctl(rtems_disk_device *dd, uint32_t req, void *argp)
 {
   if (req == RTEMS_BLKIO_REQUEST) {
@@ -417,7 +412,7 @@ static void disk_register(
   ASSERT_SC(sc);
 
   fd = open(dev, O_RDWR);
-  rtems_test_assert(rv >= 0);
+  rtems_test_assert(fd >= 0);
 
   rv = rtems_disk_fd_get_disk_device(fd, dd_ptr);
   rtems_test_assert(rv == 0);
@@ -521,7 +516,6 @@ static rtems_task Init(rtems_task_argument argument)
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 5
 
 #define CONFIGURE_MAXIMUM_TASKS 4
-#define CONFIGURE_MAXIMUM_DRIVERS 4
 
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 

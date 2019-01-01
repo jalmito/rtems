@@ -26,8 +26,6 @@
 .extern boot_card
 
 PUBLIC_VAR (_start)
-PUBLIC_VAR (bsp_interrupt_stack_start)
-PUBLIC_VAR (bsp_interrupt_stack_end)
 
 .section ".bsp_start_text", "ax"
 _start:
@@ -109,18 +107,21 @@ copy_rest_of_text:
 start_code_in_ram:
 
 	/*
-	 * ROM/RAM startup: clear bss in SDRAM
+	 * ROM/RAM startup: clear sbss/bss in SDRAM
 	 */
-	LA	r3, bsp_section_bss_begin  /* get start address of bss section */
-	LWI	r4, bsp_section_bss_size   /* get size of bss section */
-	bl	mpc8xx_zero_4          /* Clear the bss section */
+	LA	r3, bsp_section_sbss_begin
+	LWI	r4, bsp_section_sbss_size
+	bl	mpc8xx_zero_4
+	LA	r3, bsp_section_bss_begin
+	LWI	r4, bsp_section_bss_size
+	bl	mpc8xx_zero_4
 	/*
 	 * call boot_card
 	 */
 
 	/* Set stack pointer (common for RAM/ROM startup) */
-	LA	r1, bsp_section_text_begin
-        addi    r1, r1, -0x10 /* Set up stack pointer = beginning of text section - 0x10 */
+	LA	r1, _ISR_Stack_area_end
+        addi    r1, r1, -0x10
 
 	/* Create NULL */
 	li r0, 0
@@ -285,10 +286,3 @@ mpc8xx_zero_4_tail:
 	blr
 
 end_reloc_startup:
-
-	/* Interrupt stack */
-	.section ".bsp_rwextra", "aw", @nobits
-	.align 4
-bsp_interrupt_stack_start:
-	.space 32768
-bsp_interrupt_stack_end:

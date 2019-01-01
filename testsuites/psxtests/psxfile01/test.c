@@ -57,6 +57,10 @@ char test_write_buffer[ 1024 ];
 rtems_filesystem_operations_table  IMFS_ops_no_evalformake;
 rtems_filesystem_operations_table  IMFS_ops_no_rename;
 
+static const char somefile[] = "somefile";
+
+static const char somelink[] = "somelink";
+
 /*
  *  File test support routines.
  */
@@ -130,6 +134,114 @@ void stat_a_file(
 
 }
 
+static void test_open_directory(void)
+{
+  int status;
+  int fd;
+
+  fd = open( somefile, O_CREAT, S_IRWXU );
+  rtems_test_assert( fd >= 0 );
+
+  status = close( fd );
+  rtems_test_assert( status == 0 );
+
+#ifdef O_DIRECTORY
+  errno = 0;
+  fd = open( somefile, O_DIRECTORY, S_IRWXU );
+  rtems_test_assert( fd == -1 );
+  rtems_test_assert( errno == ENOTDIR );
+#endif
+
+  status = unlink( somefile );
+  rtems_test_assert( status == 0 );
+
+  errno = 0;
+  fd = open( somefile, O_RDONLY );
+  rtems_test_assert( fd == -1 );
+  rtems_test_assert( errno == ENOENT );
+}
+
+static void test_open_cloexec(void)
+{
+  int status;
+  int fd;
+  mode_t mode;
+
+  mode = O_CREAT;
+
+#ifdef O_CLOEXEC
+  mode |= O_CLOEXEC;
+#endif
+
+  fd = open( somefile, mode, S_IRWXU );
+  rtems_test_assert( fd >= 0 );
+
+  status = close( fd );
+  rtems_test_assert( status == 0 );
+
+  status = unlink( somefile );
+  rtems_test_assert( status == 0 );
+
+  errno = 0;
+  fd = open( somefile, O_RDONLY );
+  rtems_test_assert( fd == -1 );
+  rtems_test_assert( errno == ENOENT );
+}
+
+static void test_open_nofollow(void)
+{
+  int status;
+  int fd;
+  struct stat st;
+
+  fd = open( somefile, O_CREAT, S_IRWXU );
+  rtems_test_assert( fd >= 0 );
+
+  status = close( fd );
+  rtems_test_assert( status == 0 );
+
+  status = symlink( somefile, somelink );
+  rtems_test_assert( status == 0 );
+
+  fd = open( somelink, O_RDONLY );
+  rtems_test_assert( fd >= 0 );
+
+  status = fstat( fd, &st );
+  rtems_test_assert( status == 0 );
+  rtems_test_assert( S_ISREG( st.st_mode ) );
+
+  status = close( fd );
+  rtems_test_assert( status == 0 );
+
+#ifdef O_NOFOLLOW
+  fd = open( somelink, O_RDONLY | O_NOFOLLOW );
+  rtems_test_assert( fd >= 0 );
+
+  status = fstat( fd, &st );
+  rtems_test_assert( status == 0 );
+  rtems_test_assert( S_ISLNK( st.st_mode ) );
+
+  status = close( fd );
+  rtems_test_assert( status == 0 );
+#endif
+
+  status = unlink( somelink );
+  rtems_test_assert( status == 0 );
+
+  errno = 0;
+  fd = open( somelink, O_RDONLY );
+  rtems_test_assert( fd == -1 );
+  rtems_test_assert( errno == ENOENT );
+
+  status = unlink( somefile );
+  rtems_test_assert( status == 0 );
+
+  errno = 0;
+  fd = open( somefile, O_RDONLY );
+  rtems_test_assert( fd == -1 );
+  rtems_test_assert( errno == ENOENT );
+}
+
 /*
  *  Main entry point of the test
  */
@@ -160,6 +272,10 @@ int main(
   rtems_time_of_day time;
 
   TEST_BEGIN();
+
+  test_open_directory();
+  test_open_cloexec();
+  test_open_nofollow();
 
   /*
    *  Grab the maximum size of an in-memory file.

@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2018 embedded brains GmbH
  * Copyright (c) 2015 Hesham Almatary <hesham@alumni.york.ac.uk>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,22 +30,71 @@
 
 #include <rtems/asm.h>
 
-.section .text
+	.section	.text, "ax", @progbits
+	.align	2
 
 PUBLIC(_CPU_Context_volatile_clobber)
 SYM(_CPU_Context_volatile_clobber):
 
-  .macro clobber_register reg
-  addi t0, t0, -1
-  mv  \reg, t0
-  .endm
+#if __riscv_flen > 0
+	andi	t0, a0, 0x1f
+	fsflags	t0
 
-  clobber_register  a0
-  clobber_register  a1
-  clobber_register  a2
-  clobber_register  a3
-  clobber_register  a4
-  clobber_register  a5
-  clobber_register  a6
+	addi	t0, a0, 15
+	FMVYX	ft0, t0
+	addi	t0, a0, 16
+	FMVYX	ft1, t0
+	addi	t0, a0, 17
+	FMVYX	ft2, t0
+	addi	t0, a0, 18
+	FMVYX	ft3, t0
+	addi	t0, a0, 19
+	FMVYX	ft4, t0
+	addi	t0, a0, 20
+	FMVYX	ft5, t0
+	addi	t0, a0, 21
+	FMVYX	ft6, t0
+	addi	t0, a0, 22
+	FMVYX	ft7, t0
+	addi	t0, a0, 23
+	FMVYX	ft8, t0
+	addi	t0, a0, 24
+	FMVYX	ft9, t0
+	addi	t0, a0, 25
+	FMVYX	ft10, t0
+	addi	t0, a0, 26
+	FMVYX	ft11, t0
+	addi	t0, a0, 27
+	FMVYX	fa0, t0
+	addi	t0, a0, 28
+	FMVYX	fa1, t0
+	addi	t0, a0, 29
+	FMVYX	fa2, t0
+	addi	t0, a0, 30
+	FMVYX	fa3, t0
+	addi	t0, a0, 31
+	FMVYX	fa4, t0
+	addi	t0, a0, 32
+	FMVYX	fa5, t0
+	addi	t0, a0, 33
+	FMVYX	fa6, t0
+	addi	t0, a0, 34
+	FMVYX	fa7, t0
+#endif /* __riscv_flen */
 
-  ret
+	addi	a1, a0, 1
+	addi	a2, a0, 2
+	addi	a3, a0, 3
+	addi	a4, a0, 4
+	addi	a5, a0, 5
+	addi	a6, a0, 6
+	addi	a7, a0, 7
+	addi	t0, a0, 8
+	addi	t1, a0, 9
+	addi	t2, a0, 10
+	addi	t3, a0, 11
+	addi	t4, a0, 12
+	addi	t5, a0, 13
+	addi	t6, a0, 14
+
+	ret

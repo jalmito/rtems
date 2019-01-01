@@ -2,7 +2,7 @@
  * Cobham Gaisler GRSPW/GRSPW2 SpaceWire Kernel Library Interface for RTEMS.
  *
  * This driver can be used to implement a standard I/O system "char"-driver
- * or used directly. NOTE SMP support has not been tested.
+ * or used directly.
  *
  * COPYRIGHT (c) 2011
  * Cobham Gaisler AB
@@ -20,7 +20,6 @@
 #include <string.h>
 #include <assert.h>
 #include <ctype.h>
-#include <malloc.h>
 #include <rtems/bspIo.h>
 
 #include <drvmgr/drvmgr.h>
@@ -28,40 +27,7 @@
 #include <drvmgr/ambapp_bus.h>
 #include <bsp/grspw_pkt.h>
 
-/* Use interrupt lock privmitives compatible with SMP defined in
- * RTEMS 4.11.99 and higher.
- */
-#if (((__RTEMS_MAJOR__ << 16) | (__RTEMS_MINOR__ << 8) | __RTEMS_REVISION__) >= 0x040b63)
-
-#include <rtems/score/isrlock.h> /* spin-lock */
-
-/* map via ISR lock: */
-#define SPIN_DECLARE(lock) ISR_LOCK_MEMBER(lock)
-#define SPIN_INIT(lock, name) _ISR_lock_Initialize(lock, name)
-#define SPIN_LOCK(lock, level) _ISR_lock_Acquire_inline(lock, &level)
-#define SPIN_LOCK_IRQ(lock, level) _ISR_lock_ISR_disable_and_acquire(lock, &level)
-#define SPIN_UNLOCK(lock, level) _ISR_lock_Release_inline(lock, &level)
-#define SPIN_UNLOCK_IRQ(lock, level) _ISR_lock_Release_and_ISR_enable(lock, &level)
-#define SPIN_IRQFLAGS(k) ISR_lock_Context k
-#define SPIN_ISR_IRQFLAGS(k) SPIN_IRQFLAGS(k)
-
-#else
-
-/* maintain single-core compatibility with older versions of RTEMS: */
-#define SPIN_DECLARE(name)
-#define SPIN_INIT(lock, name)
-#define SPIN_LOCK(lock, level)
-#define SPIN_LOCK_IRQ(lock, level) rtems_interrupt_disable(level)
-#define SPIN_UNLOCK(lock, level)
-#define SPIN_UNLOCK_IRQ(lock, level) rtems_interrupt_enable(level)
-#define SPIN_IRQFLAGS(k) rtems_interrupt_level k
-#define SPIN_ISR_IRQFLAGS(k)
-
-#ifdef RTEMS_SMP
-#error SMP mode not compatible with these interrupt lock primitives
-#endif
-
-#endif
+#include <grlib_impl.h>
 
 /*#define STATIC*/
 #define STATIC static
@@ -113,6 +79,7 @@ struct grspw_regs {
 #define GRSPW_CTRL_RC_BIT	29
 #define GRSPW_CTRL_NCH_BIT	27
 #define GRSPW_CTRL_PO_BIT	26
+#define GRSPW_CTRL_CC_BIT	25
 #define GRSPW_CTRL_ID_BIT	24
 #define GRSPW_CTRL_LE_BIT	22
 #define GRSPW_CTRL_PS_BIT	21
@@ -137,6 +104,7 @@ struct grspw_regs {
 #define GRSPW_CTRL_RC	(1<<GRSPW_CTRL_RC_BIT)
 #define GRSPW_CTRL_NCH	(0x3<<GRSPW_CTRL_NCH_BIT)
 #define GRSPW_CTRL_PO	(1<<GRSPW_CTRL_PO_BIT)
+#define GRSPW_CTRL_CC	(1<<GRSPW_CTRL_CC_BIT)
 #define GRSPW_CTRL_ID	(1<<GRSPW_CTRL_ID_BIT)
 #define GRSPW_CTRL_LE	(1<<GRSPW_CTRL_LE_BIT)
 #define GRSPW_CTRL_PS	(1<<GRSPW_CTRL_PS_BIT)
@@ -580,7 +548,7 @@ void *grspw_open(int dev_no)
 			goto out;
 		}
 	} else {
-		priv->bd_mem_alloced = (unsigned int)malloc(bdtabsize + BDTAB_ALIGN - 1);
+		priv->bd_mem_alloced = (unsigned int)grlib_malloc(bdtabsize + BDTAB_ALIGN - 1);
 		if (priv->bd_mem_alloced == 0) {
 			priv = NULL;
 			goto out;
@@ -1470,7 +1438,8 @@ STATIC int grspw_tx_schedule_send(struct grspw_dma_priv *dma)
 					curr_pkt->flags &= ~PKT_FLAG_TR_HDR;
 			}
 			BD_WRITE(&curr_bd->bd->haddr, hwaddr);
-			ctrl = GRSPW_TXBD_EN | curr_pkt->hlen;
+			ctrl = GRSPW_TXBD_EN |
+			       (curr_pkt->hlen & GRSPW_TXBD_HLEN);
 		} else {
 			ctrl = GRSPW_TXBD_EN;
 		}
@@ -1715,7 +1684,7 @@ void *grspw_dma_open(void *d, int chan_no)
 
 	/* Allocate memory for the two descriptor rings */
 	size = sizeof(struct grspw_ring) * (GRSPW_RXBD_NR + GRSPW_TXBD_NR);
-	dma->rx_ring_base = (struct grspw_rxring *)malloc(size);
+	dma->rx_ring_base = grlib_malloc(size);
 	dma->tx_ring_base = (struct grspw_txring *)&dma->rx_ring_base[GRSPW_RXBD_NR];
 	if (dma->rx_ring_base == NULL)
 		goto err;
@@ -2742,7 +2711,7 @@ void grspw_work_func(rtems_id msgQ)
 		rtems_message_queue_delete(msgQ);
 
 	grspw_work_event(WORKTASK_EV_QUIT, message);
-	rtems_task_delete(RTEMS_SELF);
+	rtems_task_exit();
 }
 
 STATIC void grspw_isr(void *data)
@@ -3086,7 +3055,7 @@ static int grspw2_init3(struct drvmgr_dev *dev)
 	struct grspw_priv *priv;
 	struct amba_dev_info *ambadev;
 	struct ambapp_core *pnpinfo;
-	int i, size;
+	int i;
 	unsigned int ctrl, icctrl, numi;
 	union drvmgr_key_value *value;
 
@@ -3119,6 +3088,7 @@ static int grspw2_init3(struct drvmgr_dev *dev)
 	ctrl = REG_READ(&priv->regs->ctrl);
 	priv->hwsup.rmap = (ctrl & GRSPW_CTRL_RA) >> GRSPW_CTRL_RA_BIT;
 	priv->hwsup.rmap_crc = (ctrl & GRSPW_CTRL_RC) >> GRSPW_CTRL_RC_BIT;
+	priv->hwsup.ccsds_crc = (ctrl & GRSPW_CTRL_CC) >> GRSPW_CTRL_CC_BIT;
 	priv->hwsup.rx_unalign = (ctrl & GRSPW_CTRL_RX) >> GRSPW_CTRL_RX_BIT;
 	priv->hwsup.nports = 1 + ((ctrl & GRSPW_CTRL_PO) >> GRSPW_CTRL_PO_BIT);
 	priv->hwsup.ndma_chans = 1 + ((ctrl & GRSPW_CTRL_NCH) >> GRSPW_CTRL_NCH_BIT);
@@ -3173,11 +3143,9 @@ static int grspw2_init3(struct drvmgr_dev *dev)
 		priv->hwsup.ndma_chans = value->i;
 
 	/* Allocate and init Memory for all DMA channels */
-	size = sizeof(struct grspw_dma_priv) * priv->hwsup.ndma_chans;
-	priv->dma = (struct grspw_dma_priv *) malloc(size);
+	priv->dma = grlib_calloc(priv->hwsup.ndma_chans, sizeof(*priv->dma));
 	if (priv->dma == NULL)
 		return DRVMGR_NOMEM;
-	memset(priv->dma, 0, size);
 	for (i=0; i<priv->hwsup.ndma_chans; i++) {
 		priv->dma[i].core = priv;
 		priv->dma[i].index = i;

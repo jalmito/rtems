@@ -23,13 +23,13 @@
  *    possible to have 'telnetd' run an arbitrary 'shell'
  *    program.
  *
- * Copyright (c) 2009 embedded brains GmbH and others.
+ * Copyright (c) 2009, 2018 embedded brains GmbH and others.
  *
- * embedded brains GmbH
- * Obere Lagerstr. 30
- * D-82178 Puchheim
- * Germany
- * <rtems@embedded-brains.de>
+ *   embedded brains GmbH
+ *   Dornierstr. 4
+ *   D-82178 Puchheim
+ *   Germany
+ *   <rtems@embedded-brains.de>
  *
  * The license and distribution terms for this file may be
  * found in the file LICENSE in this distribution or at
@@ -40,487 +40,420 @@
 #include "config.h"
 #endif
 
-#include <rtems.h>
-#include <rtems/error.h>
-#include <rtems/pty.h>
-#include <rtems/shell.h>
-#include <rtems/telnetd.h>
-#include <rtems/bspIo.h>
+#include <sys/queue.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <inttypes.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <syslog.h>
 
+#include <rtems.h>
+#include <rtems/pty.h>
+#include <rtems/shell.h>
+#include <rtems/telnetd.h>
+#include <rtems/thread.h>
 #include <rtems/userenv.h>
-#include <rtems/error.h>
 
 #ifdef RTEMS_NETWORKING
 #include <rtems/rtems_bsdnet.h>
 #endif
 
-#define PARANOIA
+#define TELNETD_EVENT_SUCCESS RTEMS_EVENT_0
 
-extern char *telnet_get_pty(int socket);
-extern int   telnet_pty_initialize(void);
+#define TELNETD_EVENT_ERROR RTEMS_EVENT_1
 
-struct shell_args {
-  char *devname;
-  void *arg;
-  char  peername[16];
-  char  delete_myself;
+typedef struct telnetd_context telnetd_context;
+
+typedef struct telnetd_session {
+  rtems_pty_context            pty;
+  char                         peername[16];
+  telnetd_context             *ctx;
+  rtems_id                     task_id;
+  LIST_ENTRY(telnetd_session)  link;
+} telnetd_session;
+
+struct telnetd_context {
+  rtems_telnetd_config_table   config;
+  int                          server_socket;
+  rtems_id                     task_id;
+  rtems_mutex                  mtx;
+  LIST_HEAD(, telnetd_session) free_sessions;
+  telnetd_session              sessions[RTEMS_ZERO_LENGTH_ARRAY];
 };
 
-typedef union uni_sa {
+typedef union {
   struct sockaddr_in sin;
-  struct sockaddr     sa;
-} uni_sa;
+  struct sockaddr    sa;
+} telnetd_address;
 
-static int sockpeername(int sock, char *buf, int bufsz);
-
-rtems_id telnetd_dflt_spawn(
-  const char *name,
-  unsigned priority,
-  unsigned stackSize,
-  void (*fn)(void*),
-  void *fnarg
-);
-
-/***********************************************************/
-static rtems_telnetd_config_table *telnetd_config;
-static rtems_id                    telnetd_task_id;
-
-/*
- * chrisj: this variable was global and with no declared interface in a header
- *         file and with no means to set it so I have stopped it being global;
- *         if this breaks any user they will have be to provide a formal
- *         interface to get this change reverted.
- */
-static const rtems_id (*telnetd_spawn_task)(
-  const char *,
-  unsigned,
-  unsigned,
-  void (*)(void*),
-  void *
-) = telnetd_dflt_spawn;
-
-static char *grab_a_Connection(
-  int des_socket,
-  uni_sa *srv,
-  char *peername,
-  int sz
+RTEMS_NO_RETURN static void telnetd_session_fatal_error(
+  const telnetd_context *ctx
 )
 {
-  char *rval = 0;
-  socklen_t size_adr = sizeof(srv->sin);
-  int acp_sock;
-
-  acp_sock = accept(des_socket,&srv->sa,&size_adr);
-
-  if (acp_sock<0) {
-    perror("telnetd:accept");
-    goto bailout;
-  };
-
-  if ( !(rval=telnet_get_pty(acp_sock)) ) {
-    syslog( LOG_DAEMON | LOG_ERR, "telnetd: unable to obtain PTY");
-    /* NOTE: failing 'do_get_pty()' closed the socket */
-    goto bailout;
-  }
-
-  if (sockpeername(acp_sock, peername, sz))
-    strncpy(peername, "<UNKNOWN>", sz);
-
-#ifdef PARANOIA
-  syslog(LOG_DAEMON | LOG_INFO,
-      "telnetd: accepted connection from %s on %s",
-      peername,
-      rval);
-#endif
-
-bailout:
-
-  return rval;
+  (void)rtems_event_send(ctx->task_id, TELNETD_EVENT_ERROR);
+  rtems_task_exit();
 }
 
-
-static void release_a_Connection(char *devname, char *peername, FILE **pstd, int n)
+static bool telnetd_login(telnetd_context *ctx, telnetd_session *session)
 {
+  bool success;
 
-#ifdef PARANOIA
-  syslog( LOG_DAEMON | LOG_INFO,
-      "telnetd: releasing connection from %s on %s",
-      peername,
-      devname );
-#endif
-
-  while (--n>=0)
-    if (pstd[n]) fclose(pstd[n]);
-
-}
-
-static int sockpeername(int sock, char *buf, int bufsz)
-{
-  uni_sa peer;
-  int    rval = sock < 0;
-  socklen_t len  = sizeof(peer.sin);
-
-  if ( !rval )
-    rval = getpeername(sock, &peer.sa, &len);
-
-  if ( !rval )
-    rval = !inet_ntop( AF_INET, &peer.sin.sin_addr, buf, bufsz );
-
-  return rval;
-}
-
-static void
-spawned_shell(void *arg);
-
-/***********************************************************/
-static void
-rtems_task_telnetd(void *task_argument)
-{
-  int                des_socket;
-  uni_sa             srv;
-  char              *devname;
-  char               peername[16];
-  int                i=1;
-  int                size_adr;
-  struct shell_args *arg = NULL;
-
-  if ((des_socket=socket(PF_INET,SOCK_STREAM,0))<0) {
-    perror("telnetd:socket");
-    telnetd_task_id = RTEMS_ID_NONE;
-    rtems_task_delete(RTEMS_SELF);
-  };
-  setsockopt(des_socket,SOL_SOCKET,SO_KEEPALIVE,&i,sizeof(i));
-
-  memset(&srv,0,sizeof(srv));
-  srv.sin.sin_family=AF_INET;
-  srv.sin.sin_port=htons(23);
-  size_adr=sizeof(srv.sin);
-  if ((bind(des_socket,&srv.sa,size_adr))<0) {
-    perror("telnetd:bind");
-    close(des_socket);
-    telnetd_task_id = RTEMS_ID_NONE;
-    rtems_task_delete(RTEMS_SELF);
-  };
-  if ((listen(des_socket,5))<0) {
-    perror("telnetd:listen");
-          close(des_socket);
-    telnetd_task_id = RTEMS_ID_NONE;
-    rtems_task_delete(RTEMS_SELF);
-  };
-
-  /* we don't redirect stdio as this probably
-   * was started from the console anyway ..
-   */
-  do {
-    if (telnetd_config->keep_stdio) {
-      bool start = true;
-      char device_name [32];
-
-      ttyname_r( 1, device_name, sizeof( device_name));
-      if (telnetd_config->login_check != NULL) {
-        start = rtems_shell_login_prompt(
-          stdin,
-          stderr,
-          device_name,
-          telnetd_config->login_check
-        );
-      }
-      if (start) {
-        telnetd_config->command( device_name, arg->arg);
-      } else {
-        syslog(
-          LOG_AUTHPRIV | LOG_WARNING,
-          "telnetd: to many wrong passwords entered from %s",
-          device_name
-        );
-      }
-    } else {
-      devname = grab_a_Connection(des_socket, &srv, peername, sizeof(peername));
-
-      if ( !devname ) {
-        /* if something went wrong, sleep for some time */
-        sleep(10);
-        continue;
-      }
-
-      arg = malloc( sizeof(*arg) );
-
-      arg->devname = devname;
-      arg->arg = telnetd_config->arg;
-      strncpy(arg->peername, peername, sizeof(arg->peername));
-
-      telnetd_task_id = telnetd_spawn_task(
-        devname,
-        telnetd_config->priority,
-        telnetd_config->stack_size,
-        spawned_shell,
-        arg
-      );
-      if (telnetd_task_id == RTEMS_ID_NONE) {
-        FILE *dummy;
-
-        if ( telnetd_spawn_task != telnetd_dflt_spawn ) {
-          fprintf(stderr,"Telnetd: Unable to spawn child task\n");
-        }
-
-        /* hmm - the pty driver slot can only be
-         * released by opening and subsequently
-         * closing the PTY - this also closes
-         * the underlying socket. So we mock up
-         * a stream...
-         */
-
-        if ( !(dummy=fopen(devname,"r+")) )
-          perror("Unable to dummy open the pty, losing a slot :-(");
-        release_a_Connection(devname, peername, &dummy, 1);
-        free(arg);
-        sleep(2); /* don't accept connections too fast */
-      }
-    }
-  } while(1);
-
-  /* TODO: how to free the connection semaphore? But then -
-   *       stopping the daemon is probably only needed during
-   *       development/debugging.
-   *       Finalizer code should collect all the connection semaphore
-   *       counts and eventually clean up...
-   */
-  close(des_socket);
-  telnetd_task_id = RTEMS_ID_NONE;
-}
-
-rtems_status_code rtems_telnetd_start(const rtems_telnetd_config_table* config)
-{
-  if (telnetd_config != NULL) {
-    fprintf(stderr, "telnetd already started\n");
-    return RTEMS_RESOURCE_IN_USE;
+  if (ctx->config.login_check == NULL) {
+    return true;
   }
 
-  if (config->command == NULL) {
-    fprintf(stderr, "telnetd setup with invalid command\n");
-    return RTEMS_IO_ERROR;
-  }
-
-  telnetd_config = calloc(1, sizeof(*telnetd_config));
-  if (telnetd_config == NULL) {
-    fprintf(stderr, "telnetd cannot alloc telnetd config table\n");
-    return RTEMS_NO_MEMORY;
-  }
-
-
-  if ( !telnet_pty_initialize() ) {
-    fprintf(stderr, "telnetd cannot initialize PTY driver\n");
-    free(telnetd_config);
-    telnetd_config = NULL;
-    return RTEMS_IO_ERROR;
-  }
-
-  *telnetd_config = *config;
-
-  /* Check priority */
-#ifdef RTEMS_NETWORKING
-  if (telnetd_config->priority <= 0) {
-    telnetd_config->priority = rtems_bsdnet_config.network_task_priority;
-  }
-#endif
-  if (telnetd_config->priority < 2) {
-    telnetd_config->priority = 100;
-  }
-
-  /* Check stack size */
-  if (telnetd_config->stack_size <= 0) {
-    telnetd_config->stack_size = (size_t)32 * 1024;
-  }
-
-  /* Spawn task */
-  telnetd_task_id = telnetd_spawn_task(
-    "TNTD",
-    telnetd_config->priority,
-    telnetd_config->stack_size,
-    rtems_task_telnetd,
-    0
+  success = rtems_shell_login_prompt(
+    stdin,
+    stderr,
+    session->pty.name,
+    ctx->config.login_check
   );
-  if (telnetd_task_id == RTEMS_ID_NONE) {
-    free(telnetd_config);
-    telnetd_config = NULL;
-    return RTEMS_IO_ERROR;
+
+  if (!success) {
+    syslog(
+      LOG_AUTHPRIV | LOG_WARNING,
+      "telnetd: too many wrong passwords entered from %s",
+      session->peername
+    );
   }
 
-  /* Print status */
-  if (!telnetd_config->keep_stdio) {
-    fprintf(
-      stderr,
-      "telnetd started with stacksize = %u and priority = %d\n",
-      (unsigned) telnetd_config->stack_size,
-      (unsigned) telnetd_config->priority
+  return success;
+}
+
+static void telnetd_session_task(rtems_task_argument arg)
+{
+  rtems_status_code sc;
+  telnetd_session *session;
+  telnetd_context *ctx;
+  const char *path;
+
+  session = (telnetd_session *) arg;
+  ctx = session->ctx;
+
+  sc = rtems_libio_set_private_env();
+  if (sc != RTEMS_SUCCESSFUL) {
+    telnetd_session_fatal_error(ctx);
+  }
+
+  path = rtems_pty_get_path(&session->pty);
+
+  stdin = fopen(path, "r+");
+  if (stdin == NULL) {
+    telnetd_session_fatal_error(ctx);
+  }
+
+  stdout = fopen(path, "r+");
+  if (stdout == NULL) {
+    telnetd_session_fatal_error(ctx);
+  }
+
+  stderr = fopen(path, "r+");
+  if (stderr == NULL) {
+    telnetd_session_fatal_error(ctx);
+  }
+
+  (void)rtems_event_send(ctx->task_id, TELNETD_EVENT_SUCCESS);
+
+  while (true) {
+    rtems_event_set events;
+
+    (void)rtems_event_system_receive(
+      RTEMS_EVENT_SYSTEM_SERVER,
+      RTEMS_WAIT | RTEMS_EVENT_ALL,
+      RTEMS_NO_TIMEOUT,
+      &events
     );
+
+    syslog(
+      LOG_DAEMON | LOG_INFO,
+      "telnetd: accepted connection from %s on %s",
+      session->peername,
+      path
+    );
+
+    if (telnetd_login(ctx, session)) {
+      (*ctx->config.command)(session->pty.name, ctx->config.arg);
+    }
+
+    syslog(
+      LOG_DAEMON | LOG_INFO,
+      "telnetd: releasing connection from %s on %s",
+      session->peername,
+      path
+    );
+
+    rtems_pty_close_socket(&session->pty);
+
+    rtems_mutex_lock(&ctx->mtx);
+    LIST_INSERT_HEAD(&ctx->free_sessions, session, link);
+    rtems_mutex_unlock(&ctx->mtx);
+  }
+}
+
+static void telnetd_sleep_after_error(void)
+{
+      /* If something went wrong, sleep for some time */
+      rtems_task_wake_after(10 * rtems_clock_get_ticks_per_second());
+}
+
+static void telnetd_server_task(rtems_task_argument arg)
+{
+  telnetd_context *ctx;
+
+  ctx = (telnetd_context *) arg;
+
+  while (true) {
+    telnetd_address peer;
+    socklen_t address_len;
+    int session_socket;
+    telnetd_session *session;
+
+    address_len = sizeof(peer.sin);
+    session_socket = accept(ctx->server_socket, &peer.sa, &address_len);
+    if (session_socket < 0) {
+      syslog(LOG_DAEMON | LOG_ERR, "telnetd: cannot accept session");
+      telnetd_sleep_after_error();
+      continue;
+    };
+
+    rtems_mutex_lock(&ctx->mtx);
+    session = LIST_FIRST(&ctx->free_sessions);
+
+    if (session == NULL) {
+      rtems_mutex_unlock(&ctx->mtx);
+
+      (void)close(session_socket);
+      syslog(LOG_DAEMON | LOG_ERR, "telnetd: no free session available");
+      telnetd_sleep_after_error();
+      continue;
+    }
+
+    LIST_REMOVE(session, link);
+    rtems_mutex_unlock(&ctx->mtx);
+
+    rtems_pty_set_socket(&session->pty, session_socket);
+
+    if (
+      inet_ntop(
+        AF_INET,
+        &peer.sin.sin_addr,
+        session->peername,
+        sizeof(session->peername)
+      ) == NULL
+    ) {
+      strlcpy(session->peername, "<UNKNOWN>", sizeof(session->peername));
+    }
+
+    (void)rtems_event_system_send(session->task_id, RTEMS_EVENT_SYSTEM_SERVER);
+  }
+}
+
+static void telnetd_destroy_context(telnetd_context *ctx)
+{
+  telnetd_session *session;
+
+  LIST_FOREACH(session, &ctx->free_sessions, link) {
+    if (session->task_id != 0) {
+      (void)rtems_task_delete(session->task_id);
+    }
+
+    (void)unlink(rtems_pty_get_path(&session->pty));
+  }
+
+  if (ctx->server_socket >= 0) {
+    (void)close(ctx->server_socket);
+  }
+
+  rtems_mutex_destroy(&ctx->mtx);
+  free(ctx);
+}
+
+static rtems_status_code telnetd_create_server_socket(telnetd_context *ctx)
+{
+  telnetd_address srv;
+  socklen_t address_len;
+  int enable;
+
+  ctx->server_socket = socket(PF_INET, SOCK_STREAM, 0);
+  if (ctx->server_socket < 0) {
+    syslog(LOG_DAEMON | LOG_ERR, "telnetd: cannot create server socket");
+    return RTEMS_UNSATISFIED;
+  }
+
+  enable = 1;
+  (void)setsockopt(
+    ctx->server_socket,
+    SOL_SOCKET,
+    SO_KEEPALIVE,
+    &enable,
+    sizeof(enable)
+  );
+
+  memset(&srv, 0, sizeof(srv));
+  srv.sin.sin_family = AF_INET;
+  srv.sin.sin_port = htons(ctx->config.port);
+  address_len = sizeof(srv.sin);
+
+  if (bind(ctx->server_socket, &srv.sa, address_len) != 0) {
+    syslog(LOG_DAEMON | LOG_ERR, "telnetd: cannot bind server socket");
+    return RTEMS_RESOURCE_IN_USE;
+  };
+
+  if (listen(ctx->server_socket, ctx->config.client_maximum) != 0) {
+    syslog(LOG_DAEMON | LOG_ERR, "telnetd: cannot listen on server socket");
+    return RTEMS_UNSATISFIED;
+  };
+
+  return RTEMS_SUCCESSFUL;
+}
+
+static rtems_status_code telnetd_create_session_tasks(telnetd_context *ctx)
+{
+  uint16_t i;
+
+  ctx->task_id = rtems_task_self();
+
+  for (i = 0; i < ctx->config.client_maximum; ++i) {
+    telnetd_session *session;
+    rtems_status_code sc;
+    const char *path;
+    rtems_event_set events;
+
+    session = &ctx->sessions[i];
+    session->ctx = ctx;
+    rtems_mutex_init(&ctx->mtx, "Telnet");
+    LIST_INSERT_HEAD(&ctx->free_sessions, session, link);
+
+    sc = rtems_task_create(
+      rtems_build_name('T', 'N', 'T', 'a' + i % 26),
+      ctx->config.priority,
+      ctx->config.stack_size,
+      RTEMS_DEFAULT_MODES,
+      RTEMS_FLOATING_POINT,
+      &session->task_id
+    );
+    if (sc != RTEMS_SUCCESSFUL) {
+      syslog(LOG_DAEMON | LOG_ERR, "telnetd: cannot create session task");
+      return RTEMS_UNSATISFIED;
+    }
+
+    path = rtems_pty_initialize(&session->pty, i);
+    if (path == NULL) {
+      syslog(LOG_DAEMON | LOG_ERR, "telnetd: cannot create session PTY");
+      return RTEMS_UNSATISFIED;
+    }
+
+    (void)rtems_task_start(
+      session->task_id,
+      telnetd_session_task,
+      (rtems_task_argument) session
+    );
+
+    (void)rtems_event_receive(
+      TELNETD_EVENT_SUCCESS | TELNETD_EVENT_ERROR,
+      RTEMS_WAIT | RTEMS_EVENT_ANY,
+      RTEMS_NO_TIMEOUT,
+      &events
+    );
+
+    if ((events & TELNETD_EVENT_ERROR) != 0) {
+      syslog(LOG_DAEMON | LOG_ERR, "telnetd: cannot initialize session task");
+      return RTEMS_UNSATISFIED;
+    }
   }
 
   return RTEMS_SUCCESSFUL;
 }
 
-/* utility wrapper */
-static void
-spawned_shell(void *targ)
+rtems_status_code rtems_telnetd_start(const rtems_telnetd_config_table* config)
 {
-  rtems_status_code    sc;
-  FILE                *nstd[3]={0};
-  FILE                *ostd[3]={ stdin, stdout, stderr };
-  int                  i=0;
-  struct shell_args  *arg = targ;
-  bool login_failed = false;
-  bool start = true;
+  telnetd_context *ctx;
+  rtems_status_code sc;
+  uint16_t client_maximum;
 
-  sc=rtems_libio_set_private_env();
-
-  /* newlib hack/workaround. Before we change stdin/out/err we must make
-         * sure the internal data are initialized (fileno(stdout) has this sideeffect).
-   * This should probably be done from RTEMS' libc support layer...
-   * (T.S., newlibc-1.13; 2005/10)
-         */
-
-  fileno(stdout);
-
-  if (RTEMS_SUCCESSFUL != sc) {
-    rtems_error(sc,"rtems_libio_set_private_env");
-    goto cleanup;
+  if (config->command == NULL) {
+    syslog(LOG_DAEMON | LOG_ERR, "telnetd: configuration with invalid command");
+    return RTEMS_INVALID_ADDRESS;
   }
 
-  /* redirect stdio */
-  for (i=0; i<3; i++) {
-    if ( !(nstd[i]=fopen(arg->devname,"r+")) ) {
-      perror("unable to open stdio");
-      goto cleanup;
-    }
+  if (config->client_maximum == 0) {
+    client_maximum = 5;
+  } else {
+    client_maximum = config->client_maximum;
   }
 
-  stdin  = nstd[0];
-  stdout = nstd[1];
-  stderr = nstd[2];
-
-  #if 0
-    printk("STDOUT is now %x (%x) (FD %i/%i)\n",
-           stdout,nstd[1],fileno(stdout),fileno(nstd[1]));
-    printf("hello\n");
-    write(fileno(stdout),"hellofd\n",8);
-  #endif
-
-  /* call their routine */
-  if (telnetd_config->login_check != NULL) {
-    start = rtems_shell_login_prompt(
-      stdin,
-      stderr,
-      arg->devname,
-      telnetd_config->login_check
-    );
-    login_failed = !start;
-  }
-  if (start) {
-    telnetd_config->command( arg->devname, arg->arg);
+  ctx = calloc(
+    1,
+    sizeof(*ctx) + client_maximum * sizeof(ctx->sessions[0])
+  );
+  if (ctx == NULL) {
+    syslog(LOG_DAEMON | LOG_ERR, "telnetd: cannot allocate server context");
+    return RTEMS_UNSATISFIED;
   }
 
-  stdin  = ostd[0];
-  stdout = ostd[1];
-  stderr = ostd[2];
+  ctx->config = *config;
+  ctx->config.client_maximum = client_maximum;
+  ctx->server_socket = -1;
+  LIST_INIT(&ctx->free_sessions);
 
-  if (login_failed) {
-    syslog(
-      LOG_AUTHPRIV | LOG_WARNING,
-      "telnetd: to many wrong passwords entered from %s",
-      arg->peername
-    );
+  /* Check priority */
+#ifdef RTEMS_NETWORKING
+  if (ctx->config.priority == 0) {
+    ctx->config.priority = rtems_bsdnet_config.network_task_priority;
   }
-
-cleanup:
-  release_a_Connection(arg->devname, arg->peername, nstd, i);
-  free(arg);
-}
-
-struct wrap_delete_args {
-  void (*t)(void *);
-  void           *a;
-};
-
-static rtems_task
-wrap_delete(rtems_task_argument arg)
-{
-  struct wrap_delete_args     *pwa = (struct wrap_delete_args *)arg;
-  register void              (*t)(void *) = pwa->t;
-  register void               *a   = pwa->a;
-
-  /* free argument before calling function (which may never return if
-   * they choose to delete themselves)
-   */
-  free(pwa);
-  t(a);
-  rtems_task_delete(RTEMS_SELF);
-}
-
-rtems_id
-telnetd_dflt_spawn(const char *name, unsigned int priority, unsigned int stackSize, void (*fn)(void *), void* fnarg)
-{
-  rtems_status_code        sc;
-  rtems_id                 task_id = RTEMS_ID_NONE;
-  char                     nm[4] = {'X','X','X','X' };
-  struct wrap_delete_args *pwa = malloc(sizeof(*pwa));
-
-  strncpy(nm, name, 4);
-
-  if ( !pwa ) {
-    perror("Telnetd: no memory\n");
-    return RTEMS_ID_NONE;
-  }
-
-  pwa->t = fn;
-  pwa->a = fnarg;
-
-  if ((sc=rtems_task_create(
-    rtems_build_name(nm[0], nm[1], nm[2], nm[3]),
-      (rtems_task_priority)priority,
-      stackSize,
-      RTEMS_DEFAULT_MODES,
-      RTEMS_DEFAULT_ATTRIBUTES | RTEMS_FLOATING_POINT,
-      &task_id)) ||
-    (sc=rtems_task_start(
-      task_id,
-      wrap_delete,
-      (rtems_task_argument)pwa))) {
-        free(pwa);
-        rtems_error(sc,"Telnetd: spawning task failed");
-        return RTEMS_ID_NONE;
-  }
-  return task_id;
-}
-
-/* convenience routines for CEXP (retrieve stdio descriptors
- * from reent structure)
- */
-#ifdef stdin
-static __inline__ FILE *
-_stdin(void)  { return stdin; }
-#undef stdin
-FILE *stdin(void);
-FILE *stdin(void)  { return _stdin(); }
 #endif
-#ifdef stdout
-static __inline__ FILE * _stdout(void) { return stdout; }
-#undef stdout
-FILE *stdout(void);
-FILE *stdout(void) { return _stdout(); }
-#endif
-#ifdef stderr
-static __inline__ FILE * _stderr(void) { return stderr; }
-#undef stderr
-FILE *stderr(void);
-FILE *stderr(void) { return _stderr(); }
-#endif
+  if (ctx->config.priority == 0) {
+    ctx->config.priority = 100;
+  }
 
-/* MUST NOT USE stdin & friends below here !!!!!!!!!!!!! */
+  /* Check stack size */
+  if (ctx->config.stack_size == 0) {
+    ctx->config.stack_size = (size_t)32 * 1024;
+  }
+
+  if (ctx->config.port == 0) {
+    ctx->config.port = 23;
+  }
+
+  sc = telnetd_create_server_socket(ctx);
+  if (sc != RTEMS_SUCCESSFUL) {
+    telnetd_destroy_context(ctx);
+    return sc;
+  }
+
+  sc = telnetd_create_session_tasks(ctx);
+  if (sc != RTEMS_SUCCESSFUL) {
+    telnetd_destroy_context(ctx);
+    return sc;
+  }
+
+  sc = rtems_task_create(
+    rtems_build_name('T', 'N', 'T', 'D'),
+    ctx->config.priority,
+    RTEMS_MINIMUM_STACK_SIZE,
+    RTEMS_DEFAULT_MODES,
+    RTEMS_FLOATING_POINT,
+    &ctx->task_id
+  );
+  if (sc != RTEMS_SUCCESSFUL) {
+    syslog(LOG_DAEMON | LOG_ERR, "telnetd: cannot create server task");
+    telnetd_destroy_context(ctx);
+    return RTEMS_UNSATISFIED;
+  }
+
+  (void)rtems_task_start(
+    ctx->task_id,
+    telnetd_server_task,
+    (rtems_task_argument) ctx
+  );
+
+  syslog(
+    LOG_DAEMON | LOG_INFO,
+    "telnetd: started successfully on port %" PRIu16, ctx->config.port
+  );
+  return RTEMS_SUCCESSFUL;
+}

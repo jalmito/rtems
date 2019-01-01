@@ -19,10 +19,6 @@
 #ifndef _RTEMS_CONFIG_H
 #define _RTEMS_CONFIG_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /*
  *  Unlimited object support. Changes the configuration table entry for POSIX
  *  or RTEMS APIs to bounded only by the memory of the work-space.
@@ -32,6 +28,19 @@ extern "C" {
  */
 
 #include <rtems/score/object.h>
+#include <rtems/score/isr.h>
+#include <rtems/score/watchdogticks.h>
+#include <rtems/rtems/config.h>
+#include <rtems/posix/config.h>
+#include <rtems/extension.h>
+#if defined(RTEMS_MULTIPROCESSING)
+#include <rtems/score/mpci.h>
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define RTEMS_UNLIMITED_OBJECTS OBJECTS_UNLIMITED_OBJECTS
 
 #define rtems_resource_unlimited(resource) \
@@ -42,26 +51,6 @@ extern "C" {
 
 #define rtems_resource_maximum_per_allocation(resource) \
   _Objects_Maximum_per_allocation(resource)
-
-#include <rtems/score/watchdog.h>
-
-/*
- *  This is kind of kludgy but it allows targets to totally ignore the
- *  optional APIs like POSIX safely.
- */
-
-#ifdef RTEMS_POSIX_API
-#include <rtems/posix/config.h>
-#else
-typedef void *posix_api_configuration_table;
-#endif
-
-#include <rtems/rtems/config.h>
-
-#include <rtems/extension.h>
-#if defined(RTEMS_MULTIPROCESSING)
-#include <rtems/score/mpci.h>
-#endif
 
 #if defined(RTEMS_MULTIPROCESSING)
 /*
@@ -138,18 +127,6 @@ typedef struct {
    */
   uintptr_t                      stack_space_size;
 
-  /** 
-   * This field specifies the maximum number of dynamically installed
-   * used extensions.
-   */
-  uint32_t                       maximum_extensions;
-
-  /**
-   * This field contains the maximum number of POSIX API
-   * keys which are configured for this application.
-   */
-  uint32_t                       maximum_keys;
-
   /**
    * This field contains the maximum number of POSIX API
    * key value pairs which are configured for this application.
@@ -183,13 +160,6 @@ typedef struct {
    * stack size.
    */
   uint32_t                       idle_task_stack_size;
-
-  /** 
-   * This field specifies the size of the interrupt stack.  If less than or
-   * equal to the minimum stack size, then the interrupt stack will be of
-   * minimum stack size.
-   */
-  uint32_t                       interrupt_stack_size;
 
   /**
    * @brief Optional task stack allocator initialization hook.
@@ -294,8 +264,7 @@ extern const rtems_configuration_table Configuration;
           (rtems_configuration_get_stack_allocator_avoids_work_space() ? \
             0 : rtems_configuration_get_stack_space_size()))
 
-#define rtems_configuration_get_maximum_extensions() \
-        (Configuration.maximum_extensions)
+uint32_t rtems_configuration_get_maximum_extensions( void );
 
 #define rtems_configuration_get_microseconds_per_tick() \
         (Configuration.microseconds_per_tick)
@@ -314,7 +283,7 @@ extern const rtems_configuration_table Configuration;
         (Configuration.idle_task_stack_size)
 
 #define rtems_configuration_get_interrupt_stack_size() \
-        (Configuration.interrupt_stack_size)
+        ((size_t) _ISR_Stack_size)
 
 #define rtems_configuration_get_stack_allocate_init_hook() \
         (Configuration.stack_allocate_init_hook)

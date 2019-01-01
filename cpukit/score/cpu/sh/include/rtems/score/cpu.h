@@ -50,38 +50,6 @@ extern "C" {
 #define CPU_SIMPLE_VECTORED_INTERRUPTS TRUE
 
 /*
- *  Does RTEMS manage a dedicated interrupt stack in software?
- *
- *  If TRUE, then a stack is allocated in _ISR_Handler_initialization.
- *  If FALSE, nothing is done.
- *
- *  If the CPU supports a dedicated interrupt stack in hardware,
- *  then it is generally the responsibility of the BSP to allocate it
- *  and set it up.
- *
- *  If the CPU does not support a dedicated interrupt stack, then
- *  the porter has two options: (1) execute interrupts on the
- *  stack of the interrupted task, and (2) have RTEMS manage a dedicated
- *  interrupt stack.
- *
- *  If this is TRUE, CPU_ALLOCATE_INTERRUPT_STACK should also be TRUE.
- *
- *  Only one of CPU_HAS_SOFTWARE_INTERRUPT_STACK and
- *  CPU_HAS_HARDWARE_INTERRUPT_STACK should be set to TRUE.  It is
- *  possible that both are FALSE for a particular CPU.  Although it
- *  is unclear what that would imply about the interrupt processing
- *  procedure on that CPU.
- */
-
-#define CPU_HAS_SOFTWARE_INTERRUPT_STACK TRUE
-#define CPU_HAS_HARDWARE_INTERRUPT_STACK FALSE
-
-/*
- * We define the interrupt stack in the linker script
- */
-#define CPU_ALLOCATE_INTERRUPT_STACK FALSE
-
-/*
  *  Does the RTEMS invoke the user's ISR with the vector number and
  *  a pointer to the saved interrupt frame (1) or just the vector
  *  number (0)?
@@ -178,29 +146,6 @@ extern "C" {
 #endif
 
 #define CPU_ENABLE_ROBUST_THREAD_DISPATCH FALSE
-
-/*
- *  Does this port provide a CPU dependent IDLE task implementation?
- *
- *  If TRUE, then the routine _CPU_Thread_Idle_body
- *  must be provided and is the default IDLE thread body instead of
- *  _CPU_Thread_Idle_body.
- *
- *  If FALSE, then use the generic IDLE thread body if the BSP does
- *  not provide one.
- *
- *  This is intended to allow for supporting processors which have
- *  a low power or idle mode.  When the IDLE thread is executed, then
- *  the CPU can be powered down.
- *
- *  The order of precedence for selecting the IDLE thread body is:
- *
- *    1.  BSP provided
- *    2.  CPU dependent (if provided)
- *    3.  generic (if no BSP and no CPU dependent)
- */
-
-#define CPU_PROVIDES_IDLE_THREAD_BODY    TRUE
 
 /*
  *  Does the stack grow up (toward higher addresses) or down
@@ -414,20 +359,6 @@ void CPU_delay( uint32_t   microseconds );
 #define CPU_HEAP_ALIGNMENT         CPU_ALIGNMENT
 
 /*
- *  This number corresponds to the byte alignment requirement for memory
- *  buffers allocated by the partition manager.  This alignment requirement
- *  may be stricter than that for the data types alignment specified by
- *  CPU_ALIGNMENT.  It is common for the partition to follow the same
- *  alignment requirement as CPU_ALIGNMENT.  If the CPU_ALIGNMENT is strict
- *  enough for the partition, then this should be set to CPU_ALIGNMENT.
- *
- *  NOTE:  This does not have to be a power of 2.  It does have to
- *         be greater or equal to than CPU_ALIGNMENT.
- */
-
-#define CPU_PARTITION_ALIGNMENT    CPU_ALIGNMENT
-
-/*
  *  This number corresponds to the byte alignment requirement for the
  *  stack.  This alignment requirement may be stricter than that for the
  *  data types alignment specified by CPU_ALIGNMENT.  If the CPU_ALIGNMENT
@@ -437,6 +368,8 @@ void CPU_delay( uint32_t   microseconds );
  */
 
 #define CPU_STACK_ALIGNMENT        CPU_ALIGNMENT
+
+#define CPU_INTERRUPT_STACK_ALIGNMENT CPU_CACHE_LINE_BYTES
 
 /*
  *  ISR handler macros
@@ -613,50 +546,23 @@ void _CPU_Context_Initialize(
  */
 void _CPU_Initialize(void);
 
-/*
- *  _CPU_ISR_install_raw_handler
- *
- *  This routine installs a "raw" interrupt handler directly into the
- *  processor's vector table.
- */
+typedef void ( *CPU_ISR_raw_handler )( void );
+
+extern CPU_ISR_raw_handler _Hardware_isr_Table[];
 
 void _CPU_ISR_install_raw_handler(
-  uint32_t    vector,
-  proc_ptr    new_handler,
-  proc_ptr   *old_handler
+  uint32_t             vector,
+  CPU_ISR_raw_handler  new_handler,
+  CPU_ISR_raw_handler *old_handler
 );
 
-/*
- *  _CPU_ISR_install_vector
- *
- *  This routine installs an interrupt vector.
- */
+typedef void ( *CPU_ISR_handler )( uint32_t );
 
 void _CPU_ISR_install_vector(
-  uint32_t    vector,
-  proc_ptr    new_handler,
-  proc_ptr   *old_handler
+  uint32_t         vector,
+  CPU_ISR_handler  new_handler,
+  CPU_ISR_handler *old_handler
 );
-
-/*
- *  _CPU_Install_interrupt_stack
- *
- *  This routine installs the hardware interrupt stack pointer.
- *
- *  NOTE:  It needs only be provided if CPU_HAS_HARDWARE_INTERRUPT_STACK
- *         is TRUE.
- */
-
-void _CPU_Install_interrupt_stack( void );
-
-/*
- *  _CPU_Thread_Idle_body
- *
- *  This routine is the CPU dependent IDLE thread body.
- *
- *  NOTE:  It need only be provided if CPU_PROVIDES_IDLE_THREAD_BODY
- *         is TRUE.
- */
 
 void *_CPU_Thread_Idle_body( uintptr_t ignored );
 
@@ -702,24 +608,14 @@ void _CPU_Context_restore_fp(
   Context_Control_fp **fp_context_ptr
 );
 
-static inline void _CPU_Context_volatile_clobber( uintptr_t pattern )
-{
-  /* TODO */
-}
-
-static inline void _CPU_Context_validate( uintptr_t pattern )
-{
-  while (1) {
-    /* TODO */
-  }
-}
-
 /* FIXME */
 typedef CPU_Interrupt_frame CPU_Exception_frame;
 
 void _CPU_Exception_frame_print( const CPU_Exception_frame *frame );
 
 typedef uint32_t CPU_Counter_ticks;
+
+uint32_t _CPU_Counter_frequency( void );
 
 CPU_Counter_ticks _CPU_Counter_read( void );
 

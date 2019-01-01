@@ -1,28 +1,9 @@
 /**
- * @file rtems/rtems/tasks.h
+ * @file
  *
- * @defgroup ClassicTasks Tasks
+ * @ingroup ClassicTasks
  *
- * @ingroup ClassicRTEMS
- * @brief RTEMS Tasks
- *
- * This include file contains all constants and structures associated
- * with RTEMS tasks. This manager provides a comprehensive set of directives
- * to create, delete, and administer tasks.
- *
- * Directives provided are:
- *
- * - create a task
- * - get an ID of a task
- * - start a task
- * - restart a task
- * - delete a task
- * - suspend a task
- * - resume a task
- * - set a task's priority
- * - change the current task's mode
- * - wake up after interval
- * - wake up when specified
+ * @brief Classic Task Manager API
  */
 
 /*
@@ -37,14 +18,9 @@
 #ifndef _RTEMS_RTEMS_TASKS_H
 #define _RTEMS_RTEMS_TASKS_H
 
-#include <rtems/score/object.h>
-#include <rtems/score/scheduler.h>
-#include <rtems/score/thread.h>
-#include <rtems/rtems/types.h>
-#include <rtems/rtems/event.h>
-#include <rtems/rtems/asr.h>
 #include <rtems/rtems/attr.h>
 #include <rtems/rtems/status.h>
+#include <rtems/rtems/types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -89,10 +65,12 @@ typedef uint32_t rtems_task_priority;
  *  This constant is the least valid value for a Classic API
  *  task priority.
  */
-#define RTEMS_MINIMUM_PRIORITY      (PRIORITY_MINIMUM + 1)
+#define RTEMS_MINIMUM_PRIORITY      1
+
+rtems_task_priority _RTEMS_Maximum_priority( void );
 
 /**
- *  This constant is the maximum valid value for a Classic API
+ *  This run-time constant is the maximum valid value for a Classic API
  *  task priority.
  *
  *  @note This is actually the priority of the IDLE thread so
@@ -101,18 +79,20 @@ typedef uint32_t rtems_task_priority;
  *        want to ensure that a task does not executes during
  *        certain operations such as a system mode change.
  */
-#define RTEMS_MAXIMUM_PRIORITY      ((rtems_task_priority) PRIORITY_MAXIMUM)
+#define RTEMS_MAXIMUM_PRIORITY      _RTEMS_Maximum_priority()
 
 /**
  *  The following constant is passed to rtems_task_set_priority when the
  *  caller wants to obtain the current priority.
  */
-#define RTEMS_CURRENT_PRIORITY      PRIORITY_MINIMUM
+#define RTEMS_CURRENT_PRIORITY      0
+
+struct _Thread_Control;
 
 /**
  *  External API name for Thread_Control
  */
-typedef Thread_Control rtems_tcb;
+typedef struct _Thread_Control rtems_tcb;
 
 /**
  *  The following defines the "return type" of an RTEMS task.
@@ -122,7 +102,7 @@ typedef void rtems_task;
 /**
  *  The following defines the argument to an RTEMS task.
  */
-typedef Thread_Entry_numeric_type rtems_task_argument;
+typedef CPU_Uint32ptr rtems_task_argument;
 
 /**
  *  The following defines the type for the entry point of an RTEMS task.
@@ -227,6 +207,8 @@ rtems_status_code rtems_task_delete(
   rtems_id   id
 );
 
+void rtems_task_exit( void ) RTEMS_NO_RETURN;
+
 /**
  * @brief RTEMS Task Mode
  *
@@ -256,13 +238,13 @@ rtems_status_code rtems_task_mode(
  * point with the new argument.
  *
  * @param[in] id is the thread id
- * @param[in] arg is the thread argument
+ * @param[in] argument is the thread argument
  *
  * @retval RTEMS_SUCCESSFUL if successful or error code if unsuccessful
  */
 rtems_status_code rtems_task_restart(
-  rtems_id   id,
-  uint32_t   arg
+  rtems_id            id,
+  rtems_task_argument argument
 );
 
 /**
@@ -672,41 +654,22 @@ rtems_status_code rtems_scheduler_remove_processor(
   uint32_t cpu_index
 );
 
+/**
+ * @brief Gets the maximum task priority of the specified scheduler instance.
+ *
+ * @param[in] scheduler_id Identifier of the scheduler instance.
+ * @param[out] priority Pointer to a task priority value.
+ *
+ * @retval RTEMS_SUCCESSFUL Successful operation.
+ * @retval RTEMS_INVALID_ADDRESS The @a priority parameter is @c NULL.
+ * @retval RTEMS_INVALID_ID Invalid scheduler instance identifier.
+ */
+rtems_status_code rtems_scheduler_get_maximum_priority(
+  rtems_id             scheduler_id,
+  rtems_task_priority *priority
+);
+
 /**@}*/
-
-/**
- *  This is the API specific information required by each thread for
- *  the RTEMS API to function correctly.
- *
- */
-typedef struct {
-  /** This field contains the event control for this task. */
-  Event_Control            Event;
-  /** This field contains the system event control for this task. */
-  Event_Control            System_event;
-  /** This field contains the Classic API Signal information for this task. */
-  ASR_Information          Signal;
-
-  /**
-   * @brief Signal post-switch action in case signals are pending.
-   */
-  Thread_Action            Signal_action;
-}  RTEMS_API_Control;
-
-/**
- *  @brief _RTEMS_tasks_Initialize_user_tasks_body
- *
- *  This routine creates and starts all configured user
- *  initialization threads.
- *
- *  Input parameters: NONE
- *
- *  Output parameters:  NONE
- *
- *  RTEMS Task Manager
- */
-
-extern void _RTEMS_tasks_Initialize_user_tasks_body( void );
 
 #ifdef __cplusplus
 }

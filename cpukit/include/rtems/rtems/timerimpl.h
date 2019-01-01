@@ -20,7 +20,7 @@
 #ifndef _RTEMS_RTEMS_TIMER_INL
 #define _RTEMS_RTEMS_TIMER_INL
 
-#include <rtems/rtems/timer.h>
+#include <rtems/rtems/timerdata.h>
 #include <rtems/score/objectimpl.h>
 #include <rtems/score/thread.h>
 #include <rtems/score/watchdogimpl.h>
@@ -51,12 +51,6 @@ typedef struct Timer_server_Control {
  * This value is @c NULL when the default timer server is not initialized.
  */
 extern Timer_server_Control *volatile _Timer_server;
-
-/**
- *  The following defines the information control block used to manage
- *  this class of objects.
- */
-extern Objects_Information  _Timer_Information;
 
 /**
  *  @brief Timer_Allocate

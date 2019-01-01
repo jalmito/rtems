@@ -60,6 +60,11 @@ unsigned int BSP_time_base_divisor;
 
 extern unsigned long __rtems_end[];
 
+uint32_t _CPU_Counter_frequency(void)
+{
+  return bsp_clicks_per_usec * 1000000;
+}
+
 /*
  *  bsp_start
  *
@@ -81,14 +86,9 @@ void bsp_start( void )
   BSP_bus_frequency        = (unsigned int)PSIM_INSTRUCTIONS_PER_MICROSECOND;
   bsp_clicks_per_usec      = BSP_bus_frequency;
   BSP_time_base_divisor    = 1;
-  rtems_counter_initialize_converter(bsp_clicks_per_usec * 1000000);
 
-  /*
-   * Initialize default raw exception handlers.
-   */
   ppc_exc_initialize_with_vector_base(
-    (uintptr_t) bsp_section_work_begin,
-    rtems_configuration_get_interrupt_stack_size(),
+    (uintptr_t) _ISR_Stack_area_begin,
     (void *) 0xfff00000
   );
 

@@ -325,14 +325,7 @@ rtems_flashdisk_configuration [FLASHDISK_CONFIG_COUNT] = {
 
 uint32_t rtems_flashdisk_configuration_size = FLASHDISK_CONFIG_COUNT;
 
-#define FLASHDISK_DRIVER { \
-  .initialization_entry = flashdisk_initialize, \
-  .open_entry = rtems_blkdev_generic_open, \
-  .close_entry = rtems_blkdev_generic_close, \
-  .read_entry = rtems_blkdev_generic_read, \
-  .write_entry = rtems_blkdev_generic_write, \
-  .control_entry = rtems_blkdev_generic_ioctl \
-}
+#define FLASHDISK_DRIVER { .initialization_entry = flashdisk_initialize }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
@@ -346,13 +339,11 @@ uint32_t rtems_flashdisk_configuration_size = FLASHDISK_CONFIG_COUNT;
 #define CONFIGURE_MAXIMUM_TASKS 2
 #define CONFIGURE_MAXIMUM_SEMAPHORES 1
 
-#define CONFIGURE_MINIMUM_TASK_STACK_SIZE (32U * 1024U)
-
-#define CONFIGURE_EXTRA_TASK_STACKS (8 * 1024)
-
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
+
+#define CONFIGURE_INIT_TASK_STACK_SIZE (32U * 1024U)
 
 #define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
 

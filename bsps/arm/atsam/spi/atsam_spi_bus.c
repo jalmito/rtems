@@ -32,6 +32,8 @@
 #include <bsp/atsam-spi.h>
 #include <bsp/iocopy.h>
 
+#include <rtems/thread.h>
+
 #include <dev/spi/spi.h>
 
 #include <string.h>
@@ -53,12 +55,12 @@ struct atsam_spi_xdma_buf {
 
 typedef struct {
   spi_bus base;
+  rtems_binary_semaphore sem;
   bool msg_cs_change;
   const spi_ioc_transfer *msg_current;
   const spi_ioc_transfer *msg_next;
   uint32_t msg_todo;
   int msg_error;
-  rtems_id msg_task;
   Spid spi;
   uint32_t dma_tx_channel;
   uint32_t dma_rx_channel;
@@ -72,10 +74,7 @@ typedef struct {
 
 static void atsam_spi_wakeup_task(atsam_spi_bus *bus)
 {
-  rtems_status_code sc;
-
-  sc = rtems_event_transient_send(bus->msg_task);
-  assert(sc == RTEMS_SUCCESSFUL);
+  rtems_binary_semaphore_post(&bus->sem);
 }
 
 static uint8_t atsam_calculate_dlybcs(uint16_t delay_in_us)
@@ -83,6 +82,23 @@ static uint8_t atsam_calculate_dlybcs(uint16_t delay_in_us)
   return (
     (BOARD_MCK / delay_in_us) < 0xFF) ?
     (BOARD_MCK / delay_in_us) : 0xFF;
+}
+
+static uint32_t atsam_calculate_scbr(uint32_t speed_hz)
+{
+  uint32_t scbr;
+
+  scbr = BOARD_MCK / speed_hz;
+  if (scbr > 0x0FF) {
+    /* Best estimation we can offer with the hardware. */
+    scbr = 0x0FF;
+  }
+  if (scbr == 0) {
+    /* SCBR = 0 isn't allowed. */
+    scbr = 1;
+  }
+
+  return scbr;
 }
 
 static void atsam_set_phase_and_polarity(uint32_t mode, uint32_t *csr)
@@ -109,11 +125,13 @@ static void atsam_set_phase_and_polarity(uint32_t mode, uint32_t *csr)
 static void atsam_configure_spi(atsam_spi_bus *bus)
 {
   uint8_t delay_cs;
+  uint32_t scbr;
   uint32_t csr = 0;
   uint32_t mode = 0;
   uint32_t cs = bus->base.cs;
 
   delay_cs = atsam_calculate_dlybcs(bus->base.delay_usecs);
+  scbr = atsam_calculate_scbr(bus->base.speed_hz);
 
   mode |= SPI_MR_DLYBCS(delay_cs);
   mode |= SPI_MR_MSTR;
@@ -137,7 +155,7 @@ static void atsam_configure_spi(atsam_spi_bus *bus)
   csr =
     SPI_DLYBCT(1000, BOARD_MCK) |
     SPI_DLYBS(1000, BOARD_MCK) |
-    SPI_SCBR(bus->base.speed_hz, BOARD_MCK) |
+    SPI_CSR_SCBR(scbr) |
     SPI_CSR_BITS(bus->base.bits_per_word - 8);
 
   atsam_set_phase_and_polarity(bus->base.mode, &csr);
@@ -250,7 +268,6 @@ static void atsam_spi_start_dma_transfer(
 )
 {
   Xdmac *pXdmac = XDMAC;
-  size_t i;
 
   atsam_spi_check_alignment_and_set_up_dma_descriptors(
     bus,
@@ -399,7 +416,6 @@ static int atsam_spi_transfer(
   uint32_t msg_count
 )
 {
-  rtems_status_code sc;
   atsam_spi_bus *bus = (atsam_spi_bus *)base;
 
   bus->msg_cs_change = false;
@@ -407,10 +423,8 @@ static int atsam_spi_transfer(
   bus->msg_current = NULL;
   bus->msg_todo = msg_count;
   bus->msg_error = 0;
-  bus->msg_task = rtems_task_self();
   atsam_spi_setup_transfer(bus);
-  sc = rtems_event_transient_receive(RTEMS_WAIT, RTEMS_NO_TIMEOUT);
-  assert(sc == RTEMS_SUCCESSFUL);
+  rtems_binary_semaphore_wait(&bus->sem);
   return bus->msg_error;
 }
 
@@ -445,6 +459,7 @@ static void atsam_spi_destroy(spi_bus *base)
   rtems_cache_coherent_free(bus->dma_bufs);
 
   spi_bus_destroy_and_free(&bus->base);
+  rtems_binary_semaphore_destroy(&bus->sem);
 }
 
 static int atsam_spi_setup(spi_bus *base)
@@ -605,6 +620,7 @@ int spi_bus_register_atsam(
   bus->spi.pSpiHw = config->spi_regs;
   bus->chip_select_decode = config->chip_select_decode;
 
+  rtems_binary_semaphore_init(&bus->sem, "ATSAM SPI");
   PIO_Configure(config->pins, config->pin_count);
   PMC_EnablePeripheral(config->spi_peripheral_id);
   atsam_configure_spi(bus);

@@ -85,9 +85,6 @@ LINKER_SYMBOL(RamSize);
 LINKER_SYMBOL(__bsp_ram_start);
 LINKER_SYMBOL(__bsp_ram_end);
 LINKER_SYMBOL(__rtems_end);
-LINKER_SYMBOL(_stack);
-LINKER_SYMBOL(StackSize);
-LINKER_SYMBOL(__stack_base);
 LINKER_SYMBOL(WorkAreaBase);
 LINKER_SYMBOL(MsgAreaBase);
 LINKER_SYMBOL(MsgAreaSize);
@@ -130,6 +127,10 @@ void BSP_ask_for_reset(void)
   for(;;);
 }
 
+uint32_t _CPU_Counter_frequency(void)
+{
+  return bsp_clicks_per_usec * 1000000;
+}
 
 /*===================================================================*/
 
@@ -140,9 +141,6 @@ void BSP_ask_for_reset(void)
  */
 void bsp_start(void)
 {
-  uintptr_t          intrStackStart;
-  uintptr_t          intrStackSize;
-
   ppc_cpu_id_t       myCpu;
   ppc_cpu_revision_t myCpuRevision;
 
@@ -166,29 +164,18 @@ void bsp_start(void)
 
   /* Timebase register ticks/microsecond;  The application may override these */
   bsp_clicks_per_usec        = 350;
-  rtems_counter_initialize_converter(bsp_clicks_per_usec * 1000000);
 
-  /*
-   * Initialize the interrupt related settings.
-   */
-  intrStackStart = CPU_UP_ALIGN((uint32_t)__bsp_ram_start);
-  intrStackSize  = rtems_configuration_get_interrupt_stack_size();
-
-  ppc_exc_initialize(intrStackStart, intrStackSize);
+  ppc_exc_initialize();
 
   /* Let the user know what parameters we were compiled with */
   printk("                  Base/Start     End         Size\n"
          "RAM:              %p                    %p\n"
          "RTEMS:                           %p\n"
-         "Interrupt Stack:  0x%08x              0x%x\n"
-         "Stack:            %p             %p          %p\n"
          "Workspace:        %p             %p\n"
          "MsgArea:          %p             %p\n"
          "Physical RAM                     %p\n",
          RamBase,        RamSize,
          __rtems_end,
-         intrStackStart,                intrStackSize,
-         __stack_base,   _stack,        StackSize,
          WorkAreaBase,   __bsp_ram_end,
          MsgAreaBase,    MsgAreaSize,
          __phy_ram_end);

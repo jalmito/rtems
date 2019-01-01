@@ -21,20 +21,23 @@
 #if defined(RTEMS_NEWLIB) && !defined(HAVE_CALLOC)
 #include <stdlib.h>
 #include <string.h>
+#include <rtems/score/basedefs.h>
 
 void *calloc(
   size_t nelem,
   size_t elsize
 )
 {
-  char   *cptr;
+  void   *cptr;
   size_t  length;
 
   length = nelem * elsize;
   cptr = malloc( length );
-  if ( cptr )
-    memset( cptr, '\0', length );
+  RTEMS_OBFUSCATE_VARIABLE( cptr );
+  if ( RTEMS_PREDICT_FALSE( cptr == NULL ) ) {
+    return cptr;
+  }
 
-  return cptr;
+  return memset( cptr, 0, length );
 }
 #endif

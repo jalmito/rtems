@@ -19,7 +19,6 @@
 #ifndef _RTEMS_POSIX_PTHREAD_H
 #define _RTEMS_POSIX_PTHREAD_H
 
-#include <rtems/posix/config.h>
 #include <rtems/posix/threadsup.h>
 #include <rtems/score/thread.h>
 
@@ -37,6 +36,8 @@ extern "C" {
  */
 /**@{**/
 
+extern const size_t _Configuration_POSIX_Minimum_stack_size;
+
 /**
  * @brief POSIX threads initialize user threads body.
  *
@@ -44,6 +45,12 @@ extern "C" {
  * initialization threads.
  */
 extern void _POSIX_Threads_Initialize_user_threads_body(void);
+
+/**
+ * The following defines the information control block used to manage
+ * this class of objects.
+ */
+extern Thread_Information _POSIX_Threads_Information;
 
 /** @} */
 

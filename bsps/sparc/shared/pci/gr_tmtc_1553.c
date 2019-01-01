@@ -15,6 +15,7 @@
  *  http://www.rtems.org/license/LICENSE.
  */
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,7 +24,6 @@
 
 #include <bsp.h>
 #include <rtems/bspIo.h>
-#include <rtems/score/isrlock.h> /* spin-lock */
 #include <pci.h>
 #include <pci/access.h>
 
@@ -37,15 +37,7 @@
 
 #include <bsp/gr_tmtc_1553.h>
 
-/* map via rtems_interrupt_lock_* API: */
-#define SPIN_DECLARE(lock) RTEMS_INTERRUPT_LOCK_MEMBER(lock)
-#define SPIN_INIT(lock, name) rtems_interrupt_lock_initialize(lock, name)
-#define SPIN_LOCK(lock, level) rtems_interrupt_lock_acquire_isr(lock, &level)
-#define SPIN_LOCK_IRQ(lock, level) rtems_interrupt_lock_acquire(lock, &level)
-#define SPIN_UNLOCK(lock, level) rtems_interrupt_lock_release_isr(lock, &level)
-#define SPIN_UNLOCK_IRQ(lock, level) rtems_interrupt_lock_release(lock, &level)
-#define SPIN_IRQFLAGS(k) rtems_interrupt_lock_context k
-#define SPIN_ISR_IRQFLAGS(k) SPIN_IRQFLAGS(k)
+#include <grlib_impl.h>
 
 /*#define DEBUG 1 */
 
@@ -308,11 +300,10 @@ int gr_tmtc_1553_init1(struct drvmgr_dev *dev)
 	 */
 	((struct pci_dev_info *)dev->businfo)->irq = ((struct amba_dev_info *)dev->parent->dev->businfo)->info.irq; 
 
-	priv = malloc(sizeof(struct gr_tmtc_1553_priv));
+	priv = grlib_calloc(1, sizeof(*priv));
 	if ( !priv )
 		return DRVMGR_NOMEM;
 
-	memset(priv, 0, sizeof(*priv));
 	dev->priv = priv;
 	priv->dev = dev;
 
@@ -331,13 +322,14 @@ int gr_tmtc_1553_init1(struct drvmgr_dev *dev)
 	priv->pcidev = devinfo->pcidev;
 	bar0 = devinfo->resources[0].address;
 	bar0_size = devinfo->resources[0].size;
-	printf("\n\n--- GR-TMTC-1553[%d] ---\n", dev->minor_drv);
-	printf(" PCI BUS: 0x%x, SLOT: 0x%x, FUNCTION: 0x%x\n",
+	printk("\n\n--- GR-TMTC-1553[%d] ---\n", dev->minor_drv);
+	printk(" PCI BUS: 0x%x, SLOT: 0x%x, FUNCTION: 0x%x\n",
 		PCI_DEV_EXPAND(priv->pcidev));
-	printf(" PCI VENDOR: 0x%04x, DEVICE: 0x%04x\n",
+	printk(" PCI VENDOR: 0x%04x, DEVICE: 0x%04x\n",
 		devinfo->id.vendor, devinfo->id.device);
-	printf(" PCI BAR[0]: 0x%lx - 0x%lx\n", bar0, bar0 + bar0_size - 1);
-	printf(" IRQ: %d\n\n\n", devinfo->irq);
+	printk(" PCI BAR[0]: 0x%" PRIx32 " - 0x%" PRIx32 "\n",
+		bar0, bar0 + bar0_size - 1);
+	printk(" IRQ: %d\n\n\n", devinfo->irq);
 
 	/* all neccessary space assigned to GR-TMTC-1553 target? */
 	if (bar0_size == 0)
@@ -361,7 +353,7 @@ int gr_tmtc_1553_init1(struct drvmgr_dev *dev)
 		genirq_destroy(priv->genirq);
 		free(priv);
 		dev->priv = NULL;
-		printf(" Failed to initialize GR-TMTC-1553 HW: %d\n", status);
+		printk(" Failed to initialize GR-TMTC-1553 HW: %d\n", status);
 		return DRVMGR_FAIL;
 	}
 
@@ -566,8 +558,9 @@ void gr_tmtc_1553_print_dev(struct drvmgr_dev *dev, int options)
 	bar0 = devinfo->resources[0].address;
 	bar0_size = devinfo->resources[0].size;
 
-	printf(" PCI BAR[0]: 0x%lx - 0x%lx\n", bar0, bar0 + bar0_size - 1);
-	printf(" IRQ REGS:        0x%x\n", (unsigned int)priv->irq);
+	printf(" PCI BAR[0]: 0x%" PRIx32 " - 0x%" PRIx32 "\n",
+		bar0, bar0 + bar0_size - 1);
+	printf(" IRQ REGS:        0x%" PRIxPTR "\n", (uintptr_t)priv->irq);
 	printf(" IRQ:             %d\n", devinfo->irq);
 	printf(" FREQ:            %d Hz\n", priv->version->amba_freq_hz);
 	printf(" IMASK:           0x%08x\n", priv->irq->mask[0]);

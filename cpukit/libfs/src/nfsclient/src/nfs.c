@@ -1002,7 +1002,6 @@ nfsInit(int smallPoolDepth, int bigPoolDepth)
 {
 static int initialised = 0;
 entry	dummy;
-rtems_status_code status;
 
 	if (initialised)
 		return 0;
@@ -3106,7 +3105,7 @@ rtems_filesystem_location_info_t	old;
 		rtems_filesystem_current->location = old;
 	}
 	rtems_binary_semaphore_post(&rpa->sync);
-	rtems_task_delete(RTEMS_SELF);
+	rtems_task_exit();
 }
 
 

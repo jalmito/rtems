@@ -1,3 +1,11 @@
+/**
+ * @file
+ *
+ * @ingroup csb337_at91rm9200
+ *
+ * @brief Atmel AT91RM9200_DBGU Register definitions
+ */
+
 /*
  * Atmel AT91RM9200_DBGU Register definitions
  *
@@ -56,7 +64,7 @@
 #define DBGU_INT_RXRDY      BIT0        /* RXRDY Interrupt */
 #define DBGU_INT_TXRDY      BIT1        /* TXRDY Interrupt */
 #define DBGU_INT_ENDRX      BIT3        /* End of Receive Transfer Interrupt */
-/*efine DBGU_INT_ENDTX      BIT4        /* End of Transmit Interrupt */
+#define DBGU_INT_ENDTX      BIT4        /* End of Transmit Interrupt */
 #define DBGU_INT_OVRE       BIT5        /* Overrun Interrupt */
 #define DBGU_INT_FRAME      BIT6        /* Framing Error Interrupt */
 #define DBGU_INT_PARE       BIT7        /* Parity Error Interrupt */

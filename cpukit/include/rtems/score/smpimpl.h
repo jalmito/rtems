@@ -79,7 +79,8 @@ typedef enum {
   SMP_FATAL_MULTITASKING_START_ON_UNASSIGNED_PROCESSOR,
   SMP_FATAL_SHUTDOWN,
   SMP_FATAL_SHUTDOWN_RESPONSE,
-  SMP_FATAL_START_OF_MANDATORY_PROCESSOR_FAILED
+  SMP_FATAL_START_OF_MANDATORY_PROCESSOR_FAILED,
+  SMP_FATAL_SCHEDULER_PIN_OR_UNPIN_NOT_SUPPORTED
 } SMP_Fatal_code;
 
 static inline void _SMP_Fatal( SMP_Fatal_code code )
@@ -134,9 +135,12 @@ extern Processor_mask _SMP_Online_processors;
  * uses _Thread_Start_multitasking() instead.
  *
  * This function does not return to the caller.
+ *
+ * @param[in] cpu_self The current processor control.
  */
-void _SMP_Start_multitasking_on_secondary_processor( void )
-  RTEMS_NO_RETURN;
+void _SMP_Start_multitasking_on_secondary_processor(
+  Per_CPU_Control *cpu_self
+) RTEMS_NO_RETURN;
 
 typedef void ( *SMP_Test_message_handler )( Per_CPU_Control *cpu_self );
 
@@ -165,12 +169,11 @@ void _SMP_Multicast_actions_process( void );
  *
  * @return The received message.
  */
-static inline long unsigned _SMP_Inter_processor_interrupt_handler( void )
+static inline long unsigned _SMP_Inter_processor_interrupt_handler(
+  Per_CPU_Control *cpu_self
+)
 {
-  Per_CPU_Control *cpu_self;
-  unsigned long    message;
-
-  cpu_self = _Per_CPU_Get();
+  unsigned long message;
 
   /*
    * In the common case the inter-processor interrupt is issued to carry out a
@@ -184,7 +187,7 @@ static inline long unsigned _SMP_Inter_processor_interrupt_handler( void )
     ATOMIC_ORDER_ACQUIRE
   );
 
-  if ( message != 0 ) {
+  if ( RTEMS_PREDICT_FALSE( message != 0 ) ) {
     if ( ( message & SMP_MESSAGE_SHUTDOWN ) != 0 ) {
       _SMP_Fatal( SMP_FATAL_SHUTDOWN_RESPONSE );
       /* does not continue past here */

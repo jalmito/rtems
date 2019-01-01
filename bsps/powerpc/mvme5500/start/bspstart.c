@@ -169,6 +169,11 @@ save_boot_params(
   return cmdline_buf;
 }
 
+uint32_t _CPU_Counter_frequency(void)
+{
+  return BSP_bus_frequency / (BSP_time_base_divisor / 1000);
+}
+
 void bsp_start( void )
 {
 #ifdef CONF_VPD
@@ -183,8 +188,6 @@ void bsp_start( void )
 #ifdef SHOW_LCR3_REGISTER
   unsigned l3cr;
 #endif
-  uintptr_t intrStackStart;
-  uintptr_t intrStackSize;
   Triv121PgTbl  pt=0;
 
   /* Till Straumann: 4/2005
@@ -217,16 +220,7 @@ void bsp_start( void )
   printk("Initial L1CR value = %x\n", l1cr);
 #endif
 
-  /*
-   * Initialize the interrupt related settings.
-   */
-  intrStackStart = (uintptr_t) __rtems_end;
-  intrStackSize = rtems_configuration_get_interrupt_stack_size();
-
-  /*
-   * Initialize default raw exception handlers.
-   */
-  ppc_exc_initialize(intrStackStart, intrStackSize);
+  ppc_exc_initialize();
 
   /*
    * Init MMU block address translation to enable hardware
@@ -265,9 +259,6 @@ void bsp_start( void )
   /* P94 : 7455 TB/DECR is clocked by the system bus clock frequency */
 
   bsp_clicks_per_usec    = BSP_bus_frequency/(BSP_time_base_divisor * 1000);
-  rtems_counter_initialize_converter(
-    BSP_bus_frequency / (BSP_time_base_divisor / 1000)
-  );
 
   /*
    * Initalize RTEMS IRQ system

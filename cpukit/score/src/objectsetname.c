@@ -24,41 +24,38 @@
 #include <string.h>
 
 bool _Objects_Set_name(
-  Objects_Information *information,
-  Objects_Control     *the_object,
-  const char          *name
+  const Objects_Information *information,
+  Objects_Control           *the_object,
+  const char                *name
 )
 {
-  size_t                 length;
-  const char            *s;
+  if ( _Objects_Has_string_name( information ) ) {
+    size_t  length;
+    char   *dup;
 
-  s      = name;
-  length = strnlen( name, information->name_length );
-
-#if defined(RTEMS_SCORE_OBJECT_ENABLE_STRING_NAMES)
-  if ( information->is_string ) {
-    char *d;
-
-    d = _Workspace_Allocate( length + 1 );
-    if ( !d )
+    length = strnlen( name, information->name_length );
+    dup = _Workspace_String_duplicate( name, length );
+    if ( dup == NULL ) {
       return false;
+    }
 
-    _Workspace_Free( (void *)the_object->name.name_p );
-    the_object->name.name_p = NULL;
+    the_object->name.name_p = dup;
+  } else {
+    char c[ 4 ];
+    size_t i;
 
-    strncpy( d, name, length );
-    d[length] = '\0';
-    the_object->name.name_p = d;
-  } else
-#endif
-  {
-    the_object->name.name_u32 =  _Objects_Build_name(
-      ((length)     ? s[ 0 ] : ' '),
-      ((length > 1) ? s[ 1 ] : ' '),
-      ((length > 2) ? s[ 2 ] : ' '),
-      ((length > 3) ? s[ 3 ] : ' ')
-    );
+    memset( c, ' ', sizeof( c ) );
 
+    for ( i = 0; i < 4; ++i ) {
+      if ( name[ i ] == '\0') {
+        break;
+      }
+
+      c[ i ] = name[ i ];
+    }
+
+    the_object->name.name_u32 =
+      _Objects_Build_name( c[ 0 ], c[ 1 ], c[ 2 ], c[ 3 ] );
   }
 
   return true;

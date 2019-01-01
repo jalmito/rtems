@@ -238,6 +238,20 @@ static inline struct Per_CPU_Control *_PPC_Get_current_per_CPU_control( void )
 
 #endif /* RTEMS_SMP */
 
+void _CPU_Context_volatile_clobber( uintptr_t pattern );
+
+void _CPU_Context_validate( uintptr_t pattern );
+
+RTEMS_INLINE_ROUTINE void _CPU_Instruction_illegal( void )
+{
+  __asm__ volatile ( ".long 0" );
+}
+
+RTEMS_INLINE_ROUTINE void _CPU_Instruction_no_operation( void )
+{
+  __asm__ volatile ( "nop" );
+}
+
 #ifdef __cplusplus
 }
 #endif

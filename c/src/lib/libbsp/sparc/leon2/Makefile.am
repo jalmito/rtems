@@ -142,8 +142,12 @@ librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/tmtc/grtm.c
 
 # MEMSCRUB
 librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/scrub/memscrub.c
+
 # L4STAT
 librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/stat/l4stat.c
+
+# SPWTDP
+librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/spw/spwtdp.c
 
 # Driver Manager
 librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/drvmgr/ambapp_bus.c
@@ -164,7 +168,6 @@ librtemsbsp_a_SOURCES += ../../../../../../bsps/sparc/shared/net/network_interfa
 endif
 
 
-include $(top_srcdir)/../../../../automake/local.am
 include $(srcdir)/../../../../../../bsps/shared/irq-sources.am
 include $(srcdir)/../../../../../../bsps/shared/shared-sources.am
 include $(srcdir)/../../../../../../bsps/sparc/leon2/headers.am

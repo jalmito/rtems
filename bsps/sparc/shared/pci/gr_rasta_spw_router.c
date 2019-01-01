@@ -13,6 +13,7 @@
  *  GR-RASTA-IO driver.
  */
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,7 +22,6 @@
 
 #include <bsp.h>
 #include <rtems/bspIo.h>
-#include <rtems/score/isrlock.h> /* spin-lock */
 #include <pci.h>
 
 #include <ambapp.h>
@@ -33,15 +33,7 @@
 #include <bsp/genirq.h>
 #include <bsp/gr_rasta_spw_router.h>
 
-/* map via rtems_interrupt_lock_* API: */
-#define SPIN_DECLARE(lock) RTEMS_INTERRUPT_LOCK_MEMBER(lock)
-#define SPIN_INIT(lock, name) rtems_interrupt_lock_initialize(lock, name)
-#define SPIN_LOCK(lock, level) rtems_interrupt_lock_acquire_isr(lock, &level)
-#define SPIN_LOCK_IRQ(lock, level) rtems_interrupt_lock_acquire(lock, &level)
-#define SPIN_UNLOCK(lock, level) rtems_interrupt_lock_release_isr(lock, &level)
-#define SPIN_UNLOCK_IRQ(lock, level) rtems_interrupt_lock_release(lock, &level)
-#define SPIN_IRQFLAGS(k) rtems_interrupt_lock_context k
-#define SPIN_ISR_IRQFLAGS(k) SPIN_IRQFLAGS(k)
+#include <grlib_impl.h>
 
 /* Determines which PCI address the AHB masters will access, it should be
  * set so that the masters can access the CPU RAM. Default is base of CPU RAM,
@@ -377,7 +369,6 @@ static int gr_rasta_spw_router_hw_init(struct gr_rasta_spw_router_priv *priv)
 	/* Make sure dirq(0) sampling is enabled */
 	ctrl = priv->grpci2->ctrl;
 	ctrl = (ctrl & 0xFFFFFF0F) | (1 << 4);
-	printf("data: 0x%x\n", ctrl);
 	priv->grpci2->ctrl = ctrl;
 
 	/* Successfully registered the RASTA-SPW-ROUTER board */
@@ -427,13 +418,14 @@ int gr_rasta_spw_router_init1(struct drvmgr_dev *dev)
 	priv->pcidev = devinfo->pcidev;
 	bar0 = devinfo->resources[0].address;
 	bar0_size = devinfo->resources[0].size;
-	printf("\n\n--- GR-RASTA-SPW-ROUTER[%d] ---\n", dev->minor_drv);
-	printf(" PCI BUS: 0x%x, SLOT: 0x%x, FUNCTION: 0x%x\n",
+	printk("\n\n--- GR-RASTA-SPW-ROUTER[%d] ---\n", dev->minor_drv);
+	printk(" PCI BUS: 0x%x, SLOT: 0x%x, FUNCTION: 0x%x\n",
 		PCI_DEV_EXPAND(priv->pcidev));
-	printf(" PCI VENDOR: 0x%04x, DEVICE: 0x%04x\n",
+	printk(" PCI VENDOR: 0x%04x, DEVICE: 0x%04x\n",
 		devinfo->id.vendor, devinfo->id.device);
-	printf(" PCI BAR[0]: 0x%08lx - 0x%08lx\n", bar0, bar0 + bar0_size - 1);
-	printf(" IRQ: %d\n\n\n", devinfo->irq);
+	printk(" PCI BAR[0]: 0x%08" PRIx32 " - 0x%08" PRIx32 "\n",
+		bar0, bar0 + bar0_size - 1);
+	printk(" IRQ: %d\n\n\n", devinfo->irq);
 
 	/* all neccessary space assigned to GR-RASTA-SPW-ROUTER target? */
 	if (bar0_size == 0)
@@ -464,7 +456,7 @@ int gr_rasta_spw_router_init1(struct drvmgr_dev *dev)
 
 	if ((status = gr_rasta_spw_router_hw_init(priv)) != 0) {
 		genirq_destroy(priv->genirq);
-		printf(" Failed to initialize GR-RASTA-SPW-ROUTER HW: %d\n", status);
+		printk(" Failed to initialize GR-RASTA-SPW-ROUTER HW: %d\n", status);
 		return DRVMGR_FAIL;
 	}
 
@@ -665,8 +657,9 @@ void gr_rasta_spw_router_print_dev(struct drvmgr_dev *dev, int options)
 
 	bar0 = devinfo->resources[0].address;
 	bar0_size = devinfo->resources[0].size;
-	printf(" PCI BAR[0]: 0x%lx - 0x%lx\n", bar0, bar0 + bar0_size - 1);
-	printf(" IRQ REGS:        0x%x\n", (unsigned int)priv->irq);
+	printf(" PCI BAR[0]: 0x%" PRIx32 " - 0x%" PRIx32 "\n",
+		bar0, bar0 + bar0_size - 1);
+	printf(" IRQ REGS:        0x%" PRIxPTR "\n", (uintptr_t)priv->irq);
 	printf(" IRQ:             %d\n", devinfo->irq);
 	printf(" PCI REVISION:    %d\n", devinfo->rev);
 	printf(" FREQ:            %d Hz\n", priv->version->amba_freq_hz);

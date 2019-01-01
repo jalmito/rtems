@@ -29,14 +29,9 @@
 #ifndef _RTEMS_RTEMS_CLOCK_H
 #define _RTEMS_RTEMS_CLOCK_H
 
-#include <rtems/score/watchdog.h>
-#include <rtems/score/tod.h>
 #include <rtems/rtems/status.h>
 #include <rtems/rtems/types.h>
 #include <rtems/config.h>
-#include <rtems/score/timecounterimpl.h>
-
-#include <sys/time.h> /* struct timeval */
 
 /**
  *  @defgroup ClassicClock Clocks
@@ -266,10 +261,7 @@ void rtems_clock_get_uptime_timeval( struct timeval *uptime );
  *
  * @retval The system uptime in seconds.
  */
-RTEMS_INLINE_ROUTINE time_t rtems_clock_get_uptime_seconds( void )
-{
-  return _Timecounter_Time_uptime - 1;
-}
+time_t rtems_clock_get_uptime_seconds( void );
 
 /**
  * @brief Returns the system uptime in nanoseconds.

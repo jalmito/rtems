@@ -112,6 +112,11 @@ uint32_t bsp_time_base_frequency;
 /* Legacy */
 uint32_t bsp_clicks_per_usec;
 
+uint32_t _CPU_Counter_frequency(void)
+{
+  return bsp_time_base_frequency;
+}
+
 void bsp_start(void)
 {
   /*
@@ -145,17 +150,13 @@ void bsp_start(void)
 
   bsp_time_base_frequency = XLB_CLOCK / 4;
   bsp_clicks_per_usec    = (XLB_CLOCK/4000000);
-  rtems_counter_initialize_converter(bsp_time_base_frequency);
 
   /* Initialize exception handler */
   ppc_exc_cache_wb_check = 0;
-  ppc_exc_initialize(
-    (uintptr_t) bsp_interrupt_stack_start,
-    (uintptr_t) bsp_interrupt_stack_size
-  );
+  ppc_exc_initialize();
   ppc_exc_set_handler(ASM_ALIGN_VECTOR, ppc_exc_alignment_handler);
 
-  /* Initalize interrupt support */
+  /* Initialize interrupt support */
   bsp_interrupt_initialize();
 
   /*

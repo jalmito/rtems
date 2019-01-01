@@ -26,6 +26,9 @@
 #include <errno.h>
 
 #include <rtems/posix/priorityimpl.h>
+#if defined(RTEMS_POSIX_API)
+#include <rtems/posix/psignalimpl.h>
+#endif
 #include <rtems/posix/pthreadimpl.h>
 #include <rtems/posix/pthreadattrimpl.h>
 #include <rtems/score/assert.h>
@@ -33,6 +36,8 @@
 #include <rtems/score/apimutex.h>
 #include <rtems/score/stackimpl.h>
 #include <rtems/score/schedulerimpl.h>
+#include <rtems/score/userextimpl.h>
+#include <rtems/sysinit.h>
 
 static inline size_t _POSIX_Threads_Ensure_minimum_stack (
   size_t size
@@ -62,10 +67,8 @@ int pthread_create(
   };
   const pthread_attr_t               *the_attr;
   int                                 normal_prio;
-  int                                 low_prio;
   bool                                valid;
   Priority_Control                    core_normal_prio;
-  Priority_Control                    core_low_prio;
   Thread_CPU_budget_algorithms        budget_algorithm;
   Thread_CPU_budget_algorithm_callout budget_callout;
   bool                                is_fp;
@@ -73,14 +76,18 @@ int pthread_create(
   Thread_Control                     *the_thread;
   Thread_Control                     *executing;
   const Scheduler_Control            *scheduler;
-  POSIX_API_Control                  *api;
-  const POSIX_API_Control            *executing_api;
   int                                 schedpolicy = SCHED_RR;
   struct sched_param                  schedparam;
   size_t                              stacksize;
   Objects_Name                        name;
   int                                 error;
   ISR_lock_Context                    lock_context;
+#if defined(RTEMS_POSIX_API)
+  int                                 low_prio;
+  Priority_Control                    core_low_prio;
+  POSIX_API_Control                  *api;
+  const POSIX_API_Control            *executing_api;
+#endif
 
   if ( !start_routine )
     return EFAULT;
@@ -167,6 +174,7 @@ int pthread_create(
     return EINVAL;
   }
 
+#if defined(RTEMS_POSIX_API)
   if ( schedpolicy == SCHED_SPORADIC ) {
     low_prio = schedparam.sched_ss_low_priority;
   } else {
@@ -177,6 +185,7 @@ int pthread_create(
   if ( !valid ) {
     return EINVAL;
   }
+#endif
 
   if ( the_attr->affinityset == NULL ) {
     return EINVAL;
@@ -242,6 +251,10 @@ int pthread_create(
      return EINVAL;
    }
 
+  the_thread->was_created_with_inherited_scheduler =
+    ( the_attr->inheritsched == PTHREAD_INHERIT_SCHED );
+
+#if defined(RTEMS_POSIX_API)
   /*
    *  finish initializing the per API structure
    */
@@ -249,9 +262,6 @@ int pthread_create(
   executing_api = executing->API_Extensions[ THREAD_API_POSIX ];
 
   api->signals_unblocked = executing_api->signals_unblocked;
-
-  the_thread->was_created_with_inherited_scheduler =
-    ( the_attr->inheritsched == PTHREAD_INHERIT_SCHED );
 
   _Priority_Node_set_priority( &api->Sporadic.Low_priority, core_low_prio );
   api->Sporadic.sched_ss_repl_period =
@@ -264,6 +274,7 @@ int pthread_create(
   if ( schedpolicy == SCHED_SPORADIC ) {
     _POSIX_Threads_Sporadic_timer( &api->Sporadic.Timer );
   }
+#endif
 
   /*
    *  POSIX threads are allocated and started in one operation.
@@ -293,3 +304,136 @@ int pthread_create(
   _Objects_Allocator_unlock();
   return 0;
 }
+
+#if defined(RTEMS_POSIX_API)
+void _POSIX_Threads_Sporadic_timer( Watchdog_Control *watchdog )
+{
+  POSIX_API_Control    *api;
+  Thread_Control       *the_thread;
+  Thread_queue_Context  queue_context;
+
+  api = RTEMS_CONTAINER_OF( watchdog, POSIX_API_Control, Sporadic.Timer );
+  the_thread = api->Sporadic.thread;
+
+  _Thread_queue_Context_initialize( &queue_context );
+  _Thread_queue_Context_clear_priority_updates( &queue_context );
+  _Thread_Wait_acquire( the_thread, &queue_context );
+
+  if ( _Priority_Node_is_active( &api->Sporadic.Low_priority ) ) {
+    _Thread_Priority_add(
+      the_thread,
+      &the_thread->Real_priority,
+      &queue_context
+    );
+    _Thread_Priority_remove(
+      the_thread,
+      &api->Sporadic.Low_priority,
+      &queue_context
+    );
+    _Priority_Node_set_inactive( &api->Sporadic.Low_priority );
+  }
+
+  _Watchdog_Per_CPU_remove_ticks( &api->Sporadic.Timer );
+  _POSIX_Threads_Sporadic_timer_insert( the_thread, api );
+
+  _Thread_Wait_release( the_thread, &queue_context );
+  _Thread_Priority_update( &queue_context );
+}
+
+void _POSIX_Threads_Sporadic_budget_callout( Thread_Control *the_thread )
+{
+  POSIX_API_Control    *api;
+  Thread_queue_Context  queue_context;
+
+  api = the_thread->API_Extensions[ THREAD_API_POSIX ];
+
+  _Thread_queue_Context_initialize( &queue_context );
+  _Thread_queue_Context_clear_priority_updates( &queue_context );
+  _Thread_Wait_acquire( the_thread, &queue_context );
+
+  /*
+   *  This will prevent the thread from consuming its entire "budget"
+   *  while at low priority.
+   */
+  the_thread->cpu_time_budget = UINT32_MAX;
+
+  if ( !_Priority_Node_is_active( &api->Sporadic.Low_priority ) ) {
+    _Thread_Priority_add(
+      the_thread,
+      &api->Sporadic.Low_priority,
+      &queue_context
+    );
+    _Thread_Priority_remove(
+      the_thread,
+      &the_thread->Real_priority,
+      &queue_context
+    );
+  }
+
+  _Thread_Wait_release( the_thread, &queue_context );
+  _Thread_Priority_update( &queue_context );
+}
+
+static bool _POSIX_Threads_Create_extension(
+  Thread_Control *executing RTEMS_UNUSED,
+  Thread_Control *created
+)
+{
+  POSIX_API_Control *api;
+
+  api = created->API_Extensions[ THREAD_API_POSIX ];
+
+  api->Sporadic.thread = created;
+  _Watchdog_Preinitialize( &api->Sporadic.Timer, _Per_CPU_Get_by_index( 0 ) );
+  _Watchdog_Initialize( &api->Sporadic.Timer, _POSIX_Threads_Sporadic_timer );
+  _Priority_Node_set_inactive( &api->Sporadic.Low_priority );
+
+  return true;
+}
+
+static void _POSIX_Threads_Terminate_extension( Thread_Control *executing )
+{
+  POSIX_API_Control *api;
+  ISR_lock_Context   lock_context;
+
+  api = executing->API_Extensions[ THREAD_API_POSIX ];
+
+  _Thread_State_acquire( executing, &lock_context );
+  _Watchdog_Per_CPU_remove_ticks( &api->Sporadic.Timer );
+  _Thread_State_release( executing, &lock_context );
+}
+#endif
+
+static void _POSIX_Threads_Exitted_extension(
+  Thread_Control *executing
+)
+{
+  /*
+   *  If the executing thread was not created with the POSIX API, then this
+   *  API do not get to define its exit behavior.
+   */
+  if ( _Objects_Get_API( executing->Object.id ) == OBJECTS_POSIX_API )
+    pthread_exit( executing->Wait.return_argument );
+}
+
+static User_extensions_Control _POSIX_Threads_User_extensions = {
+  .Callouts = {
+#if defined(RTEMS_POSIX_API)
+    .thread_create    = _POSIX_Threads_Create_extension,
+    .thread_terminate = _POSIX_Threads_Terminate_extension,
+#endif
+    .thread_exitted   = _POSIX_Threads_Exitted_extension
+  }
+};
+
+static void _POSIX_Threads_Manager_initialization( void )
+{
+  _Thread_Initialize_information( &_POSIX_Threads_Information );
+  _User_extensions_Add_API_set( &_POSIX_Threads_User_extensions );
+}
+
+RTEMS_SYSINIT_ITEM(
+  _POSIX_Threads_Manager_initialization,
+  RTEMS_SYSINIT_POSIX_THREADS,
+  RTEMS_SYSINIT_ORDER_MIDDLE
+);

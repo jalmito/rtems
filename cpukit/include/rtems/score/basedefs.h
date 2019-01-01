@@ -10,7 +10,7 @@
  *  COPYRIGHT (c) 1989-2007.
  *  On-Line Applications Research Corporation (OAR).
  *
- *  Copyright (c) 2010, 2017 embedded brains GmbH.
+ *  Copyright (c) 2010, 2018 embedded brains GmbH.
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
@@ -67,7 +67,7 @@
 
 /**
  *  The following macro is a compiler specific way to ensure that memory
- *  writes are not reordered around certian points.  This specifically can
+ *  writes are not reordered around certain points.  This specifically can
  *  impact interrupt disable and thread dispatching critical sections.
  */
 #ifdef __GNUC__
@@ -238,6 +238,56 @@
 #endif
 
 /**
+ * @brief Tells the compiler that this function is a memory allocation function
+ * similar to malloc().
+ */
+#if defined(__GNUC__)
+  #define RTEMS_MALLOCLIKE __attribute__((__malloc__))
+#else
+  #define RTEMS_MALLOCLIKE
+#endif
+
+/**
+ * @brief Tells the compiler the memory allocation size parameter of this
+ * function similar to malloc().
+ */
+#if defined(__GNUC__)
+  #define RTEMS_ALLOC_SIZE( _index ) __attribute__((__alloc_size__(_index)))
+#else
+  #define RTEMS_ALLOC_SIZE( _index )
+#endif
+
+/**
+ * @brief Tells the compiler the memory allocation item count and item size
+ * parameter of this function similar to calloc().
+ */
+#if defined(__GNUC__)
+  #define RTEMS_ALLOC_SIZE_2( _count_index, _size_index ) \
+     __attribute__((__alloc_size__(_count_index, _size_index)))
+#else
+  #define RTEMS_ALLOC_SIZE_2( _count_index, _size_index )
+#endif
+
+/**
+ * @brief Tells the compiler the memory allocation alignment parameter of this
+ * function similar to aligned_alloc().
+ */
+#if defined(__GNUC__)
+  #define RTEMS_ALLOC_ALIGN( _index ) __attribute__((__alloc_align__(_index)))
+#else
+  #define RTEMS_ALLOC_ALIGN( _index )
+#endif
+
+/**
+ * @brief Tells the compiler that the result of this function should be used.
+ */
+#if defined(__GNUC__)
+  #define RTEMS_WARN_UNUSED_RESULT __attribute__((__warn_unused_result__))
+#else
+  #define RTEMS_WARN_UNUSED_RESULT
+#endif
+
+/**
  * @brief Obfuscates the variable so that the compiler cannot perform
  * optimizations based on the variable value.
  *
@@ -249,6 +299,66 @@
   #define RTEMS_OBFUSCATE_VARIABLE( _var ) (void) (_var)
 #endif
 
+/**
+ * @brief Declares a global symbol with the specified name.
+ *
+ * This macro must be placed at file scope.
+ *
+ * The name must be a valid designator.
+ */
+#define RTEMS_DECLARE_GLOBAL_SYMBOL( _name ) \
+  extern char _name[]
+
+/**
+ * @brief Defines a global symbol with the specified name and value.
+ *
+ * This macro must be placed at file scope.
+ *
+ * The name must be a valid designator.
+ *
+ * On the value parameters macro expansion is performed and afterwards it is
+ * stringified.  It must expand to an integer literal understood by the
+ * assembler.
+ */
+#if defined(__GNUC__)
+  #define RTEMS_DEFINE_GLOBAL_SYMBOL( _name, _value ) \
+    __asm__( \
+      "\t.globl " RTEMS_XSTRING( __USER_LABEL_PREFIX__ ) #_name \
+      "\n\t.set " RTEMS_XSTRING( __USER_LABEL_PREFIX__ ) #_name \
+      ", " RTEMS_STRING( _value ) "\n" \
+    )
+#else
+  #define RTEMS_DEFINE_GLOBAL_SYMBOL( _name, _value )
+#endif
+
+/**
+ * @brief Returns the value of the specified integral expression and tells the
+ * compiler that the predicted value is true (1).
+ *
+ * @param[in] _exp The expression.
+ *
+ * @return The value of the expression.
+ */
+#if defined(__GNUC__)
+  #define RTEMS_PREDICT_TRUE( _exp ) __builtin_expect( ( _exp ), 1 )
+#else
+  #define RTEMS_PREDICT_TRUE( _exp ) ( _exp )
+#endif
+
+/**
+ * @brief Returns the value of the specified integral expression and tells the
+ * compiler that the predicted value is false (0).
+ *
+ * @param[in] _exp The expression.
+ *
+ * @return The value of the expression.
+ */
+#if defined(__GNUC__)
+  #define RTEMS_PREDICT_FALSE( _exp ) __builtin_expect( ( _exp ), 0 )
+#else
+  #define RTEMS_PREDICT_FALSE( _exp ) ( _exp )
+#endif
+
 #if __cplusplus >= 201103L
   #define RTEMS_STATIC_ASSERT(cond, msg) \
     static_assert(cond, # msg)
@@ -257,7 +367,8 @@
     _Static_assert(cond, # msg)
 #else
   #define RTEMS_STATIC_ASSERT(cond, msg) \
-    typedef int rtems_static_assert_ ## msg [(cond) ? 1 : -1]
+    struct rtems_static_assert_ ## msg \
+      { int rtems_static_assert_ ## msg : (cond) ? 1 : -1; }
 #endif
 
 #define RTEMS_ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
@@ -286,7 +397,7 @@
 
 /* The reference type idea based on libHX by Jan Engelhardt */
 #define RTEMS_TYPEOF_REFX(_ptr_level, _ptr_type) \
-  typeof(_ptr_level(union { int z; typeof(_ptr_type) x; }){0}.x)
+  __typeof__(_ptr_level(union { int z; __typeof__(_ptr_type) x; }){0}.x)
 
 #if defined(__GNUC__) && !defined(ASM)
 #if  ((__GNUC__ * 1000 + __GNUC_MINOR__) >= 4004)
@@ -369,8 +480,8 @@ extern void RTEMS_DEQUALIFY_types_not_compatible(void);
 #ifdef __GNUC__
   #define RTEMS_HAVE_MEMBER_SAME_TYPE( _t_lhs, _m_lhs, _t_rhs, _m_rhs ) \
     __builtin_types_compatible_p( \
-      __typeof( ( (_t_lhs *) 0 )->_m_lhs ), \
-      __typeof( ( (_t_rhs *) 0 )->_m_rhs ) \
+      __typeof__( ( (_t_lhs *) 0 )->_m_lhs ), \
+      __typeof__( ( (_t_rhs *) 0 )->_m_rhs ) \
     )
 #else
   #define RTEMS_HAVE_MEMBER_SAME_TYPE( _t_lhs, _m_lhs, _t_rhs, _m_rhs ) \
@@ -399,15 +510,15 @@ extern void RTEMS_DEQUALIFY_types_not_compatible(void);
 
 #ifndef ASM
   #ifdef RTEMS_DEPRECATED_TYPES
-    typedef bool boolean;
-    typedef float single_precision;
-    typedef double double_precision;
+    typedef bool boolean RTEMS_DEPRECATED;
+    typedef float single_precision RTEMS_DEPRECATED;
+    typedef double double_precision RTEMS_DEPRECATED;
   #endif
 
   /**
    * XXX: Eventually proc_ptr needs to disappear!!!
    */
-  typedef void * proc_ptr;
+  typedef void * proc_ptr RTEMS_DEPRECATED;
 #endif
 
 /**@}*/

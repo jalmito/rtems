@@ -117,4 +117,78 @@
 #define EXTERN(sym)    .extern SYM (sym)
 #define TYPE_FUNC(sym) .type SYM (sym), %function
 
+#if __riscv_xlen == 32
+
+#define LREG lw
+
+#define SREG sw
+
+#elif __riscv_xlen == 64
+
+#define LREG ld
+
+#define SREG sd
+
+#endif /* __riscv_xlen */
+
+#ifdef __riscv_cmodel_medany
+
+#define LADDR lla
+
+#else /* !__riscv_cmodel_medany */
+
+#define LADDR la
+
+#endif /* __riscv_cmodel_medany */
+
+#if __riscv_flen == 32
+
+#define FLREG flw
+
+#define FSREG fsw
+
+#define FMVYX fmv.s.x
+
+#define FMVXY fmv.x.s
+
+#elif __riscv_flen == 64
+
+#define FLREG fld
+
+#define FSREG fsd
+
+#if __riscv_xlen == 32
+
+#define FMVYX fmv.s.x
+
+#define FMVXY fmv.x.s
+
+#elif __riscv_xlen == 64
+
+#define FMVYX fmv.d.x
+
+#define FMVXY fmv.x.d
+
+#endif /* __riscv_xlen */
+
+#endif /* __riscv_flen */
+
+.macro GET_SELF_CPU_CONTROL REG
+#ifdef RTEMS_SMP
+	csrr	\REG, mscratch
+#else
+	LADDR	\REG, _Per_CPU_Information
+#endif
+.endm
+
+.macro CLEAR_RESERVATIONS REG
+#ifdef __riscv_atomic
+	/*
+	 * Clear reservations, see also RISC-V User-Level ISA V2.3, comment in
+	 * section 8.2 "Load-Reserved/Store-Conditional Instructions".
+	 */
+	sc.w	zero, zero, (\REG)
+#endif
+.endm
+
 #endif

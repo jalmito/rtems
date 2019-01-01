@@ -14,11 +14,9 @@
 
 #include <bsp.h>
 #include <bsp/bootcard.h>
-#include <bsp/arm-a9mpcore-clock.h>
 #include <bsp/irq-generic.h>
 
 void bsp_start(void)
 {
-  a9mpcore_clock_initialize_early();
   bsp_interrupt_initialize();
 }

@@ -69,15 +69,15 @@ bool       bsp_serial_xon_xoff;
 bool       bsp_serial_cts_rts;
 uint32_t   bsp_serial_rate;
 
-extern char IntrStack_start [];
-extern char intrStack [];
-
+/* leave in case needed in future */
+#if 0
 static void _BSP_GPLED0_on(void)
 {
   BCSR *csr;
   csr = (BCSR *)(m8260.memc[1].br & 0xFFFF8000);
   csr->bcsr0 &=  ~GP0_LED;		/* Turn on GP0 LED */
 }
+#endif
 
 static void _BSP_GPLED0_off(void)
 {
@@ -86,12 +86,15 @@ static void _BSP_GPLED0_off(void)
   csr->bcsr0 |=  GP0_LED;		/* Turn off GP0 LED */
 }
 
+/* leave in case needed in future */
+#if 0
 static void _BSP_GPLED1_on(void)
 {
   BCSR *csr;
   csr = (BCSR *)(m8260.memc[1].br & 0xFFFF8000);
   csr->bcsr0 &=  ~GP1_LED;		/* Turn on GP1 LED */
 }
+#endif
 
 static void _BSP_GPLED1_off(void)
 {
@@ -112,6 +115,11 @@ static void _BSP_Uart2_enable(void)
   BCSR *csr;
   csr = (BCSR *)(m8260.memc[1].br & 0xFFFF8000);
   csr->bcsr1 &= ~UART2_E;		/* Enable Uart2 */
+}
+
+uint32_t _CPU_Counter_frequency(void)
+{
+  return bsp_clock_speed;
 }
 
 void bsp_start(void)
@@ -136,14 +144,7 @@ void bsp_start(void)
   mmu_init();
 */
 
-  /* Initialize exception handler */
-  /* FIXME: Interrupt stack begin and size */
-  ppc_exc_initialize(
-    (uintptr_t) IntrStack_start,
-    (uintptr_t) intrStack - (uintptr_t) IntrStack_start
-  );
-
-  /* Initalize interrupt support */
+  ppc_exc_initialize();
   bsp_interrupt_initialize();
 
 /*
@@ -171,7 +172,6 @@ void bsp_start(void)
   bsp_serial_cts_rts 	     = 0;
   bsp_serial_rate 	     = 9600;
   bsp_clock_speed 	   = 40000000;
-  rtems_counter_initialize_converter(bsp_clock_speed);
 
 #ifdef REV_0_2
   /* set up some board specific registers */

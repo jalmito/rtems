@@ -42,8 +42,6 @@ uint32_t bsp_clicks_per_usec;
  * Memory on this board.
  */
 extern char RamSize[];
-extern char bsp_interrupt_stack_start[];
-extern char bsp_interrupt_stack_end[];
 uint32_t BSP_mem_size = (uint32_t)RamSize;
 
 /* Default decrementer exception handler */
@@ -52,6 +50,11 @@ static int default_decrementer_exception_handler( BSP_Exception_frame *frame, un
   ppc_set_decrementer_register(UINT32_MAX);
 
   return 0;
+}
+
+uint32_t _CPU_Counter_frequency(void)
+{
+  return bsp_time_base_frequency;
 }
 
 /*
@@ -63,8 +66,6 @@ static int default_decrementer_exception_handler( BSP_Exception_frame *frame, un
 void bsp_start( void )
 {
   rtems_status_code sc = RTEMS_SUCCESSFUL;
-  uintptr_t intrStackStart;
-  uintptr_t intrStackSize;
 
   /*
    * Note we can not get CPU identification dynamically, so
@@ -80,20 +81,10 @@ void bsp_start( void )
   BSP_bus_frequency        = 20;
   bsp_time_base_frequency  = 20000000;
   bsp_clicks_per_usec      = BSP_bus_frequency;
-  rtems_counter_initialize_converter(bsp_time_base_frequency);
-
-  /*
-   * Initialize the interrupt related settings.
-   */
-  intrStackStart = (uintptr_t) bsp_interrupt_stack_start;
-  intrStackSize =  (uintptr_t) bsp_interrupt_stack_end - intrStackStart;
 
   BSP_mem_size = (uint32_t )RamSize;
 
-  /*
-   * Initialize default raw exception handlers.
-   */
-  ppc_exc_initialize(intrStackStart, intrStackSize);
+  ppc_exc_initialize();
 
   /* Install default handler for the decrementer exception */
   sc = ppc_exc_set_handler( ASM_DEC_VECTOR, default_decrementer_exception_handler);

@@ -29,6 +29,7 @@
 #include <rtems/dosfs.h>
 #include <rtems/ramdisk.h>
 #include <rtems/libcsupport.h>
+#include <rtems/userenv.h>
 #include "image.h"
 #include "image_bin_le_singlebyte.h"
 #include "image_bin_le_multibyte.h"
@@ -62,18 +63,6 @@ static const char UTF8_BOM[] = {0xEF, 0xBB, 0xBF};
 #define UTF8_BOM_SIZE 3 /* Size of the UTF-8 byte-order-mark */
 
 #define BLOCK_SIZE 512
-
-#define BLOCK_COUNT ( sizeof( image_bin ) / BLOCK_SIZE )
-
-static ramdisk                            disk_image = {
-  .block_size             = BLOCK_SIZE,
-  .block_num              = BLOCK_COUNT,
-  .area                   = &image_bin[0],
-  .initialized            = true,
-  .malloced               = false,
-  .trace                  = false,
-  .free_at_delete_request = false
-};
 
 static rtems_resource_snapshot            before_mount;
 
@@ -981,11 +970,8 @@ static void compare_image(
 static void test_compatibility( void )
 {
   int                       rc;
-  rtems_status_code         sc;
-  dev_t                     dev;
-  char                      diskpath[] = "/dev/ramdisk1";
+  char                      diskpath[] = "/dev/rdd";
   rtems_dosfs_mount_options mount_opts;
-  rtems_device_major_number major;
   FILE                     *fp;
   int                       buffer;
   unsigned int              index_file = 0;
@@ -1001,20 +987,6 @@ static void test_compatibility( void )
 
   mount_opts.converter = rtems_dosfs_create_utf8_converter( "CP850" );
   rtems_test_assert( mount_opts.converter != NULL );
-
-  sc = rtems_io_register_driver( 0, &ramdisk_ops, &major );
-  rtems_test_assert( sc == RTEMS_SUCCESSFUL );
-
-  dev = rtems_filesystem_make_dev_t( major, 1 );
-
-  sc  = rtems_disk_create_phys(
-    dev,
-    BLOCK_SIZE,
-    BLOCK_COUNT,
-    ramdisk_ioctl,
-    &disk_image,
-    diskpath );
-  rtems_test_assert( sc == RTEMS_SUCCESSFUL );
 
   rc = mount_and_make_target_path(
     diskpath,
@@ -1172,6 +1144,44 @@ static void test_file_with_same_name_as_volume_label( void )
   rtems_test_assert( rc == 0 );
 }
 
+static void test_getcwd( void )
+{
+  const char *dir_path = MOUNT_DIR "/somedir";
+  char cwd_buf[128];
+  char *cwd;
+  int rc;
+  rtems_status_code sc;
+
+  sc = rtems_libio_set_private_env();
+  rtems_test_assert( sc == RTEMS_SUCCESSFUL );
+
+  cwd = getcwd( cwd_buf, sizeof( cwd_buf ) );
+  rtems_test_assert( cwd != NULL );
+  rtems_test_assert( strcmp( cwd, "/" ) == 0 );
+
+  rc = mkdir( dir_path, S_IRWXU | S_IRWXG | S_IRWXO );
+  rtems_test_assert( rc == 0 );
+
+  rc = chdir( dir_path );
+  rtems_test_assert( rc == 0 );
+
+  cwd = getcwd( cwd_buf, sizeof( cwd_buf ) );
+  rtems_test_assert( cwd != NULL );
+  rtems_test_assert( strcmp( cwd, dir_path ) == 0 );
+
+  rc = chdir( "/" );
+  rtems_test_assert( rc == 0 );
+
+  rc = unlink( dir_path );
+  rtems_test_assert( rc == 0 );
+
+  cwd = getcwd( cwd_buf, sizeof( cwd_buf ) );
+  rtems_test_assert( cwd != NULL );
+  rtems_test_assert( strcmp( cwd, "/" ) == 0 );
+
+  rtems_libio_use_global_env();
+}
+
 static void test_special_cases( void )
 {
   test_end_of_string_matches();
@@ -1179,6 +1189,7 @@ static void test_special_cases( void )
   test_full_8_3_name();
   test_file_with_same_name_as_volume_label();
   test_dir_with_same_name_as_volume_label();
+  test_getcwd();
 }
 
 /*
@@ -1416,7 +1427,8 @@ static void Init( rtems_task_argument arg )
 rtems_ramdisk_config rtems_ramdisk_configuration [] = {
   { .block_size = BLOCK_SIZE, .block_num = BLOCK_NUM },
   { .block_size = BLOCK_SIZE, .block_num = BLOCK_NUM, .location = &IMAGE_BIN_LE_SINGLEBYTE[0] },
-  { .block_size = BLOCK_SIZE, .block_num = BLOCK_NUM, .location = &IMAGE_BIN_LE_MULTIBYTE[0] }
+  { .block_size = BLOCK_SIZE, .block_num = BLOCK_NUM, .location = &IMAGE_BIN_LE_MULTIBYTE[0] },
+  { .block_size = BLOCK_SIZE, .block_num = sizeof( image_bin ) / BLOCK_SIZE, .location = image_bin }
 };
 
 size_t rtems_ramdisk_configuration_size = RTEMS_ARRAY_SIZE(rtems_ramdisk_configuration);
@@ -1424,8 +1436,8 @@ size_t rtems_ramdisk_configuration_size = RTEMS_ARRAY_SIZE(rtems_ramdisk_configu
 #define CONFIGURE_INIT_TASK_STACK_SIZE ( 1024 * 64 )
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
-#define CONFIGURE_MAXIMUM_DRIVERS 4
 #define CONFIGURE_MAXIMUM_SEMAPHORES (2 * RTEMS_DOSFS_SEMAPHORES_PER_INSTANCE)
+#define CONFIGURE_MAXIMUM_POSIX_KEY_VALUE_PAIRS 2
 #define CONFIGURE_APPLICATION_EXTRA_DRIVERS RAMDISK_DRIVER_TABLE_ENTRY
 
 #define CONFIGURE_APPLICATION_NEEDS_LIBBLOCK

@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2018 embedded brains GmbH
  *
  * Copyright (c) 2015 University of York.
  * Hesham Almatary <hesham@alumni.york.ac.uk>
@@ -32,36 +33,42 @@
 #include "config.h"
 #endif
 
-#include <string.h>
-
-#include <rtems/score/cpu.h>
-#include <rtems/score/riscv-utility.h>
-#include <rtems/score/interr.h>
+#include <rtems/score/cpuimpl.h>
+#include <rtems/score/address.h>
+#include <rtems/score/tls.h>
 
 void _CPU_Context_Initialize(
   Context_Control *context,
-  void *stack_area_begin,
-  size_t stack_area_size,
-  unsigned long new_level,
-  void (*entry_point)( void ),
-  bool is_fp,
-  void *tls_area
+  void            *stack_area_begin,
+  size_t           stack_area_size,
+  uint32_t         new_level,
+  void          ( *entry_point )( void ),
+  bool             is_fp,
+  void            *tls_area
 )
 {
-  uintptr_t stack = ((uintptr_t) stack_area_begin);
+  void *stack;
 
-  /* Account for red-zone */
-  uintptr_t stack_high = stack + stack_area_size - RISCV_GCC_RED_ZONE_SIZE;
+  stack = _Addresses_Add_offset( stack_area_begin, stack_area_size );
+  stack = _Addresses_Align_down( stack, CPU_STACK_ALIGNMENT );
 
-  memset(context, 0, sizeof(*context));
+  context->ra = (uintptr_t) entry_point;
+  context->sp = (uintptr_t) stack;
+  context->isr_dispatch_disable = 0;
 
-  /* Stack Pointer - sp/x2 */
-  context->x[2] = stack_high;
-  /* Frame Pointer - fp/x8 */
-  context->x[8] = stack_high;
-  /* Return Address - ra/x1 */
-  context->x[1] = (uintptr_t) entry_point;
+#if __riscv_flen > 0
+  /*
+   * According to C11 section 7.6 "Floating-point environment <fenv.h>" the
+   * floating-point environment shall be initialized to the current state of
+   * the creating thread.
+   */
+  context->fcsr = _RISCV_Read_FCSR();
+#endif
 
-  /* Enable interrupts and FP */
-  context->mstatus = MSTATUS_FS | MSTATUS_MIE;
+  if ( tls_area != NULL ) {
+    void *tls_block;
+
+    tls_block = _TLS_TCB_before_TLS_block_initialize( tls_area );
+    context->tp = (uintptr_t) tls_block;
+  }
 }

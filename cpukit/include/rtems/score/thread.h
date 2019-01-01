@@ -26,8 +26,9 @@
 #if defined(RTEMS_MULTIPROCESSING)
 #include <rtems/score/mppkt.h>
 #endif
+#include <rtems/score/freechain.h>
 #include <rtems/score/isrlock.h>
-#include <rtems/score/object.h>
+#include <rtems/score/objectdata.h>
 #include <rtems/score/priority.h>
 #include <rtems/score/schedulernode.h>
 #include <rtems/score/stack.h>
@@ -69,9 +70,7 @@ extern "C" {
  */
 /**@{*/
 
-#if defined(RTEMS_POSIX_API)
-  #define RTEMS_SCORE_THREAD_ENABLE_EXHAUST_TIMESLICE
-#endif
+#define RTEMS_SCORE_THREAD_ENABLE_EXHAUST_TIMESLICE
 
 /*
  * With the addition of the Constant Block Scheduler (CBS),
@@ -79,9 +78,7 @@ extern "C" {
  */
 #define RTEMS_SCORE_THREAD_ENABLE_SCHEDULER_CALLOUT
 
-#if defined(RTEMS_POSIX_API)
-  #define RTEMS_SCORE_THREAD_ENABLE_USER_PROVIDED_STACK_VIA_API
-#endif
+#define RTEMS_SCORE_THREAD_ENABLE_USER_PROVIDED_STACK_VIA_API
 
 #if defined(RTEMS_DEBUG)
 #define RTEMS_SCORE_THREAD_ENABLE_RESOURCE_COUNT
@@ -259,9 +256,14 @@ typedef struct {
   Thread_Scheduler_state state;
 
   /**
-   * @brief The home scheduler control of this thread.
+   * @brief The home scheduler of this thread.
    */
-  const struct _Scheduler_Control *home;
+  const struct _Scheduler_Control *home_scheduler;
+
+  /**
+   * @brief The pinned scheduler of this thread.
+   */
+  const struct _Scheduler_Control *pinned_scheduler;
 
   /**
    * @brief The processor assigned by the current scheduler.
@@ -270,12 +272,12 @@ typedef struct {
 
   /**
    * @brief Scheduler nodes immediately available to the thread by its home
-   * scheduler instance and due to thread queue ownerships.
+   * scheduler and due to thread queue ownerships.
    *
    * This chain is protected by the thread wait lock.
    *
    * This chain is never empty.  The first scheduler node on the chain is the
-   * scheduler node of the home scheduler instance.
+   * scheduler node of the home scheduler.
    */
   Chain_Control Wait_nodes;
 
@@ -285,8 +287,12 @@ typedef struct {
    *
    * This chain is protected by the thread state lock.
    *
-   * This chain is never empty.  The first scheduler node on the chain is the
-   * scheduler node of the home scheduler instance.
+   * This chain is never empty for normal threads (the only exception are idle
+   * threads associated with an online processor which is not used by a
+   * scheduler).  In case a pinned scheduler is set for this thread, then the
+   * first scheduler node of this chain belongs to the pinned scheduler,
+   * otherwise the first scheduler node of this chain belongs to the home
+   * scheduler.
    */
   Chain_Control Scheduler_nodes;
 
@@ -311,6 +317,28 @@ typedef struct {
    * This list is protected by the thread scheduler lock.
    */
   Scheduler_Node *requests;
+
+  /**
+   * @brief The thread pinning to current processor level.
+   *
+   * Must be touched only by the executing thread with thread dispatching
+   * disabled.  If non-zero, then the thread is pinned to its current
+   * processor.  The pin level is incremented and decremented by two.  The
+   * least-significant bit indicates that the thread was pre-empted and must
+   * undo the pinning with respect to the scheduler once the level changes from
+   * three to one.
+   *
+   * The thread pinning may be used to access per-processor data structures in
+   * critical sections with enabled thread dispatching, e.g. a pinned thread is
+   * allowed to block.
+   *
+   * Thread pinning should be used only for short critical sections and not all
+   * the time.  Thread pinning is a very low overhead operation in case the
+   * thread is not preempted during the pinning.
+   *
+   * @see _Thread_Pin() and _Thread_Unpin().
+   */
+  int pin_level;
 
   /**
    * @brief The thread processor affinity set.
@@ -672,7 +700,6 @@ typedef struct {
    */
   uint32_t pending_life_change_requests;
 
-#if defined(RTEMS_POSIX_API)
   /**
    * @brief The thread exit value.
    *
@@ -682,7 +709,6 @@ typedef struct {
    * - NULL.
    */
   void *exit_value;
-#endif
 } Thread_Life_control;
 
 typedef struct  {
@@ -848,17 +874,6 @@ struct _Thread_Control {
   void                                 *extensions[ RTEMS_ZERO_LENGTH_ARRAY ];
 };
 
-#if (CPU_PROVIDES_IDLE_THREAD_BODY == FALSE)
-/**
- *  This routine is the body of the system idle thread.
- *
- *  NOTE: This routine is actually instantiated by confdefs.h when needed.
- */
-void *_Thread_Idle_body(
-  uintptr_t  ignored
-);
-#endif
-
 typedef void (*rtems_per_thread_routine)( Thread_Control * );
 
 /* Use rtems_task_iterate() instead */
@@ -895,7 +910,7 @@ typedef struct {
  *
  * This array is provided via <rtems/confdefs.h>.
  *
- * @see _Thread_Control_add_on_count and _Thread_Control_size.
+ * @see _Thread_Control_add_on_count.
  */
 extern const Thread_Control_add_on _Thread_Control_add_ons[];
 
@@ -909,13 +924,11 @@ extern const Thread_Control_add_on _Thread_Control_add_ons[];
 extern const size_t _Thread_Control_add_on_count;
 
 /**
- * @brief Size of the thread control block of a particular application.
+ * @brief Count of configured threads.
  *
  * This value is provided via <rtems/confdefs.h>.
- *
- * @see _Thread_Control_add_ons.
  */
-extern const size_t _Thread_Control_size;
+extern const size_t _Thread_Initial_thread_count;
 
 /**
  * @brief Maximum size of a thread name in characters (including the
@@ -924,6 +937,115 @@ extern const size_t _Thread_Control_size;
  * This value is provided via <rtems/confdefs.h>.
  */
 extern const size_t _Thread_Maximum_name_size;
+
+/**
+ * @brief The configured thread control block.
+ *
+ * This type is defined in <rtems/confdefs.h> and depends on the application
+ * configuration.
+ */
+typedef struct Thread_Configured_control Thread_Configured_control;
+
+/**
+ * @brief The configured thread queue heads.
+ *
+ * In SMP configurations, this type is defined in <rtems/confdefs.h> and depends
+ * on the application configuration.
+ */
+#if defined(RTEMS_SMP)
+typedef struct Thread_queue_Configured_heads Thread_queue_Configured_heads;
+#else
+typedef Thread_queue_Heads Thread_queue_Configured_heads;
+#endif
+
+/**
+ * @brief Size of the thread queue heads of a particular application.
+ *
+ * In SMP configurations, this value is provided via <rtems/confdefs.h>.
+ */
+#if defined(RTEMS_SMP)
+extern const size_t _Thread_queue_Heads_size;
+#else
+#define _Thread_queue_Heads_size sizeof(Thread_queue_Heads)
+#endif
+
+/**
+ * @brief The thread object information.
+ */
+typedef struct {
+  /**
+   * @brief The object information.
+   */
+  Objects_Information Objects;
+
+  /**
+   * @brief Thread queue heads maintenance.
+   */
+  union {
+    /**
+     * @brief Contains the initial set of thread queue heads.
+     *
+     * This is set by <rtems/confdefs.h> via THREAD_INFORMATION_DEFINE().
+     */
+    Thread_queue_Configured_heads *initial;
+
+    /**
+     * @brief The free thread queue heads.
+     *
+     * This member is initialized by _Thread_Initialize_information().
+     */
+    Freechain_Control Free;
+  } Thread_queue_heads;
+} Thread_Information;
+
+/**
+ * @brief The internal thread  objects information.
+ */
+extern Thread_Information _Thread_Information;
+
+#define THREAD_INFORMATION_DEFINE_ZERO( name, api, cls ) \
+Thread_Information name##_Information = { \
+  { \
+    _Objects_Build_id( api, cls, 1, 0 ), \
+    NULL, \
+    0, \
+    0, \
+    0, \
+    0, \
+    CHAIN_INITIALIZER_EMPTY( name##_Information.Objects.Inactive ), \
+    NULL, \
+    NULL, \
+    NULL \
+    OBJECTS_INFORMATION_MP( name##_Information.Objects, NULL ), \
+  }, { \
+    NULL \
+  } \
+}
+
+#define THREAD_INFORMATION_DEFINE( name, api, cls, max ) \
+static Objects_Control * \
+name##_Local_table[ _Objects_Maximum_per_allocation( max ) ]; \
+static Thread_Configured_control \
+name##_Objects[ _Objects_Maximum_per_allocation( max ) ]; \
+static Thread_queue_Configured_heads \
+name##_Heads[ _Objects_Maximum_per_allocation( max ) ]; \
+Thread_Information name##_Information = { \
+  { \
+    _Objects_Build_id( api, cls, 1, _Objects_Maximum_per_allocation( max ) ), \
+    name##_Local_table, \
+    0, \
+    _Objects_Is_unlimited( max ) ? _Objects_Maximum_per_allocation( max ) : 0, \
+    sizeof( Thread_Configured_control ), \
+    OBJECTS_NO_STRING_NAME, \
+    CHAIN_INITIALIZER_EMPTY( name##_Information.Objects.Inactive ), \
+    NULL, \
+    NULL, \
+    &name##_Objects[ 0 ].Control.Object \
+    OBJECTS_INFORMATION_MP( name##_Information.Objects, NULL ) \
+  }, { \
+    &name##_Heads[ 0 ] \
+  } \
+}
 
 /**@}*/
 

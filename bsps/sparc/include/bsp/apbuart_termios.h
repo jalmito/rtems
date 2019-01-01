@@ -30,28 +30,9 @@ struct apbuart_context {
   char *buf;
 };
 
-const rtems_termios_device_handler apbuart_handler_interrupt;
+extern const rtems_termios_device_handler apbuart_handler_interrupt;
 
-const rtems_termios_device_handler apbuart_handler_polled;
-
-/*
- *  apbuart_outbyte_polled
- *
- *  This routine transmits a character using polling.
- */
-void apbuart_outbyte_polled(
-  struct apbuart_regs *regs,
-  unsigned char ch,
-  int do_cr_on_newline,
-  int wait_sent
-);
-
-/*
- *  apbuart_inbyte_nonblocking
- *
- *  This routine polls for a character.
- */
-int apbuart_inbyte_nonblocking(struct apbuart_regs *regs);
+extern const rtems_termios_device_handler apbuart_handler_polled;
 
 #ifdef __cplusplus
 }

@@ -17,7 +17,7 @@
 #ifndef _RTEMS_RTEMS_DPMEM_INL
 #define _RTEMS_RTEMS_DPMEM_INL
 
-#include <rtems/rtems/dpmem.h>
+#include <rtems/rtems/dpmemdata.h>
 #include <rtems/score/objectimpl.h>
 
 #ifdef __cplusplus
@@ -31,12 +31,6 @@ extern "C" {
  *
  * @{
  */
-
-/**
- *  @brief Define the internal Dual Ported Memory information
- *  The following define the internal Dual Ported Memory information.
- */
-extern Objects_Information _Dual_ported_memory_Information;
 
 /**
  *  @brief Allocates a port control block from the inactive chain

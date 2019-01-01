@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2016 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2014, 2018 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
  *  Dornierstr. 4
@@ -61,6 +61,10 @@ typedef enum {
   DELETE_7,
   DELETE_8,
   DELETE_9,
+  EXIT_0,
+  EXIT_1,
+  EXIT_2,
+  EXIT_3,
   INVALID
 } test_state;
 
@@ -153,9 +157,6 @@ static void restart_extension(
       rtems_test_assert(ctx->worker_task_id == rtems_task_self());
       ctx->current = RESTART_2;
       break;
-    case INIT:
-      /* Restart via _Thread_Global_construction() */
-      break;
     default:
       rtems_test_assert(0);
       break;
@@ -185,6 +186,10 @@ static void delete_extension(
       assert_priority(PRIO_VERY_LOW);
       ctx->current = DELETE_9;
       break;
+    case EXIT_2:
+      assert_priority(PRIO_VERY_LOW);
+      ctx->current = EXIT_3;
+      break;
     default:
       rtems_test_assert(0);
       break;
@@ -194,7 +199,6 @@ static void delete_extension(
 static void terminate_extension(Thread_Control *executing)
 {
   test_context *ctx = &test_instance;
-  rtems_status_code sc;
 
   rtems_test_assert(ctx->worker_task_id == rtems_task_self());
 
@@ -202,8 +206,8 @@ static void terminate_extension(Thread_Control *executing)
     case DELETE_0:
       assert_priority(PRIO_INIT);
       ctx->current = DELETE_1;
-      sc = rtems_task_delete(RTEMS_SELF);
-      rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+      rtems_task_delete(RTEMS_SELF);
+      rtems_test_assert(0);
       break;
     case DELETE_1:
       assert_priority(PRIO_INIT);
@@ -216,7 +220,10 @@ static void terminate_extension(Thread_Control *executing)
     case DELETE_7:
       assert_priority(PRIO_LOW);
       ctx->current = DELETE_8;
-      wake_up_main(ctx);
+      break;
+    case EXIT_1:
+      assert_priority(PRIO_LOW);
+      ctx->current = EXIT_2;
       break;
     default:
       rtems_test_assert(0);
@@ -293,6 +300,11 @@ static void worker_task(rtems_task_argument arg)
       case DELETE_SELF:
         ctx->current = DELETE_7;
         rtems_task_delete(RTEMS_SELF);
+        rtems_test_assert(0);
+        break;
+      case EXIT_0:
+        ctx->current = EXIT_1;
+        rtems_task_exit();
         rtems_test_assert(0);
         break;
       default:
@@ -402,8 +414,17 @@ static void test(void)
   set_priority(PRIO_VERY_LOW);
 
   rtems_test_assert(rtems_resource_snapshot_check(&snapshot));
+  set_priority(PRIO_INIT);
 
-  rtems_test_assert(ctx->current == DELETE_9);
+  create_and_start_worker(ctx);
+
+  change_state(ctx, DELETE_9, EXIT_0, INVALID);
+  set_priority(PRIO_VERY_LOW);
+
+  rtems_test_assert(rtems_resource_snapshot_check(&snapshot));
+  set_priority(PRIO_INIT);
+
+  rtems_test_assert(ctx->current == EXIT_3);
 }
 
 static void Init(rtems_task_argument arg)

@@ -109,16 +109,12 @@ unsigned lpc176x_cclk( void )
   return cclk;
 }
 
+uint32_t _CPU_Counter_frequency(void)
+{
+  return LPC176X_PCLK;
+}
+
 CPU_Counter_ticks _CPU_Counter_read( void )
 {
   return lpc176x_get_timer1();
 }
-
-inline CPU_Counter_ticks _CPU_Counter_difference(
-  CPU_Counter_ticks second,
-  CPU_Counter_ticks first
-)
-{
-  return second - first;
-}
-

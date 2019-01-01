@@ -33,9 +33,6 @@ static struct timecounter or1ksim_tc;
 /* CPU counter */
 static CPU_Counter_ticks cpu_counter_ticks;
 
-/* This prototype is added here to Avoid warnings */
-void Clock_isr(void *arg);
-
 static void generic_or1k_clock_at_tick(void)
 {
   uint32_t TTMR;
@@ -56,7 +53,7 @@ static void generic_or1k_clock_at_tick(void)
   cpu_counter_ticks += TTMR_NUM_OF_CLOCK_TICKS_INTERRUPT;
 }
 
-static void generic_or1k_clock_handler_install(proc_ptr new_isr)
+static void generic_or1k_clock_handler_install(CPU_ISR_handler new_isr)
 {
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   _CPU_ISR_install_vector(OR1K_EXCEPTION_TICK_TIMER,
@@ -112,36 +109,11 @@ static void generic_or1k_clock_initialize(void)
   rtems_timecounter_install(&or1ksim_tc);
 }
 
-static void generic_or1k_clock_cleanup(void)
-{
- uint32_t sr;
-
-  sr = _OR1K_mfspr(CPU_OR1K_SPR_SR);
-
-  /* Disable tick timer exceptions */
-  _OR1K_mtspr(CPU_OR1K_SPR_SR, (sr & ~CPU_OR1K_SPR_SR_IEE)
-  & ~CPU_OR1K_SPR_SR_TEE);
-
-  /* Invalidate tick timer config registers */
-  _OR1K_mtspr(CPU_OR1K_SPR_TTCR, 0);
-  _OR1K_mtspr(CPU_OR1K_SPR_TTMR, 0);
-}
-
-CPU_Counter_ticks _CPU_Counter_difference(
-  CPU_Counter_ticks second,
-  CPU_Counter_ticks first
-)
-{
-  return second - first;
-}
-
 #define Clock_driver_support_at_tick() generic_or1k_clock_at_tick()
 
 #define Clock_driver_support_initialize_hardware() generic_or1k_clock_initialize()
 
 #define Clock_driver_support_install_isr(isr) \
   generic_or1k_clock_handler_install(isr)
-
-#define Clock_driver_support_shutdown_hardware() generic_or1k_clock_cleanup()
 
 #include "../../../shared/dev/clock/clockimpl.h"

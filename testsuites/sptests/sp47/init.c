@@ -10,8 +10,7 @@
 
 const char rtems_test_name[] = "SP 47";
 
-#define PRIXModes_Control 	PRIX32
-#define PRIXrtems_mode		PRIXModes_Control
+#define PRIXrtems_mode 	PRIX32
 
 rtems_task test_asr(rtems_task_argument unused);
 rtems_task Init(rtems_task_argument ignored);
@@ -57,7 +56,7 @@ rtems_task Init(rtems_task_argument ignored)
 
   rtems_task_start(ti, test_asr, 0);
 
-  rtems_task_delete(RTEMS_SELF);
+  rtems_task_exit();
 }
 
 /* configuration stuff */

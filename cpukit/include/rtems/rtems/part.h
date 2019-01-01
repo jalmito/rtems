@@ -1,23 +1,9 @@
 /**
- * @file rtems/rtems/part.h
+ * @file
  *
- * @defgroup ClassicPart Partitions
+ * @ingroup ClassicPart
  *
- * @ingroup ClassicRTEMS
- * @brief Partition Manager
- *
- * This include file contains all the constants and structures associated
- * with the Partition Manager. This manager provides facilities to
- * dynamically allocate memory in fixed-sized units which are returned
- * as buffers.
- *
- * Directives provided are:
- *
- * - create a partition
- * - get an ID of a partition
- * - delete a partition
- * - get a buffer from a partition
- * - return a buffer to a partition
+ * @brief Classic Partition Manager API
  */
 
 /* COPYRIGHT (c) 1989-2008.
@@ -34,7 +20,6 @@
 #include <rtems/rtems/attr.h>
 #include <rtems/rtems/status.h>
 #include <rtems/rtems/types.h>
-#include <rtems/score/isrlock.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,28 +34,6 @@ extern "C" {
  *  Classic API Partition Manager.
  */
 /**@{*/
-
-/**
- *  The following defines the control block used to manage each partition.
- */
-typedef struct {
-  /** This field is the object management portion of a Partition instance. */
-  Objects_Control     Object;
-  /** This field is the lock of the Partition. */
-  ISR_LOCK_MEMBER(    Lock )
-  /** This field is the physical starting address of the Partition. */
-  void               *starting_address;
-  /** This field is the size of the Partition in bytes. */
-  intptr_t            length;
-  /** This field is the size of each buffer in bytes */
-  uint32_t            buffer_size;
-  /** This field is the attribute set provided at create time. */
-  rtems_attribute     attribute_set;
-  /** This field is the of allocated buffers. */
-  uint32_t            number_of_used_blocks;
-  /** This field is the chain used to manage unallocated buffers. */
-  Chain_Control       Memory;
-}   Partition_Control;
 
 /**
  *  @brief RTEMS Partition Create
@@ -88,8 +51,8 @@ typedef struct {
 rtems_status_code rtems_partition_create(
   rtems_name       name,
   void            *starting_address,
-  uint32_t         length,
-  uint32_t         buffer_size,
+  uintptr_t        length,
+  size_t           buffer_size,
   rtems_attribute  attribute_set,
   rtems_id        *id
 );

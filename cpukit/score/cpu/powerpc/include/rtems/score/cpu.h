@@ -53,29 +53,6 @@ extern "C" {
 /* conditional compilation parameters */
 
 /*
- *  Does this port provide a CPU dependent IDLE task implementation?
- *
- *  If TRUE, then the routine _CPU_Thread_Idle_body
- *  must be provided and is the default IDLE thread body instead of
- *  _CPU_Thread_Idle_body.
- *
- *  If FALSE, then use the generic IDLE thread body if the BSP does
- *  not provide one.
- *
- *  This is intended to allow for supporting processors which have
- *  a low power or idle mode.  When the IDLE thread is executed, then
- *  the CPU can be powered down.
- *
- *  The order of precedence for selecting the IDLE thread body is:
- *
- *    1.  BSP provided
- *    2.  CPU dependent (if provided)
- *    3.  generic (if no BSP and no CPU dependent)
- */
-
-#define CPU_PROVIDES_IDLE_THREAD_BODY    FALSE
-
-/*
  *  Does the stack grow up (toward higher addresses) or down
  *  (toward lower addresses)?
  *
@@ -473,60 +450,6 @@ typedef struct {
 #define CPU_SIMPLE_VECTORED_INTERRUPTS FALSE
 
 /*
- *  Does RTEMS manage a dedicated interrupt stack in software?
- *
- *  If TRUE, then a stack is allocated in _ISR_Handler_initialization.
- *  If FALSE, nothing is done.
- *
- *  If the CPU supports a dedicated interrupt stack in hardware,
- *  then it is generally the responsibility of the BSP to allocate it
- *  and set it up.
- *
- *  If the CPU does not support a dedicated interrupt stack, then
- *  the porter has two options: (1) execute interrupts on the
- *  stack of the interrupted task, and (2) have RTEMS manage a dedicated
- *  interrupt stack.
- *
- *  If this is TRUE, CPU_ALLOCATE_INTERRUPT_STACK should also be TRUE.
- *
- *  Only one of CPU_HAS_SOFTWARE_INTERRUPT_STACK and
- *  CPU_HAS_HARDWARE_INTERRUPT_STACK should be set to TRUE.  It is
- *  possible that both are FALSE for a particular CPU.  Although it
- *  is unclear what that would imply about the interrupt processing
- *  procedure on that CPU.
- */
-
-#define CPU_HAS_SOFTWARE_INTERRUPT_STACK TRUE
-
-/*
- *  Does this CPU have hardware support for a dedicated interrupt stack?
- *
- *  If TRUE, then it must be installed during initialization.
- *  If FALSE, then no installation is performed.
- *
- *  If this is TRUE, CPU_ALLOCATE_INTERRUPT_STACK should also be TRUE.
- *
- *  Only one of CPU_HAS_SOFTWARE_INTERRUPT_STACK and
- *  CPU_HAS_HARDWARE_INTERRUPT_STACK should be set to TRUE.  It is
- *  possible that both are FALSE for a particular CPU.  Although it
- *  is unclear what that would imply about the interrupt processing
- *  procedure on that CPU.
- */
-
-#define CPU_HAS_HARDWARE_INTERRUPT_STACK FALSE
-
-/*
- *  Does RTEMS allocate a dedicated interrupt stack in the Interrupt Manager?
- *
- *  If TRUE, then the memory is allocated during initialization.
- *  If FALSE, then the memory is allocated during initialization.
- *
- *  This should be TRUE is CPU_HAS_SOFTWARE_INTERRUPT_STACK is TRUE.
- */
-
-#define CPU_ALLOCATE_INTERRUPT_STACK TRUE
-
-/*
  *  Does the RTEMS invoke the user's ISR with the vector number and
  *  a pointer to the saved interrupt frame (1) or just the vector
  *  number (0)?
@@ -596,7 +519,6 @@ typedef struct {
  *  bits out of a thread mode.
  */
 
-#define CPU_MODES_INTERRUPT_LEVEL  0x00000001 /* interrupt level in mode */
 #define CPU_MODES_INTERRUPT_MASK   0x00000001 /* interrupt level in mode */
 
 /*
@@ -738,20 +660,6 @@ void ppc_set_interrupt_level( uint32_t level );
 #define CPU_HEAP_ALIGNMENT         (PPC_ALIGNMENT)
 
 /*
- *  This number corresponds to the byte alignment requirement for memory
- *  buffers allocated by the partition manager.  This alignment requirement
- *  may be stricter than that for the data types alignment specified by
- *  CPU_ALIGNMENT.  It is common for the partition to follow the same
- *  alignment requirement as CPU_ALIGNMENT.  If the CPU_ALIGNMENT is strict
- *  enough for the partition, then this should be set to CPU_ALIGNMENT.
- *
- *  NOTE:  This does not have to be a power of 2.  It does have to
- *         be greater or equal to than CPU_ALIGNMENT.
- */
-
-#define CPU_PARTITION_ALIGNMENT    (PPC_ALIGNMENT)
-
-/*
  *  This number corresponds to the byte alignment requirement for the
  *  stack.  This alignment requirement may be stricter than that for the
  *  data types alignment specified by CPU_ALIGNMENT.  If the CPU_ALIGNMENT
@@ -761,6 +669,8 @@ void ppc_set_interrupt_level( uint32_t level );
  */
 
 #define CPU_STACK_ALIGNMENT        (PPC_STACK_ALIGNMENT)
+
+#define CPU_INTERRUPT_STACK_ALIGNMENT CPU_CACHE_LINE_BYTES
 
 #ifndef ASM
 /*  The following routine swaps the endian format of an unsigned int.
@@ -803,6 +713,8 @@ static inline uint32_t CPU_swap_u32(
 
 typedef uint32_t CPU_Counter_ticks;
 
+uint32_t _CPU_Counter_frequency( void );
+
 static inline CPU_Counter_ticks _CPU_Counter_read( void )
 {
   CPU_Counter_ticks value;
@@ -810,6 +722,8 @@ static inline CPU_Counter_ticks _CPU_Counter_read( void )
 #if defined(__PPC_CPU_E6500__)
   /* Use Alternate Time Base */
   __asm__ volatile( "mfspr %0, 526" : "=r" (value) );
+#elif defined(mpc860)
+  __asm__ volatile( "mftb %0" : "=r" (value) );
 #else
   __asm__ volatile( "mfspr %0, 268" : "=r" (value) );
 #endif
@@ -991,17 +905,7 @@ void _CPU_Context_Initialize(
 
 void _CPU_Initialize(void);
 
-/*
- *  _CPU_ISR_install_vector
- *
- *  This routine installs an interrupt vector.
- */
-
-void _CPU_ISR_install_vector(
-  uint32_t    vector,
-  proc_ptr    new_handler,
-  proc_ptr   *old_handler
-);
+void *_CPU_Thread_Idle_body( uintptr_t ignored );
 
 /*
  *  _CPU_Context_switch
@@ -1046,10 +950,6 @@ void _CPU_Context_save_fp(
 void _CPU_Context_restore_fp(
   Context_Control_fp **fp_context_ptr
 );
-
-void _CPU_Context_volatile_clobber( uintptr_t pattern );
-
-void _CPU_Context_validate( uintptr_t pattern );
 
 #ifdef RTEMS_SMP
   uint32_t _CPU_SMP_Initialize( void );

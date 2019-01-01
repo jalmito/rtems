@@ -37,7 +37,7 @@ static inline void  the_real_free(void *p)
 	return free(p);
 }
 
-#define __INSIDE_RTEMS_BSD_TCPIP_STACK__
+#include <machine/rtems-bsd-kernel-space.h>
 #include <rtems/rtems_bsdnet.h>
 #include <rtems/rtems_bsdnet_internal.h>
 #ifdef __i386__
@@ -254,8 +254,6 @@ register u_int32_t rval;
 #ifndef __FBSDID
 #define __FBSDID(arg)
 #endif
-
-#define _KERNEL
 
 #define device_printf(device,format,args...) printk(format,## args)
 

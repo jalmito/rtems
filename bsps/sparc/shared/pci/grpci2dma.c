@@ -18,40 +18,10 @@
 #include <bsp.h>
 #include <bsp/grpci2dma.h>
 
+#include <grlib_impl.h>
+
 /* This driver has been prepared for SMP operation
  */
-/* Use interrupt lock privmitives compatible with SMP defined in
- * RTEMS 4.11.99 and higher.
- */
-#if (((__RTEMS_MAJOR__ << 16) | (__RTEMS_MINOR__ << 8) | __RTEMS_REVISION__) >= 0x040b63)
-
-/* map via rtems_interrupt_lock_* API: */
-#define SPIN_DECLARE(lock) RTEMS_INTERRUPT_LOCK_MEMBER(lock)
-#define SPIN_INIT(lock, name) rtems_interrupt_lock_initialize(lock, name)
-#define SPIN_LOCK(lock, level) rtems_interrupt_lock_acquire_isr(lock, &level)
-#define SPIN_LOCK_IRQ(lock, level) rtems_interrupt_lock_acquire(lock, &level)
-#define SPIN_UNLOCK(lock, level) rtems_interrupt_lock_release_isr(lock, &level)
-#define SPIN_UNLOCK_IRQ(lock, level) rtems_interrupt_lock_release(lock, &level)
-#define SPIN_IRQFLAGS(k) rtems_interrupt_lock_context k
-#define SPIN_ISR_IRQFLAGS(k) SPIN_IRQFLAGS(k)
-
-#else
-
-/* maintain single-core compatibility with older versions of RTEMS: */
-#define SPIN_DECLARE(name)
-#define SPIN_INIT(lock, name)
-#define SPIN_LOCK(lock, level)
-#define SPIN_LOCK_IRQ(lock, level) rtems_interrupt_disable(level)
-#define SPIN_UNLOCK(lock, level)
-#define SPIN_UNLOCK_IRQ(lock, level) rtems_interrupt_enable(level)
-#define SPIN_IRQFLAGS(k) rtems_interrupt_level k
-#define SPIN_ISR_IRQFLAGS(k)
-
-#ifdef RTEMS_SMP
-#error SMP mode not compatible with these interrupt lock primitives
-#endif
-
-#endif
 
 /*#define STATIC*/
 #define STATIC static
@@ -1315,7 +1285,7 @@ STATIC int grpci2dma_data_print(struct grpci2_bd_data * data)
 void * grpci2dma_channel_new(int number)
 {
 	/* Allocate memory */
-	unsigned int * orig_ptr = (unsigned int *) malloc(
+	unsigned int * orig_ptr = (unsigned int *) grlib_malloc(
 			(GRPCI2DMA_BD_CHAN_SIZE)*number + GRPCI2DMA_BD_CHAN_ALIGN);
 	if (orig_ptr == NULL) return NULL;
 
@@ -1347,7 +1317,7 @@ void grpci2dma_channel_delete(void * chan)
 void * grpci2dma_data_new(int number)
 {
 	/* Allocate memory */
-	unsigned int * orig_ptr = (unsigned int *) malloc(
+	unsigned int * orig_ptr = (unsigned int *) grlib_malloc(
 			(GRPCI2DMA_BD_DATA_SIZE)*number + GRPCI2DMA_BD_DATA_ALIGN);
 	if (orig_ptr == NULL) return NULL;
 
@@ -1405,13 +1375,10 @@ int grpci2dma_init(
 		return -1;
 
 	/* Allocate and init Memory for DMA */
-	int size = sizeof(struct grpci2dma_priv);
-	priv = (struct grpci2dma_priv *) malloc(size);
+	priv = grlib_calloc(1, sizeof(*priv));
 	if (priv == NULL)
 		return DRVMGR_NOMEM;
 
-	/* Initialize all fields */
-	memset(priv, 0, size);
 	priv->regs = regs;
 	strncpy(&priv->devname[0], "grpci2dma0", DEVNAME_LEN);
 

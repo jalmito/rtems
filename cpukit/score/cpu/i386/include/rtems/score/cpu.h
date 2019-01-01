@@ -50,14 +50,6 @@ extern "C" {
 #define CPU_SIMPLE_VECTORED_INTERRUPTS FALSE
 
 /*
- *  i386 has an RTEMS allocated and managed interrupt stack.
- */
-
-#define CPU_HAS_SOFTWARE_INTERRUPT_STACK TRUE
-#define CPU_HAS_HARDWARE_INTERRUPT_STACK FALSE
-#define CPU_ALLOCATE_INTERRUPT_STACK     TRUE
-
-/*
  *  Does the RTEMS invoke the user's ISR with the vector number and
  *  a pointer to the saved interrupt frame (1) or just the vector
  *  number (0)?
@@ -103,19 +95,6 @@ extern "C" {
 #define CPU_CACHE_LINE_BYTES 64
 
 #define CPU_STRUCTURE_ALIGNMENT
-
-/*
- *  Does this port provide a CPU dependent IDLE task implementation?
- *
- *  If TRUE, then the routine _CPU_Thread_Idle_body
- *  must be provided and is the default IDLE thread body instead of
- *  _CPU_Thread_Idle_body.
- *
- *  If FALSE, then use the generic IDLE thread body if the BSP does
- *  not provide one.
- */
-
-#define CPU_PROVIDES_IDLE_THREAD_BODY    FALSE
 
 #define CPU_MAXIMUM_PROCESSORS 32
 
@@ -341,7 +320,6 @@ extern Context_Control_fp _CPU_Null_fp_context;
  *  bits out of a thread mode.
  */
 
-#define CPU_MODES_INTERRUPT_LEVEL  0x00000001 /* interrupt level in mode */
 #define CPU_MODES_INTERRUPT_MASK   0x00000001 /* interrupt level in mode */
 
 /*
@@ -371,7 +349,6 @@ extern Context_Control_fp _CPU_Null_fp_context;
 
 #define CPU_ALIGNMENT                    4
 #define CPU_HEAP_ALIGNMENT               CPU_ALIGNMENT
-#define CPU_PARTITION_ALIGNMENT          CPU_ALIGNMENT
 
 /*
  *  On i386 thread stacks require no further alignment after allocation
@@ -383,6 +360,8 @@ extern Context_Control_fp _CPU_Null_fp_context;
  */
 
 #define CPU_STACK_ALIGNMENT             16
+
+#define CPU_INTERRUPT_STACK_ALIGNMENT CPU_CACHE_LINE_BYTES
 
 /* macros */
 
@@ -560,42 +539,15 @@ extern void _CPU_Fatal_halt(uint32_t source, uint32_t error)
 
 void _CPU_Initialize(void);
 
-/*
- *  _CPU_ISR_install_raw_handler
- *
- *  This routine installs a "raw" interrupt handler directly into the
- *  processor's vector table.
- */
-
-void _CPU_ISR_install_raw_handler(
-  uint32_t    vector,
-  proc_ptr    new_handler,
-  proc_ptr   *old_handler
-);
-
-/*
- *  _CPU_ISR_install_vector
- *
- *  This routine installs an interrupt vector.
- */
+typedef void ( *CPU_ISR_handler )( void );
 
 void _CPU_ISR_install_vector(
-  uint32_t    vector,
-  proc_ptr    new_handler,
-  proc_ptr   *old_handler
+  uint32_t         vector,
+  CPU_ISR_handler  new_handler,
+  CPU_ISR_handler *old_handler
 );
 
-/*
- *  _CPU_Thread_Idle_body
- *
- *  Use the halt instruction of low power mode of a particular i386 model.
- */
-
-#if (CPU_PROVIDES_IDLE_THREAD_BODY == TRUE)
-
 void *_CPU_Thread_Idle_body( uintptr_t ignored );
-
-#endif /* CPU_PROVIDES_IDLE_THREAD_BODY */
 
 /*
  *  _CPU_Context_switch
@@ -681,21 +633,11 @@ void _CPU_Context_restore_fp(
   } while (0)
 #endif
 
-static inline void _CPU_Context_volatile_clobber( uintptr_t pattern )
-{
-  /* TODO */
-}
-
-static inline void _CPU_Context_validate( uintptr_t pattern )
-{
-  while (1) {
-    /* TODO */
-  }
-}
-
 void _CPU_Exception_frame_print( const CPU_Exception_frame *frame );
 
 typedef uint32_t CPU_Counter_ticks;
+
+uint32_t _CPU_Counter_frequency( void );
 
 CPU_Counter_ticks _CPU_Counter_read( void );
 
