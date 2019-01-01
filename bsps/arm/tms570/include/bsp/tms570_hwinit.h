@@ -1,6 +1,10 @@
 #ifndef LIBBSP_ARM_TMS570_HWINIT_H
 #define LIBBSP_ARM_TMS570_HWINIT_H
 
+#ifndef TMS570_LC43X
+#define TMS570_LC43X
+#endif
+
 #define TMS570_TCRAM_START_PTR       ( (void *) ( 0x08000000U ) )
 #define TMS570_TCRAM_WINDOW_END_PTR  ( (void *) ( 0x08080000U ) )
 
@@ -10,8 +14,15 @@
 /* Ti TMS570 core setup implemented in assembly */
 void _esmCcmErrorsClear_( void );
 void _coreEnableEventBusExport_( void );
+#ifdef TMS570_LC43X /* Code added to support the LC43X Family*/
 void _errata_CORTEXR4_66_( void );
 void _errata_CORTEXR4_57_( void );
+#else
+void _cacheEnable_( void );
+void _cacheDisable_( void );
+void _dCacheInvalidate_( void );
+void _iCacheInvalidate_( void );
+#endif
 void _coreEnableRamEcc_( void );
 void _coreDisableRamEcc_( void );
 void _mpuInit_( void );

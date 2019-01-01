@@ -170,7 +170,7 @@ tms570_bsp_pinmmr_config(const uint32_t *pinmmr_values, int reg_start, int reg_c
   TMS570_IOMM.KICK_REG0 = tms570_bsp_pinmmr_kick_key0;
   TMS570_IOMM.KICK_REG1 = tms570_bsp_pinmmr_kick_key1;
 
-  pinmmrx = (&TMS570_IOMM.PINMUX.PINMMR0) + reg_start;
+  pinmmrx = (&TMS570_IOMM.PINMUXOut.PINMMR0) + reg_start;
   pval = pinmmr_values;
   cnt = reg_count;
 
@@ -180,7 +180,7 @@ tms570_bsp_pinmmr_config(const uint32_t *pinmmr_values, int reg_start, int reg_c
     pval++;
   } while( --cnt );
 
-  pinmmrx = (&TMS570_IOMM.PINMUX.PINMMR0) + reg_start;
+  pinmmrx = (&TMS570_IOMM.PINMUXOut.PINMMR0) + reg_start;
   pval = pinmmr_values;
   cnt = reg_count;
 

@@ -47,54 +47,16 @@ tms570_sci_context driver_context_table[] = {
     /* TMS570 UART peripheral use subset of LIN registers which are equivalent
      * to SCI ones
      */
-    .regs = (volatile tms570_sci_t *) &TMS570_LIN,
-    .irq = TMS570_IRQ_SCI_LEVEL_0,
+    .regs = (volatile tms570_sci_t *) &TMS570_SCI,
+    .irq = TMS570_IRQ_SCI2_LEVEL_0,
   },
   {
     .base = RTEMS_TERMIOS_DEVICE_CONTEXT_INITIALIZER("TMS570 SCI2"),
     .device_name = "/dev/ttyS1",
-    .regs = &TMS570_SCI,
-    .irq = TMS570_IRQ_SCI2_LEVEL_0,
+    .regs = &TMS570_LIN,
+    .irq = TMS570_IRQ_SCI_LEVEL_0,
   }
 };
-
-void tms570_sci_initialize(tms570_sci_context *ctx)
-{
-  uint32_t rx_pin = 1 << 1;
-  uint32_t tx_pin = 1 << 2;
-
-  /* Resec SCI peripheral */
-  ctx->regs->GCR0 = TMS570_SCI_GCR0_RESET * 0;
-  ctx->regs->GCR0 = TMS570_SCI_GCR0_RESET * 1;
-
-  /* Clear all interrupt sources */
-  ctx->regs->CLEARINT = 0xffffffff;
-
-  /* Map all interrupts to SCI INT0 line */
-  ctx->regs->CLEARINTLVL = 0xffffffff;
-
-  ctx->regs->GCR1 = TMS570_SCI_GCR1_TXENA * 0 |
-                    TMS570_SCI_GCR1_RXENA * 0 |
-                    TMS570_SCI_GCR1_CONT * 0 | /* continue operation when debugged */
-                    TMS570_SCI_GCR1_LOOP_BACK * 0 |
-                    TMS570_SCI_GCR1_POWERDOWN * 0 |
-                    TMS570_SCI_GCR1_SLEEP * 0 |
-                    TMS570_SCI_GCR1_SWnRST * 0 | /* reset state */
-                    TMS570_SCI_GCR1_CLOCK * 1 | /* internal clock */
-                    TMS570_SCI_GCR1_TIMING_MODE * 1 |
-                    TMS570_SCI_GCR1_COMM_MODE * 0;
-
-  /* Setup connection of SCI peripheral Rx and Tx  pins */
-  ctx->regs->PIO0 = rx_pin * 1 | tx_pin * 1; /* Rx and Tx pins are not GPIO */
-  ctx->regs->PIO3 = rx_pin * 0 | tx_pin * 0; /* Default output low  */
-  ctx->regs->PIO1 = rx_pin * 0 | tx_pin * 0; /* Input when not used by SCI */
-  ctx->regs->PIO6 = rx_pin * 0 | tx_pin * 0; /* No open drain */
-  ctx->regs->PIO7 = rx_pin * 0 | tx_pin * 0; /* Pull-up/down enabled */
-  ctx->regs->PIO8 = rx_pin * 1 | tx_pin * 1; /* Select pull-up */
-
-  /* Bring device out of software reset */
-  ctx->regs->GCR1 |= TMS570_SCI_GCR1_SWnRST;
-}
 
 /**
  * @brief Serial drivers init function
@@ -133,8 +95,42 @@ rtems_device_driver console_initialize(
     ++minor
   ) {
     tms570_sci_context *ctx = &driver_context_table[minor];
+    uint32_t rx_pin = 1 << 1;
+    uint32_t tx_pin = 1 << 2;
 
-    tms570_sci_initialize(ctx);
+    /* Resec SCI peripheral */
+    ctx->regs->GCR0 = TMS570_SCI_GCR0_RESET * 0;
+    ctx->regs->GCR0 = TMS570_SCI_GCR0_RESET * 1;
+
+    /* Clear all interrupt sources */
+    ctx->regs->CLEARINT = 0xffffffff;
+
+    /* Map all interrupts to SCI INT0 line */
+    ctx->regs->CLEARINTLVL = 0xffffffff;
+
+    ctx->regs->GCR1 = TMS570_SCI_GCR1_TXENA * 1 |
+                      TMS570_SCI_GCR1_RXENA * 1 |
+                      TMS570_SCI_GCR1_CONT * 0 | /* continue operation when debugged */
+                      TMS570_SCI_GCR1_LOOP_BACK * 0 |
+                      TMS570_SCI_GCR1_POWERDOWN * 0 |
+                      TMS570_SCI_GCR1_SLEEP * 0 |
+                      TMS570_SCI_GCR1_SWnRST * 0 | /* reset state */
+                      TMS570_SCI_GCR1_CLOCK * 1 | /* internal clock */
+                      TMS570_SCI_GCR1_STOP * 1 |
+			TMS570_SCI_GCR1_PARITY_ENA * 0 |
+                      TMS570_SCI_GCR1_TIMING_MODE * 1 |
+                      TMS570_SCI_GCR1_COMM_MODE * 0;
+
+    /* Setup connection of SCI peripheral Rx and Tx  pins */
+    ctx->regs->PIO0 = rx_pin * 1 | tx_pin * 1; /* Rx and Tx pins are not GPIO */
+    ctx->regs->PIO3 = rx_pin * 0 | tx_pin * 0; /* Default output low  */
+    ctx->regs->PIO1 = rx_pin * 0 | tx_pin * 0; /* Input when not used by SCI */
+    ctx->regs->PIO6 = rx_pin * 0 | tx_pin * 0; /* No open drain */
+    ctx->regs->PIO7 = rx_pin * 0 | tx_pin * 0; /* Pull-up/down enabled */
+    ctx->regs->PIO8 = rx_pin * 1 | tx_pin * 1; /* Select pull-up */
+
+    /* Bring device out of software reset */
+    ctx->regs->GCR1 |= TMS570_SCI_GCR1_SWnRST;
 
     /*
      * Install this device in the file system and Termios.  In order
@@ -144,6 +140,8 @@ rtems_device_driver console_initialize(
      */
     sc = rtems_termios_device_install(
         ctx->device_name,
+        major,
+        minor,
         handler,
         NULL,
         &ctx->base
@@ -242,7 +240,7 @@ static int tms570_sci_transmitted_chars(tms570_sci_context * ctx)
  * @param[in] t termios driver
  * @retval true peripheral setting is changed
  */
-bool tms570_sci_set_attributes(
+static bool tms570_sci_set_attributes(
   rtems_termios_device_context *base,
   const struct termios *t
 )
@@ -251,13 +249,7 @@ bool tms570_sci_set_attributes(
   rtems_interrupt_lock_context lock_context;
   int32_t bauddiv;
   int32_t baudrate;
-  uint32_t flr_tx_ready = TMS570_SCI_FLR_TX_EMPTY;
-  /*
-   * Test for TMS570_SCI_FLR_TXRDY is not necessary
-   * because both SCITD and SCITXSHF has to be empty
-   * to TX_EMPTY be asserted. But there is no interrupt
-   * option for TX_EMPTY. Polling is used isntead.
-   */
+  uint32_t flr_tx_ready = TMS570_SCI_FLR_TX_EMPTY | TMS570_SCI_FLR_TX_EMPTY;
 
   /* Baud rate */
   baudrate = rtems_termios_baud_to_number(cfgetospeed(t));
@@ -310,7 +302,7 @@ bool tms570_sci_set_attributes(
 
   /* Apply baudrate to the hardware */
   baudrate *= 2 * 16;
-  bauddiv = (BSP_PLL_OUT_CLOCK + baudrate / 2) / baudrate;
+  bauddiv = ((BSP_PLL_OUT_CLOCK + baudrate ) / 2 / baudrate)-1;
   ctx->regs->BRS = bauddiv;
 
   ctx->regs->GCR1 |= TMS570_SCI_GCR1_SWnRST | TMS570_SCI_GCR1_TXENA |

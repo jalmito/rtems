@@ -46,13 +46,13 @@ BSP_START_TEXT_SECTION void bsp_start_hook_0( void )
    * by its ECC logic for accesses to program flash or data RAM.
    */
   _coreEnableEventBusExport_();
-
+#ifndef TMS570_LC43X
   /* Workaround for Errata CORTEXR4 66 */
   _errata_CORTEXR4_66_();
 
   /* Workaround for Errata CORTEXR4 57 */
   _errata_CORTEXR4_57_();
-
+#endif
   /* check for power-on reset condition */
   /*SAFETYMCUSW 139 S MR:13.7 <APPROVED> "Hardware status bit read check" */
   if ( ( TMS570_SYS1.SYSESR & TMS570_SYS1_SYSESR_PORST ) != 0U ) {
@@ -195,7 +195,6 @@ BSP_START_TEXT_SECTION void bsp_start_hook_0( void )
 
     /* Disable RAM ECC before doing PBIST for Main RAM */
     _coreDisableRamEcc_();
-
     /* Run PBIST on CPU RAM.
      * The PBIST controller needs to be configured separately for single-port and dual-port SRAMs.
      * The CPU RAM is a single-port memory. The actual "RAM Group" for all on-chip SRAMs is defined in the
