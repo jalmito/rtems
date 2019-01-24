@@ -170,6 +170,10 @@ libbsp_a_SOURCES += ../../../libcpu/shared/src/cache_manager.c
 libbsp_a_SOURCES += ../../../libcpu/arm/shared/include/cache_.h
 libbsp_a_CPPFLAGS += -I$(srcdir)/../../../libcpu/arm/shared/include
 
+#ip-stack flags
+
+#libbsp_a_CPPFLAGS = -D__INSIDE_RTEMS_BSD_TCPIP_STACK__
+
 #network_CPPFLAGS = -D__INSIDE_RTEMS_BSD_TCPIP_STACK__
 #noinst_PROGRAMS = network.rel
 #network_rel_SOURCES = network/source/tms570_netif.c
@@ -178,13 +182,13 @@ libbsp_a_CPPFLAGS += -I$(srcdir)/../../../libcpu/arm/shared/include
 ##network_rel_CPPFLAGS += -I network/include 
 #network_rel_LDFLAGS = $(RTEMS_RELLDFLAGS)
 
-network_CPPFLAGS = -D__INSIDE_RTEMS_BSD_TCPIP_STACK__
-noinst_PROGRAMS = network.rel
-network_rel_SOURCES = network/include/emac.h
-network_rel_SOURCES += network/source/network.c network/source/emac.c network/source/mdio.c  network/source/phy_dp83640.c
-network_rel_CPPFLAGS = $(AM_CPPFLAGS) $(network_CPPFLAGS)
-#network_rel_CPPFLAGS += -I network/include 
-network_rel_LDFLAGS = $(RTEMS_RELLDFLAGS)
+###network_CPPFLAGS = -D__INSIDE_RTEMS_BSD_TCPIP_STACK__
+###noinst_PROGRAMS = network.rel
+###network_rel_SOURCES = network/include/emac.h
+###network_rel_SOURCES += network/source/network.c network/source/emac.c network/source/mdio.c  network/source/phy_dp83640.c
+###network_rel_CPPFLAGS = $(AM_CPPFLAGS) $(network_CPPFLAGS)
+####network_rel_CPPFLAGS += -I network/include 
+###network_rel_LDFLAGS = $(RTEMS_RELLDFLAGS)
 # Start hooks
 libbsp_a_SOURCES += startup/bspstarthooks.c
 
@@ -194,7 +198,7 @@ libbsp_a_SOURCES += startup/bspstarthooks.c
 
 DISTCLEANFILES = include/bspopts.h
 
-libbsp_a_LIBADD += network.rel
+###libbsp_a_LIBADD += network.rel
 
 include $(srcdir)/preinstall.am
 include $(top_srcdir)/../../../../automake/local.am

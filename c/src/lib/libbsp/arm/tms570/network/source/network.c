@@ -1,11 +1,4 @@
 /*
- * RTEMS driver for M68360 SCC1 Ethernet
- *
- * W. Eric Norum
- * Saskatchewan Accelerator Laboratory
- * University of Saskatchewan
- * Saskatoon, Saskatchewan, CANADA
- * eric@skatter.usask.ca
  */
 #include <bsp.h>
 #include <stdio.h>
