@@ -8,6 +8,7 @@
  * eric@skatter.usask.ca
  */
 #include <bsp.h>
+#include <bsp/tms570.h>
 #include <stdio.h>
 #include <errno.h>
 #include <rtems/error.h>
@@ -35,9 +36,18 @@
 static uint8_t pbuf_array[MAX_RX_PBUF_ALLOC][MAX_TRANSFER_UNIT];
 //static uint8_t rxDataBuf[MAX_RX_PBUF_ALLOC][MAX_TRANSFER_UNIT];
 #define NTMSDRIVER	1
+#define CHANNEL		0
 uint32 EMACSwizzleData(uint32 word);
+static void tms570_eth_init_buffer_descriptors(hdkif_t *hdkif);
 boolean tms570_eth_send_raw(hdkif_t *hdkif, struct mbuf *mbuf);
-
+u32_t sys_arch_sem_wait(rtems_id rtid, u32_t timeout);
+void static tms570_eth_process_irq_request(void *arg);
+tms570_eth_process_irq(void *arg);
+static void tms570_eth_rx_pbuf_refill( struct tms_softc *sc, int single_fl);
+static void tms570_eth_process_irq_rx(void *arg);
+static void tms570_eth_process_irq_tx(void *arg);
+tms570_eth_hw_set_TX_HDP(hdkif_t *hdkif, volatile struct emac_tx_bd *new_head);
+tms570_eth_hw_set_RX_HDP(hdkif_t *hdkif, volatile struct emac_rx_bd *new_head);
 
 /*
  * Default number of buffer descriptors set aside for this driver.
@@ -197,7 +207,7 @@ void EMACDMAInit(hdkif_t *hdkif)
 
       uint32 num_bd, pbuf_cnt = 0U;
       volatile emac_tx_bd_t *curr_txbd, *last_txbd;
-      txch_t *txch_dma;
+      txch *txch_dma;
       volatile emac_rx_bd_t *curr_bd, *last_bd;
 
       rxch_t *rxch_dma;
@@ -303,13 +313,13 @@ void EMACDMAInit(hdkif_t *hdkif)
       rxch_dma->active_tail = last_bd;
 }
 #endif
-#ifdef ULAN
+#ifdef SENDULAN
 tms570_eth_hw_set_RX_HDP(hdkif_t *hdkif, volatile struct emac_rx_bd *new_head)
 {
   /* Writes to RX HDP are allowed
                                                  * only when it is 0
                                                  */
-  while (hdkif->emac_base->RXHDP[EMAC_CHANNELNUMBER] != 0) {
+  while (TMS570_EMACM.RXHDP[EMAC_CHANNELNUMBER] != 0) {
     printf("HW -RX- is slacking!!!\n");
 //    sys_arch_delay(10);
   }
@@ -324,7 +334,8 @@ tms570_eth_hw_set_TX_HDP(hdkif_t *hdkif, volatile struct emac_tx_bd *new_head)
   /* Writes to RX HDP are allowed
                                                  * only when it is 0
                                                  */
-  while (hdkif->emac_base->TXHDP[EMAC_CHANNELNUMBER] != 0) {
+//  while (hdkif->emac_base.TXHDP[EMAC_CHANNELNUMBER] != 0) {
+  while (TMS570_EMACM.RXHDP[EMAC_CHANNELNUMBER] != 0) {
     printf("HW -TX- is slacking!!!\n");
 //    sys_arch_delay(10);
   }
@@ -334,7 +345,7 @@ tms570_eth_hw_set_TX_HDP(hdkif_t *hdkif, volatile struct emac_tx_bd *new_head)
     (uint32)new_head,
     EMAC_CHANNELNUMBER);
 }
-#endif /*ULAN*/
+#endif /*SENDULAN*/
 
 boolean tms570_eth_send_raw(hdkif_t *hdkif, struct mbuf *mbuf)
 {
@@ -410,7 +421,7 @@ boolean tms570_eth_send_raw(hdkif_t *hdkif, struct mbuf *mbuf)
   if (curr_bd == NULL)
     txch->inactive_tail = curr_bd;
 
-  sys_arch_data_sync_barier();
+  //sys_arch_data_sync_barier();
 
   if (txch->active_tail == NULL) {
     txch->active_head = packet_head;
@@ -437,7 +448,7 @@ boolean tms570_eth_send_raw(hdkif_t *hdkif, struct mbuf *mbuf)
   return TRUE;
 
 error_out_of_descriptors:
-  m_freem((struct mbuf *)mbuf)//pbuf_free(pbuf);
+  m_freem((struct mbuf *)mbuf);//pbuf_free(pbuf);
   return FALSE;
 }
 /* EMAC Packet Buffer Sizes and Placement */
@@ -472,7 +483,7 @@ error_out_of_descriptors:
 boolean EMACTransmit(hdkif_t *hdkif, pbuf_t *pbuf)
 {
     
-  txch_t *txch;
+  txch *txch;
   pbuf_t *q;
   uint16 totLen;
   uint16 qLen;
@@ -595,8 +606,9 @@ tms_tx_interrupt_handler (rtems_vector_number v)
 {  hdkif_t *hdkif;
   hdkif=&hdkif_data[0];
   tms[0].txInterrupts++;
-  EMACTxIntHandler(hdkif);
-  EMACCoreIntAck(EMAC_0_BASE, (uint32)EMAC_INT_CORE0_TX); 
+  tms570_eth_process_irq_tx(hdkif);
+//  EMACTxIntHandler(hdkif);
+//  EMACCoreIntAck(EMAC_0_BASE, (uint32)EMAC_INT_CORE0_TX); 
   rtems_bsdnet_event_send (tms[0].txDaemonTid, INTERRUPT_EVENT);
   // tries=2;
   //  printf("f");           
@@ -606,14 +618,16 @@ static void
 tms570_eth_process_irq_rx(void *arg)
 {
   struct tms_softc *sc = (struct tms_softc *)arg;
+  struct ifnet *ifp = &sc->arpcom.ac_if;
   hdkif_t *hdkif;
   hdkif=sc->hdkif;
 //  struct tms570_netif_state *nf_state;
-  struct rxch_t *rxch;
+  struct rxch *rxch;
 //  struct netif *netif = (struct netif *)arg;
   volatile struct emac_rx_bd *curr_bd;
   struct mbuf *mbuf;
-  struct mbuf *q,eh;
+  struct mbuf *q;
+  struct ether_header *eh;
 
 //  nf_state = netif->state;
 //  rxch = &(nf_state->rxch);
@@ -632,7 +646,7 @@ tms570_eth_process_irq_rx(void *arg)
     unsigned int processed_rx_len = 0;
     int corrupt_fl = 0;
 
-//    sys_arch_data_sync_barier();
+//    //sys_arch_data_sync_barier();
 
     mbuf = curr_bd->mbuf;
     total_rx_len = curr_bd->flags_pktlen & 0xFFFF;
@@ -646,7 +660,7 @@ tms570_eth_process_irq_rx(void *arg)
      */
     for (;; ) {
       q = curr_bd->mbuf;
-      eh = mtod (m, struct ether_header *);
+      eh = mtod (q, struct ether_header *);
       /* Since this pbuf will be freed, we need to
        * keep track of its size to be able to
        * allocate it back again
@@ -658,7 +672,7 @@ tms570_eth_process_irq_rx(void *arg)
       /* This is the size of the "received data" not the PBUF */
       q->m_pkthdr.len = total_rx_len - processed_rx_len;
       q->m_len = curr_bd->bufoff_len & 0xFFFF;
-      q->m_data=q->bufptr;
+      q->m_data=curr_bd->bufptr;
 
       if (curr_bd->flags_pktlen & EMAC_BUF_DESC_EOP)
         break;
@@ -675,13 +689,13 @@ tms570_eth_process_irq_rx(void *arg)
         break;
       }
       curr_bd = curr_bd->next;
-      q->next = curr_bd->mbuf;
+      q->m_next = curr_bd->mbuf;
 
-      processed_rx_len += q->len;
+      processed_rx_len += q->m_len;
     }
  //   tms570_eth_debug_printf("\n");
     /* Close the chain */
-    q->next = NULL;
+    q->m_next = NULL;
     if (rxch->inactive_tail == NULL) {
       rxch->inactive_head = rxch->active_head;
     } else {
@@ -694,7 +708,7 @@ tms570_eth_process_irq_rx(void *arg)
     rxch->inactive_tail->next = NULL;
 
 
-//    LINK_STATS_INC(link.recv);
+//    //LINK_STATS_INC(link.recv);
 
     /* Process the packet */
     /* ethernet_input((struct pbuf *)pbuf, netif) */
@@ -703,20 +717,20 @@ tms570_eth_process_irq_rx(void *arg)
 //      if (netif->input(pbuf, netif) != ERR_OK)
 //        corrupt_fl = 1;
     if (corrupt_fl) {
-//      LINK_STATS_INC(link.memerr);
-//      LINK_STATS_INC(link.drop);
+//      //LINK_STATS_INC(link.memerr);
+//      //LINK_STATS_INC(link.drop);
      m_freem((struct mbuf *)mbuf);// pbuf_free(pbuf);
     }
 
     /* Acknowledge that this packet is processed */
-    EMACRxCPWrite(nf_state->emac_base, 0, (unsigned int)curr_bd);
+    EMACRxCPWrite(hdkif->emac_base, 0, (unsigned int)curr_bd);
 
     /* The earlier PBUF chain is freed from the upper layer.
      * So, we need to allocate a new pbuf chain and update
      * the descriptors with the PBUF info.
      * Care should be taken even if the allocation fails.
      */
-    tms570_eth_rx_pbuf_refill(nf_state, 0);
+    tms570_eth_rx_pbuf_refill(sc, 0);
     //tms570_eth_debug_print_rxch();
     curr_bd = rxch->active_head;
     if (curr_bd == NULL) {
@@ -786,16 +800,16 @@ tms570_eth_process_irq_tx(void *arg)
 
 
     /* Ack the Interrupt in the EMAC peripheral */
-    EMACTxCPWrite(nf_state->emac_base, CHANNEL,
+    EMACTxCPWrite(hdkif->emac_base, CHANNEL,
                   (uint32_t)curr_bd);
 
     /* Free the corresponding pbuf
      * Sidenote: Each fragment of the single packet points
      * to the same pbuf // FIXME is it true?
      */
-    m_freem((struct mbuf *)mbuf); //pbuf_free(start_of_packet_bd->mbuf);
+    m_freem((struct mbuf *)start_of_packet_bd->mbuf); //pbuf_free(start_of_packet_bd->mbuf);
 
-    LINK_STATS_INC(link.xmit);
+    //LINK_STATS_INC(link.xmit);
 
     /* Move to the next packet */
     start_of_packet_bd = txch->active_head;
@@ -805,21 +819,21 @@ tms570_eth_process_irq_tx(void *arg)
 static rtems_isr
 tms_rx_interrupt_handler (rtems_vector_number v)
 {
- 
-
+	hdkif_t *hdkif;
+	  hdkif=&hdkif_data[0];
     tms[0].rxInterrupts++;
-    tms570_eth_process_irq_rx(void *arg)
-    EMACCoreIntAck(EMAC_0_BASE, (uint32)EMAC_INT_CORE0_RX); 
+    tms570_eth_process_irq_rx(hdkif);
+//    EMACCoreIntAck(EMAC_0_BASE, (uint32)EMAC_INT_CORE0_RX); 
     rtems_bsdnet_event_send (tms[0].rxDaemonTid, INTERRUPT_EVENT);
   
 
 }
 
-static void
-tms570_eth_rx_pbuf_refill( struct tms_softc *sc, int single_fl)
+static void tms570_eth_rx_pbuf_refill( struct tms_softc *sc, int single_fl)
 {
   struct ifnet *ifp = &sc->arpcom.ac_if;
   hdkif_t *hdkif;
+  hdkif=sc->hdkif;
   struct rxch *rxch;
   volatile struct emac_rx_bd *curr_bd;
   volatile struct emac_rx_bd *curr_head;
@@ -828,6 +842,7 @@ tms570_eth_rx_pbuf_refill( struct tms_softc *sc, int single_fl)
   struct mbuf *m;
 //  struct pbuf *q;
   uint32_t alloc_rq_bytes;
+  uint16_t rxBds=0;
 
   //rxch = &(nf_state->rxch);
   rxch = &(hdkif->rxch);
@@ -849,9 +864,9 @@ tms570_eth_rx_pbuf_refill( struct tms_softc *sc, int single_fl)
     new_mbuf->m_pkthdr.rcvif = ifp;
     sc->rxMbuf[rxBds] = new_mbuf;
 
-    new_pbuf = pbuf_alloc(PBUF_RAW,
-                          alloc_rq_bytes,
-                          PBUF_POOL);
+//    new_pbuf = pbuf_alloc(PBUF_RAW,
+//                          alloc_rq_bytes,
+//                          PBUF_POOL);
     if (new_mbuf == NULL) {
       alloc_rq_bytes = (1 << (30-__builtin_clz(alloc_rq_bytes)));
       if (alloc_rq_bytes <= PBUF_POOL_BUFSIZE) {
@@ -866,10 +881,10 @@ tms570_eth_rx_pbuf_refill( struct tms_softc *sc, int single_fl)
       for (;; ) {
         curr_bd->bufptr = (uint8_t *)m->m_data;
         curr_bd->bufoff_len = m->m_len;
-        curr_bd->flags_pktlen = EMAC_DSC_FLAG_OWNER;
+        curr_bd->flags_pktlen = EMAC_BUF_DESC_OWNER;
         curr_bd->mbuf = m;
         rxch->freed_pbuf_len -= m->m_len;
-        m = m->next;
+        m = m->m_next;
         if (m == NULL)
           break;
         if (curr_bd->next == NULL) {
@@ -887,20 +902,21 @@ tms570_eth_rx_pbuf_refill( struct tms_softc *sc, int single_fl)
       rxch->inactive_head = curr_bd->next;
 
       curr_bd->next = NULL;
-      sys_arch_data_sync_barier();
+//      //sys_arch_data_sync_barier();
 
       if (rxch->active_head == NULL) {
         rxch->active_head = curr_head;
         rxch->active_tail = curr_bd;
-        tms570_eth_hw_set_RX_HDP(nf_state, rxch->active_head);
+        tms570_eth_hw_set_RX_HDP(hdkif, rxch->active_head);
       } else {
         rxch->active_tail->next = curr_head;
-        sys_arch_data_sync_barier();
-        if ((rxch->active_tail->flags_pktlen & EMAC_DSC_FLAG_EOQ) != 0)
-          tms570_eth_hw_set_RX_HDP(nf_state, rxch->active_head);
+        //sys_arch_data_sync_barier();
+        if ((rxch->active_tail->flags_pktlen & EMAC_BUF_DESC_EOQ) != 0)
+          tms570_eth_hw_set_RX_HDP(hdkif, rxch->active_head);
         rxch->active_tail = curr_bd;
       }
     }
+  rxBds++;
   }
 }
 
@@ -908,6 +924,7 @@ tms570_eth_rx_pbuf_refill( struct tms_softc *sc, int single_fl)
 /*
  * SCC reader task
  */
+#ifndef SENDULAN
 static void
 tms_rxDaemon (void *arg)
 {
@@ -1089,6 +1106,7 @@ for (;;) {
 	
 }
 }
+#endif
 
 static void
 sendpacket (struct ifnet *ifp, struct mbuf *m)
@@ -1352,7 +1370,7 @@ tms570_eth_init_buffer_descriptors(hdkif);
       rxch = &(hdkif->rxchptr);
       /* Write to the RX HDP for channel 0 */
       /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-      EMACRxHdrDescPtrWrite(hdkif->emac_base, (uint32)rxch->active_head, (uint32)EMAC_CHANNELNUMBER);
+   //   EMACRxHdrDescPtrWrite(hdkif->emac_base, (uint32)rxch->active_head, (uint32)EMAC_CHANNELNUMBER);
 //#else
       /*SAFETYMCUSW 1 J MR:14.1 <APPROVED> "If condition parameter is taken as input from GUI." */    
       /*SAFETYMCUSW 1 J MR:14.1 <APPROVED> "If condition parameter is taken as input from GUI." */  
@@ -1371,7 +1389,7 @@ tms570_eth_init_buffer_descriptors(hdkif);
       status = rtems_interrupt_handler_install( TMS570_IRQ_EMAC_TX,
       "tms1",
       RTEMS_INTERRUPT_SHARED,
-      tms_tx_interrupt_handler,
+      tms570_eth_process_irq,
       NULL
 						);
       if (status != RTEMS_SUCCESSFUL) 
@@ -1385,7 +1403,7 @@ tms570_eth_init_buffer_descriptors(hdkif);
       status = rtems_interrupt_handler_install( TMS570_IRQ_EMAC_RX,
       "tms1",
       RTEMS_INTERRUPT_SHARED,
-      tms_rx_interrupt_handler,
+      tms570_eth_process_irq,
       NULL
 						);
 
@@ -1399,12 +1417,16 @@ tms570_eth_init_buffer_descriptors(hdkif);
  */
 
 
-tms570_eth_process_irq(void *argument)
+tms570_eth_process_irq(void *arg)
 {
-  struct netif *netif = (struct netif *)argument;
-  struct tms570_netif_state *nf_state;
-
-  nf_state = netif->state;
+//  struct netif *netif = (struct netif *)argument;
+//  struct tms570_netif_state *nf_state;
+//
+//  nf_state = netif->state;
+  struct tms_softc *sc = arg;
+  hdkif_t *hdkif;
+//  struct ifnet *ifp = &sc->arpcom.ac_if;
+  hdkif=sc->hdkif;
   uint32_t macints;
   while (1) {
     macints = TMS570_EMACM.MACINVECTOR;
@@ -1412,18 +1434,62 @@ tms570_eth_process_irq(void *argument)
       break;
     }
     if (macints & (0xff<<16)) { //TX interrupt
-      tms570_eth_process_irq_tx(netif);
-      EMACCoreIntAck(nf_state->emac_base, EMAC_INT_CORE0_TX);
+      tms570_eth_process_irq_tx(sc);
+      EMACCoreIntAck(hdkif->emac_base, EMAC_INT_CORE0_TX);
     }
     if (macints & (0xff<<0)) { //RX interrupt
-      tms570_eth_process_irq_rx(netif);
-      EMACCoreIntAck(nf_state->emac_base, EMAC_INT_CORE0_RX);
+      tms570_eth_process_irq_rx(sc);
+      EMACCoreIntAck(hdkif->emac_base, EMAC_INT_CORE0_RX);
     }
   }
-  sys_arch_unmask_interrupt_source(TMS570_IRQ_EMAC_RX);
-  sys_arch_unmask_interrupt_source(TMS570_IRQ_EMAC_TX);
+//  sys_arch_unmask_interrupt_source(TMS570_IRQ_EMAC_RX);
+//  sys_arch_unmask_interrupt_source(TMS570_IRQ_EMAC_TX);
 }
 
+
+void static
+tms570_eth_process_irq_request(void *arg)
+{
+//  struct netif *netif = (struct netif *)argument;
+//  struct tms570_netif_state *nf_state;
+
+  struct tms_softc *sc = arg;
+  hdkif_t *hdkif;
+//  struct ifnet *ifp = &sc->arpcom.ac_if;
+  hdkif=sc->hdkif;
+//  nf_state = netif->state;
+
+  for (;; ) {
+    sys_arch_sem_wait(sc->rxDaemonTid, 0);
+    tms570_eth_process_irq(sc);
+  }
+}
+
+u32_t
+sys_arch_sem_wait(rtems_id rtid, u32_t timeout)
+{
+  rtems_status_code status;
+  rtems_interval tps = rtems_clock_get_ticks_per_second();
+  rtems_interval tick_timeout;
+  uint64_t       start_time;
+  uint64_t       wait_time;
+
+  start_time = rtems_clock_get_uptime_nanoseconds();
+  if (timeout == 0) {
+    tick_timeout = RTEMS_NO_TIMEOUT;
+  } else {
+    tick_timeout = (timeout * tps + 999) / 1000;
+  }
+  status = rtems_semaphore_obtain(rtid, RTEMS_WAIT, tick_timeout);
+  if (status == RTEMS_TIMEOUT) {
+    return SYS_ARCH_TIMEOUT;
+  }
+  if (status != RTEMS_SUCCESSFUL) {
+    return SYS_ARCH_TIMEOUT;
+  }
+  wait_time = rtems_clock_get_uptime_nanoseconds() - start_time;
+  return wait_time / (1000 * 1000);
+}
 static void
 tms_eth_init (void *arg)
 {
@@ -1442,10 +1508,10 @@ tms_eth_init (void *arg)
 		/*
 		 * Start driver tasks
 		 */
-		sc->txDaemonTid = rtems_bsdnet_newproc ("TMStx", 2048, tms_txDaemon, sc);
-		sc->rxDaemonTid = rtems_bsdnet_newproc ("TMSrx", 2048, tms_rxDaemon, sc);
+//		sc->txDaemonTid = rtems_bsdnet_newproc ("TMStx", 2048, tms_txDaemon, sc);
+//		sc->rxDaemonTid = rtems_bsdnet_newproc ("TMSrx", 2048, tms_rxDaemon, sc);
 //		sc->txDaemonTid = rtems_bsdnet_newproc ("TMStx", 1024, tms570_eth_process_irq_request, sc);
-//		sc->rxDaemonTid = rtems_bsdnet_newproc ("TMSrx", 1024, tms570_eth_process_irq_request, sc);
+		sc->rxDaemonTid = rtems_bsdnet_newproc ("TMSrx", 2048, tms570_eth_process_irq_request, sc);
 
 	}
 
