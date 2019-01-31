@@ -36,6 +36,7 @@ static uint8_t pbuf_array[MAX_RX_PBUF_ALLOC][MAX_TRANSFER_UNIT];
 //static uint8_t rxDataBuf[MAX_RX_PBUF_ALLOC][MAX_TRANSFER_UNIT];
 #define NTMSDRIVER	1
 uint32 EMACSwizzleData(uint32 word);
+boolean tms570_eth_send_raw(hdkif_t *hdkif, struct mbuf *mbuf);
 
 
 /*
@@ -50,7 +51,7 @@ uint32 EMACSwizzleData(uint32 word);
 #define MAX_FRAME_LENGTH 1500
 #define pinMuxBaseReg ((long unsigned int) 0xFFFF1D10U) 
 #define RegEdit ((long unsigned int) 0xFFFFEA38U)
-#define SET_DRIVER_RMII 0
+#define SET_DRIVER_RMII 1
 /*
  * RTEMS event used by interrupt handler to signal driver tasks.
  * This must not be any of the events used by the network task synchronization.
@@ -103,7 +104,93 @@ uint32 EMACSwizzleData(uint32 word) {
 			((word >> 24U) & 0x000000FFU));
 }
 
-#ifdef ULAN
+#ifdef SENDULAN
+static void tms570_eth_init_buffer_descriptors(hdkif_t *hdkif)
+  
+{
+  uint32_t num_bd;
+  volatile struct emac_tx_bd *curr_txbd;
+  volatile struct emac_rx_bd *curr_rxbd;
+
+  struct rxch *rxch;
+  struct txch *txch;
+
+  rxch = &(hdkif->rxch);
+  txch = &(hdkif->txch);
+
+//  rxch = &(nf_state->rxch);
+//  txch = &(nf_state->txch);
+
+
+  /*
+   * Use the CPPI RAM to store RX/TX Buffer Descriptors (= BD).
+   * 1/2 of CPPI RAM is used for TX BDs, another 1/2 for RX BDs.
+   * All the TX BDs are 'owned' by the software. They are initialized
+   * as a linked-list forming a ring. They are awaiting the application
+   * to append pbuf payload to the them and correctly configure for
+   * actual transmission.
+   * Only such number of RX BDs is configured that the pbufs can be
+   * allocated for (i.e. MAX_RX_PBUF_ALLOC). Pbufs are allocated from
+   * the PBUF_POOL (thus the allocated pbufs might be chained).
+   * Each payload part of a payload is them used to initialize single
+   * RX BD. The RX BDs are then configured to be 'owned' bythe EMAC
+   */
+
+  /*
+   * Initialize the Descriptor Memory For TX and RX
+   * Only Channel 0 is supported for both TX and RX
+   */
+  txch->inactive_head = (volatile struct emac_tx_bd *)hdkif->emac_ctrl_ram;
+  txch->inactive_tail = NULL;
+  txch->active_head = NULL;
+  txch->active_tail = NULL;
+
+  /* Set the number of descriptors for the channel */
+  /* take half of CPPI ram for TX BDs */
+
+  num_bd = ((SIZE_EMAC_CTRL_RAM >> 1) / sizeof(struct emac_tx_bd))-1;
+#if TMS570_NETIF_DEBUG
+  tms570_eth_debug_printf("pocet bd %d\n", num_bd);
+#endif
+
+  curr_txbd = txch->inactive_head;
+
+  /* Initialize all the TX buffer Descriptors */
+  while (num_bd > 0) {
+    curr_txbd->next = curr_txbd + 1;
+    curr_txbd->flags_pktlen = 0;
+    txch->inactive_tail = curr_txbd;
+    curr_txbd = curr_txbd->next;
+    num_bd--;
+  }
+  curr_txbd->next = NULL;
+
+  /* Initialize the descriptors for the RX channel */
+  rxch->inactive_head = ((volatile struct emac_rx_bd *)curr_txbd)+2;
+//  rxch->freed_pbuf_len = MAX_RX_PBUF_ALLOC*PBUF_LEN_MAX;
+  rxch->inactive_head->flags_pktlen = EMAC_BUF_DESC_OWNER;
+  rxch->inactive_head->next = rxch->inactive_head + 1;
+  curr_rxbd = rxch->inactive_head;
+
+  num_bd = ((SIZE_EMAC_CTRL_RAM >> 1) / sizeof(struct emac_rx_bd))-1;
+
+  while (num_bd > 0) {
+    curr_rxbd = curr_rxbd->next;
+    curr_rxbd->next = curr_rxbd + 1;
+    curr_rxbd->flags_pktlen = EMAC_BUF_DESC_OWNER;
+    curr_rxbd->mbuf = NULL;
+    num_bd--;
+  }
+  curr_rxbd->next = NULL;
+  rxch->inactive_tail = curr_rxbd;
+  rxch->active_tail = NULL;
+  rxch->active_head = NULL;
+#if TMS570_NETIF_DEBUG
+  tms570_eth_debug_show_rx(nf_state);
+  tms570_eth_debug_show_tx(nf_state);
+#endif
+
+}
 #else
 void EMACDMAInit(hdkif_t *hdkif)
 {
@@ -247,10 +334,11 @@ tms570_eth_hw_set_TX_HDP(hdkif_t *hdkif, volatile struct emac_tx_bd *new_head)
     (uint32)new_head,
     EMAC_CHANNELNUMBER);
 }
+#endif /*ULAN*/
 
-boolean tms570_eth_send_raw(hdkif_t *hdkif, struct pbuf *pbuf)
+boolean tms570_eth_send_raw(hdkif_t *hdkif, struct mbuf *mbuf)
 {
-  struct pbuf *q;
+  struct mbuf *q;
   struct txch *txch;
   unsigned int pktlen;
   unsigned int padlen = 0;
@@ -260,7 +348,7 @@ boolean tms570_eth_send_raw(hdkif_t *hdkif, struct pbuf *pbuf)
 
 //  nf_state = (struct tms570_netif_state *)netif->state;
 //  txch = &(nf_state->txch);
-  txch = &(hdkif->txchptr);
+  txch = &(hdkif->txch);
 
   /* Get the first BD that is unused and will be used for TX */
   curr_bd = txch->inactive_head;
@@ -271,7 +359,7 @@ boolean tms570_eth_send_raw(hdkif_t *hdkif, struct pbuf *pbuf)
   packet_tail = curr_bd;
 
   /* adjust the packet length if less than minimum required */
-  pktlen = pbuf->tot_len;
+  pktlen = mbuf->m_pkthdr.len;
   if (pktlen < MIN_PKT_LEN) {
     padlen = MIN_PKT_LEN - pktlen;
     pktlen = MIN_PKT_LEN;
@@ -284,18 +372,18 @@ boolean tms570_eth_send_raw(hdkif_t *hdkif, struct pbuf *pbuf)
   /* Copy pbuf information into TX BDs --
    * remember that the pbuf for a single packet might be chained!
    */
-  for (q = pbuf; q != NULL; q = q->next) {
+  for (q = mbuf; q != NULL; q = q->m_next) {
     if (curr_bd == NULL)
       goto error_out_of_descriptors;
 
-    curr_bd->bufptr = (uint8_t *)(q->payload);
-    curr_bd->bufoff_len = (q->len) & 0xFFFF;
+    curr_bd->bufptr = mtod(q,uint8_t *);
+    curr_bd->bufoff_len = (q->m_len) & 0xFFFF;
 
     /* This is an extra field that is not par of the in-HW BD.
      * This is used when freeing the pbuf after the TX processing
      * is done in EMAC
      */
-    curr_bd->pbuf = pbuf;
+    curr_bd->mbuf = mbuf;
     packet_tail = curr_bd;
     curr_bd = curr_bd->next;
   }
@@ -310,7 +398,7 @@ boolean tms570_eth_send_raw(hdkif_t *hdkif, struct pbuf *pbuf)
      */
     curr_bd->bufptr = packet_head->bufptr;
     curr_bd->bufoff_len = padlen;
-    curr_bd->pbuf = pbuf;
+    curr_bd->mbuf = mbuf;
     packet_tail = curr_bd;
     curr_bd = curr_bd->next;
   }
@@ -349,10 +437,9 @@ boolean tms570_eth_send_raw(hdkif_t *hdkif, struct pbuf *pbuf)
   return TRUE;
 
 error_out_of_descriptors:
-  //pbuf_free(pbuf);
+  m_freem((struct mbuf *)mbuf)//pbuf_free(pbuf);
   return FALSE;
 }
-#endif /*ULAN*/
 /* EMAC Packet Buffer Sizes and Placement */
 //#ifdef CONFIG_EMAC_PKT_FRAG_SIZE
 //  #define EMAC_FRAG_SIZE    CONFIG_EMAC_PKT_FRAG_SIZE
@@ -380,125 +467,8 @@ error_out_of_descriptors:
 //
 //#include <lwip/netifapi.h>
 #ifdef	ULAN_RECV 
-static void
-tms570_eth_process_irq_rx(void *arg)
-{
-  hdkif_t *hdkif;
-//  struct tms570_netif_state *nf_state;
-  struct rxch_t *rxch;
-//  struct netif *netif = (struct netif *)arg;
-  volatile struct emac_rx_bd_t *curr_bd;
-  struct pbuf *pbuf;
-  struct pbuf *q;
-
-//  nf_state = netif->state;
-//  rxch = &(nf_state->rxch);
-  rxch = &(hdkif->rxchptr);
-  /* Get the bd which contains the earliest filled data */
-  curr_bd = rxch->active_head;
-  if (curr_bd == NULL) {
-    tms570_eth_rx_pbuf_refill(nf_state, 0);
-    return;
-  }
-
-  /* For each valid frame */
-  while ((curr_bd->flags_pktlen & EMAC_DSC_FLAG_SOP) &&
-         !(curr_bd->flags_pktlen & EMAC_DSC_FLAG_OWNER)) {
-    unsigned int total_rx_len;
-    unsigned int processed_rx_len = 0;
-    int corrupt_fl = 0;
-
-    sys_arch_data_sync_barier();
-
-    pbuf = curr_bd->pbuf;
-    total_rx_len = curr_bd->flags_pktlen & 0xFFFF;
-    tms570_eth_debug_printf("recieve packet. L = %d ", total_rx_len);
-    /* The received frame might be fragmented into muliple
-     * pieces -- each one referenced by a separate BD.
-     * To further process the data, we need to 'make' a
-     * proper PBUF out of it -- that means linking each
-     * buffer together, copy the length information form
-     * the DB to PBUF, calculate the 'tot_len' etc.
-     */
-    for (;; ) {
-      q = curr_bd->pbuf;
-      /* Since this pbuf will be freed, we need to
-       * keep track of its size to be able to
-       * allocate it back again
-       */
-      rxch->freed_pbuf_len += q->len;
-      tms570_eth_debug_printf("bd - %d ", tms570_eth_debug_get_BD_num(curr_bd, nf_state));
-      tms570_eth_debug_printf("pbuf len - %d ", q->len);
-      tms570_eth_debug_printf("A - 0x%08x ", q);
-      /* This is the size of the "received data" not the PBUF */
-      q->tot_len = total_rx_len - processed_rx_len;
-      q->len = curr_bd->bufoff_len & 0xFFFF;
-
-      if (curr_bd->flags_pktlen & EMAC_DSC_FLAG_EOP)
-        break;
-      /*
-       * If we are executing here, it means this
-       * packet is being split over multiple BDs
-       */
-      tms570_eth_debug_printf("MB");
-      /* chain the pbufs since they belong
-       * to the same packet
-       */
-      if (curr_bd->next == NULL) {
-        corrupt_fl = 1;
-        break;
-      }
-      curr_bd = curr_bd->next;
-      q->next = curr_bd->pbuf;
-
-      processed_rx_len += q->len;
-    }
-    tms570_eth_debug_printf("\n");
-    /* Close the chain */
-    q->next = NULL;
-    if (rxch->inactive_tail == NULL) {
-      rxch->inactive_head = rxch->active_head;
-    } else {
-      rxch->inactive_tail->next = rxch->active_head;
-    }
-    rxch->inactive_tail = curr_bd;
-    rxch->active_head = curr_bd->next;
-    if (curr_bd->next == NULL)
-      rxch->active_tail = NULL;
-    rxch->inactive_tail->next = NULL;
-
-
-    LINK_STATS_INC(link.recv);
-
-    /* Process the packet */
-    /* ethernet_input((struct pbuf *)pbuf, netif) */
-    if (!corrupt_fl)
-      if (netif->input(pbuf, netif) != ERR_OK)
-        corrupt_fl = 1;
-    if (corrupt_fl) {
-      LINK_STATS_INC(link.memerr);
-      LINK_STATS_INC(link.drop);
-      pbuf_free(pbuf);
-    }
-
-    /* Acknowledge that this packet is processed */
-    EMACRxCPWrite(nf_state->emac_base, 0, (unsigned int)curr_bd);
-
-    /* The earlier PBUF chain is freed from the upper layer.
-     * So, we need to allocate a new pbuf chain and update
-     * the descriptors with the PBUF info.
-     * Care should be taken even if the allocation fails.
-     */
-    tms570_eth_rx_pbuf_refill(nf_state, 0);
-    //tms570_eth_debug_print_rxch();
-    curr_bd = rxch->active_head;
-    if (curr_bd == NULL) {
-      return;
-    }
-  }
-}
 #endif /*ULAN_RECV*/
-#ifndef ULAN
+#ifdef ULAN
 boolean EMACTransmit(hdkif_t *hdkif, pbuf_t *pbuf)
 {
     
@@ -632,17 +602,307 @@ tms_tx_interrupt_handler (rtems_vector_number v)
   //  printf("f");           
 }
 
+static void
+tms570_eth_process_irq_rx(void *arg)
+{
+  struct tms_softc *sc = (struct tms_softc *)arg;
+  hdkif_t *hdkif;
+  hdkif=sc->hdkif;
+//  struct tms570_netif_state *nf_state;
+  struct rxch_t *rxch;
+//  struct netif *netif = (struct netif *)arg;
+  volatile struct emac_rx_bd *curr_bd;
+  struct mbuf *mbuf;
+  struct mbuf *q,eh;
+
+//  nf_state = netif->state;
+//  rxch = &(nf_state->rxch);
+  rxch = &(hdkif->rxch);
+  /* Get the bd which contains the earliest filled data */
+  curr_bd = rxch->active_head;
+  if (curr_bd == NULL) {
+    tms570_eth_rx_pbuf_refill(sc, 0);
+    return;
+  }
+
+  /* For each valid frame */
+  while ((curr_bd->flags_pktlen & EMAC_BUF_DESC_SOP) &&
+         !(curr_bd->flags_pktlen & EMAC_BUF_DESC_OWNER)) {
+    unsigned int total_rx_len;
+    unsigned int processed_rx_len = 0;
+    int corrupt_fl = 0;
+
+//    sys_arch_data_sync_barier();
+
+    mbuf = curr_bd->mbuf;
+    total_rx_len = curr_bd->flags_pktlen & 0xFFFF;
+   // tms570_eth_debug_printf("recieve packet. L = %d ", total_rx_len);
+    /* The received frame might be fragmented into muliple
+     * pieces -- each one referenced by a separate BD.
+     * To further process the data, we need to 'make' a
+     * proper PBUF out of it -- that means linking each
+     * buffer together, copy the length information form
+     * the DB to PBUF, calculate the 'tot_len' etc.
+     */
+    for (;; ) {
+      q = curr_bd->mbuf;
+      eh = mtod (m, struct ether_header *);
+      /* Since this pbuf will be freed, we need to
+       * keep track of its size to be able to
+       * allocate it back again
+       */
+      rxch->freed_pbuf_len += q->m_len;
+//      tms570_eth_debug_printf("bd - %d ", tms570_eth_debug_get_BD_num(curr_bd, nf_state));
+//      tms570_eth_debug_printf("pbuf len - %d ", q->len);
+//      tms570_eth_debug_printf("A - 0x%08x ", q);
+      /* This is the size of the "received data" not the PBUF */
+      q->m_pkthdr.len = total_rx_len - processed_rx_len;
+      q->m_len = curr_bd->bufoff_len & 0xFFFF;
+      q->m_data=q->bufptr;
+
+      if (curr_bd->flags_pktlen & EMAC_BUF_DESC_EOP)
+        break;
+      /*
+       * If we are executing here, it means this
+       * packet is being split over multiple BDs
+       */
+//      tms570_eth_debug_printf("MB");
+      /* chain the pbufs since they belong
+       * to the same packet
+       */
+      if (curr_bd->next == NULL) {
+        corrupt_fl = 1;
+        break;
+      }
+      curr_bd = curr_bd->next;
+      q->next = curr_bd->mbuf;
+
+      processed_rx_len += q->len;
+    }
+ //   tms570_eth_debug_printf("\n");
+    /* Close the chain */
+    q->next = NULL;
+    if (rxch->inactive_tail == NULL) {
+      rxch->inactive_head = rxch->active_head;
+    } else {
+      rxch->inactive_tail->next = rxch->active_head;
+    }
+    rxch->inactive_tail = curr_bd;
+    rxch->active_head = curr_bd->next;
+    if (curr_bd->next == NULL)
+      rxch->active_tail = NULL;
+    rxch->inactive_tail->next = NULL;
+
+
+//    LINK_STATS_INC(link.recv);
+
+    /* Process the packet */
+    /* ethernet_input((struct pbuf *)pbuf, netif) */
+    if (!corrupt_fl)
+	ether_input (ifp, eh, mbuf);
+//      if (netif->input(pbuf, netif) != ERR_OK)
+//        corrupt_fl = 1;
+    if (corrupt_fl) {
+//      LINK_STATS_INC(link.memerr);
+//      LINK_STATS_INC(link.drop);
+     m_freem((struct mbuf *)mbuf);// pbuf_free(pbuf);
+    }
+
+    /* Acknowledge that this packet is processed */
+    EMACRxCPWrite(nf_state->emac_base, 0, (unsigned int)curr_bd);
+
+    /* The earlier PBUF chain is freed from the upper layer.
+     * So, we need to allocate a new pbuf chain and update
+     * the descriptors with the PBUF info.
+     * Care should be taken even if the allocation fails.
+     */
+    tms570_eth_rx_pbuf_refill(nf_state, 0);
+    //tms570_eth_debug_print_rxch();
+    curr_bd = rxch->active_head;
+    if (curr_bd == NULL) {
+      return;
+    }
+  }
+}
+static void
+tms570_eth_process_irq_tx(void *arg)
+{
+  struct tms_softc *sc = (struct tms_softc *)arg;
+  hdkif_t *hdkif;
+  hdkif=sc->hdkif;
+
+  struct txch *txch;
+  volatile struct emac_tx_bd *curr_bd;
+  volatile struct emac_tx_bd *start_of_packet_bd;
+//  struct netif *netif = (struct netif *)arg;
+//  struct tms570_netif_state *nf_state;
+
+//  nf_state = netif->state;
+  txch = &(hdkif->txch);
+
+  start_of_packet_bd = txch->active_head;
+  curr_bd = txch->active_head;
+
+  /* Traverse the list of BDs used for transmission --
+   * stop on the first unused
+   */
+  while ((curr_bd != NULL) && (curr_bd->flags_pktlen & EMAC_BUF_DESC_SOP)) {
+    /* Make sure the transmission is over */
+    if (curr_bd->flags_pktlen & EMAC_BUF_DESC_OWNER) {
+//      tms570_eth_debug_printf("TXthread ownership not transfered!!!!\n");
+      break;
+    }
+
+    /* Find the last chunk of the packet */
+    while (!(curr_bd->flags_pktlen & EMAC_BUF_DESC_EOP))
+      curr_bd = curr_bd->next;
+
+    /* Remove flags for the transmitted BDs */
+    start_of_packet_bd->flags_pktlen &= (~EMAC_BUF_DESC_SOP);
+    curr_bd->flags_pktlen &= (~EMAC_BUF_DESC_EOP);
+
+    /*
+* Return processed BDs to inactive list
+     */
+    if (txch->inactive_tail == NULL) {
+      txch->inactive_head = start_of_packet_bd;
+    } else {
+      txch->inactive_tail->next = start_of_packet_bd;
+    }
+    txch->inactive_tail = curr_bd;
+
+    /*
+     * Remove BDs from active list
+                       */
+    txch->active_head = curr_bd->next;
+    if (curr_bd->next == NULL) {
+      txch->active_tail = NULL;
+    }
+
+    /*
+     * Insert null element at the end of the inactive list
+                       */
+    txch->inactive_tail->next = NULL;
+
+
+    /* Ack the Interrupt in the EMAC peripheral */
+    EMACTxCPWrite(nf_state->emac_base, CHANNEL,
+                  (uint32_t)curr_bd);
+
+    /* Free the corresponding pbuf
+     * Sidenote: Each fragment of the single packet points
+     * to the same pbuf // FIXME is it true?
+     */
+    m_freem((struct mbuf *)mbuf); //pbuf_free(start_of_packet_bd->mbuf);
+
+    LINK_STATS_INC(link.xmit);
+
+    /* Move to the next packet */
+    start_of_packet_bd = txch->active_head;
+    curr_bd = txch->active_head;
+  }
+}
 static rtems_isr
 tms_rx_interrupt_handler (rtems_vector_number v)
 {
  
 
     tms[0].rxInterrupts++;
+    tms570_eth_process_irq_rx(void *arg)
+    EMACCoreIntAck(EMAC_0_BASE, (uint32)EMAC_INT_CORE0_RX); 
     rtems_bsdnet_event_send (tms[0].rxDaemonTid, INTERRUPT_EVENT);
   
 
 }
 
+static void
+tms570_eth_rx_pbuf_refill( struct tms_softc *sc, int single_fl)
+{
+  struct ifnet *ifp = &sc->arpcom.ac_if;
+  hdkif_t *hdkif;
+  struct rxch *rxch;
+  volatile struct emac_rx_bd *curr_bd;
+  volatile struct emac_rx_bd *curr_head;
+//  struct pbuf *new_pbuf;
+  struct mbuf *new_mbuf;
+  struct mbuf *m;
+//  struct pbuf *q;
+  uint32_t alloc_rq_bytes;
+
+  //rxch = &(nf_state->rxch);
+  rxch = &(hdkif->rxch);
+  if (single_fl) {
+    alloc_rq_bytes = PBUF_POOL_BUFSIZE;
+  } else {
+    alloc_rq_bytes = rxch->freed_pbuf_len;
+  }
+
+  for (; (rxch->freed_pbuf_len > 0) && (rxch->inactive_head != NULL); ) {
+    //stats_display();
+
+    curr_bd = rxch->inactive_head;
+    curr_head = rxch->inactive_head;
+//    tms570_eth_debug_printf("attempt to allocate %d bytes from pbuf pool (RX)\n", alloc_rq_bytes);
+
+    MGETHDR (new_mbuf, M_WAIT, MT_DATA);
+    MCLGET (new_mbuf, M_WAIT);
+    new_mbuf->m_pkthdr.rcvif = ifp;
+    sc->rxMbuf[rxBds] = new_mbuf;
+
+    new_pbuf = pbuf_alloc(PBUF_RAW,
+                          alloc_rq_bytes,
+                          PBUF_POOL);
+    if (new_mbuf == NULL) {
+      alloc_rq_bytes = (1 << (30-__builtin_clz(alloc_rq_bytes)));
+      if (alloc_rq_bytes <= PBUF_POOL_BUFSIZE) {
+        tms570_eth_debug_printf("not enough memory\n");
+        break;
+      }
+      alloc_rq_bytes = rxch->freed_pbuf_len > alloc_rq_bytes ?
+                       alloc_rq_bytes : rxch->freed_pbuf_len;
+      continue;
+    } else {
+      m = new_mbuf;
+      for (;; ) {
+        curr_bd->bufptr = (uint8_t *)m->m_data;
+        curr_bd->bufoff_len = m->m_len;
+        curr_bd->flags_pktlen = EMAC_DSC_FLAG_OWNER;
+        curr_bd->mbuf = m;
+        rxch->freed_pbuf_len -= m->m_len;
+        m = m->next;
+        if (m == NULL)
+          break;
+        if (curr_bd->next == NULL) {
+          rxch->inactive_tail = NULL;
+          break;
+        }
+        curr_bd = curr_bd->next;
+      }
+
+      if (m != NULL)
+        m_freem((struct mbuf *)m);
+      /* Add the newly allocated BDs to the
+       * end of the list
+       */
+      rxch->inactive_head = curr_bd->next;
+
+      curr_bd->next = NULL;
+      sys_arch_data_sync_barier();
+
+      if (rxch->active_head == NULL) {
+        rxch->active_head = curr_head;
+        rxch->active_tail = curr_bd;
+        tms570_eth_hw_set_RX_HDP(nf_state, rxch->active_head);
+      } else {
+        rxch->active_tail->next = curr_head;
+        sys_arch_data_sync_barier();
+        if ((rxch->active_tail->flags_pktlen & EMAC_DSC_FLAG_EOQ) != 0)
+          tms570_eth_hw_set_RX_HDP(nf_state, rxch->active_head);
+        rxch->active_tail = curr_bd;
+      }
+    }
+  }
+}
 
 
 /*
@@ -845,26 +1105,31 @@ sendpacket (struct ifnet *ifp, struct mbuf *m)
   /*  if(a->m_ext.ext_buf!=a->m_data && (a->m_flags&M_EXT)==M_EXT)
      a->m_data=a->m_ext.ext_buf;
      ti_buffer[im].tot_len=a->m_pkthdr.len;*/
-  while(a){   
-        myframe=mtod(a,uint8 *);
-        if (a->m_len) {
-	  memcpy(&test[0]+acc,myframe,a->m_len);
-	  acc+=a->m_len;
-	}
-       MFREE (a, b);
-       a=b;
+
+  if (m->m_pkthdr.len < MIN_PKT_LEN) {
+    m->m_pkthdr.len = MIN_PKT_LEN;
+    m->m_len = MIN_PKT_LEN;
   }
-  ti_buffer[im].payload=&test[0];
-  ti_buffer[im].next=NULL;
-  if(acc<MIN_FRAME_LENGTH)
-    ti_buffer[im].tot_len=ti_buffer[im].len=65;
-  else
-    ti_buffer[im].tot_len=ti_buffer[im].len=acc;
-#ifdef ULAN
-    i=tms570_eth_send_raw(sc->hdkif, &ti_buffer[0]);
-#else
-    i=EMACTransmit(sc->hdkif, &ti_buffer[0]);
-#endif
+//  while(a){   
+//        myframe=mtod(a,uint8 *);
+//        if (a->m_len) {
+//	  memcpy(&test[0]+acc,myframe,a->m_len);
+//	  acc+=a->m_len;
+//	}
+//       MFREE (a, b);
+//       a=b;
+//  }
+//  ti_buffer[im].payload=&test[0];
+//  ti_buffer[im].next=NULL;
+//  if(acc<MIN_FRAME_LENGTH)
+//    ti_buffer[im].tot_len=ti_buffer[im].len=65;
+//  else
+//    ti_buffer[im].tot_len=ti_buffer[im].len=acc;
+//#ifdef ULAN
+    i=tms570_eth_send_raw(sc->hdkif, m);// &ti_buffer[0]);
+//#else
+//    i=EMACTransmit(sc->hdkif, &ti_buffer[0]);
+//#endif
     //    memset(test,0,1514);
     //  if(i==false)
     //  printf("Could not send frame!");
@@ -939,9 +1204,9 @@ tms_EMAC_hw_init(uint8 macaddr[6U])
   hdkif = &hdkif_data[0U];
   EMACInstConfig(hdkif);
   /* set MAC hardware address */
-  for(temp = 0U; temp < EMAC_HWADDR_LEN; temp++) {
-    hdkif->mac_addr[temp] = macaddr[(EMAC_HWADDR_LEN - 1U) - temp];
-  }
+//  for(temp = 0U; temp < EMAC_HWADDR_LEN; temp++) {
+//    hdkif->mac_addr[temp] = macaddr[(EMAC_HWADDR_LEN - 1U) - temp];
+//  }
   /*Initialize the EMAC, EMAC Control and MDIO modules. */
   EMACInit(hdkif->emac_ctrl_base, hdkif->emac_base);
   MDIOInit(hdkif->mdio_base, MDIO_FREQ_INPUT, MDIO_FREQ_OUTPUT);
@@ -1008,7 +1273,8 @@ tms_EMAC_hw_init(uint8 macaddr[6U])
   /* The transmit and receive buffer descriptors are initialized here. 
    * Also, packet buffers are allocated to the receive buffer descriptors.
    */
-#ifdef ULAN
+#ifdef SENDULAN
+tms570_eth_init_buffer_descriptors(hdkif);
 #else
   EMACDMAInit(hdkif);
 #endif
@@ -1018,25 +1284,25 @@ tms_EMAC_hw_init(uint8 macaddr[6U])
 
   /* Enable MII if enabled in the GUI. */
   /*SAFETYMCUSW 139 S MR:13.7 <APPROVED> "Parameter is taken as input from GUI." */
-#if(EMAC_MII_ENABLE)
+//#if(EMAC_MII_ENABLE)
 //      EMACMIIEnable(hdkif->emac_base);
-#else
+//#else
       /*SAFETYMCUSW 1 J MR:14.1 <APPROVED> "If condition parameter is taken as input from GUI." */  
       EMACMIIDisable(hdkif->emac_base);
-#endif
+//#endif
   EMACRMIISpeedSet(hdkif->emac_base,EMAC_RMIISPEED_100MBPS);
 
 
   /* Enable Broadcast if enabled in the GUI. */
   /*SAFETYMCUSW 139 S MR:13.7 <APPROVED> "Parameter is taken as input from GUI." */
-#if(EMAC_BROADCAST_ENABLE)
+//#if(EMAC_BROADCAST_ENABLE)
       EMACRxBroadCastEnable(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER);
       HWREG(emacBase + EMAC_RXMBPENABLE) |= ((uint32)0x20  );
-#else
+//#else
    /*SAFETYMCUSW 1 J MR:14.1 <APPROVED> "If condition parameter is taken as input from GUI." */
    /*SAFETYMCUSW 1 J MR:14.1 <APPROVED> "If condition parameter is taken as input from GUI." */
-      EMACRxBroadCastDisable(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER);
-#endif
+//      EMACRxBroadCastDisable(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER);
+//#endif
   
   /* Enable Broadcast if enabled in the GUI. */
   /*SAFETYMCUSW 139 S MR:13.7 <APPROVED> "Parameter is taken as input from GUI." */
@@ -1049,12 +1315,12 @@ tms_EMAC_hw_init(uint8 macaddr[6U])
 
   /*Enable Full Duplex or Half-Duplex mode based on GUI Input. */
   /*SAFETYMCUSW 139 S MR:13.7 <APPROVED> "Parameter is taken as input from GUI." */
-#if (EMAC_FULL_DUPLEX_ENABLE)
+//#if (EMAC_FULL_DUPLEX_ENABLE)
         EMACDuplexSet(EMAC_0_BASE, (uint32)EMAC_DUPLEX_FULL);
-#else
+//#else
         /*SAFETYMCUSW 1 J MR:14.1 <APPROVED> "If condition arameter is taken as input from GUI." */
-        EMACDuplexSet(EMAC_0_BASE, (uint32)EMAC_DUPLEX_HALF);
-#endif
+//        EMACDuplexSet(EMAC_0_BASE, (uint32)EMAC_DUPLEX_HALF);
+//#endif
 
   /* Enable Loopback based on GUI Input */ 
   /*SAFETYMCUSW 139 S MR:13.7 <APPROVED> "Parameter is taken as input from GUI." */
@@ -1067,19 +1333,19 @@ tms_EMAC_hw_init(uint8 macaddr[6U])
 
   /* Enable Transmit and Transmit Interrupt */ 
   /*SAFETYMCUSW 139 S MR:13.7 <APPROVED> "Parameter is taken as input from GUI." */
-#if(EMAC_TX_ENABLE)
+//#if(EMAC_TX_ENABLE)
       EMACTxEnable(hdkif->emac_base);
       EMACTxIntPulseEnable(hdkif->emac_base, hdkif->emac_ctrl_base, (uint32)EMAC_CHANNELNUMBER, (uint32)EMAC_CHANNELNUMBER);
-#else
+//#else
       /*SAFETYMCUSW 1 J MR:14.1 <APPROVED> "If condition parameter is taken as input from GUI." */
       /*SAFETYMCUSW 1 J MR:14.1 <APPROVED> "If condition parameter is taken as input from GUI." */
-      EMACTxDisable(hdkif->emac_base);
-      EMACTxIntPulseDisable(hdkif->emac_base, hdkif->emac_ctrl_base, (uint32)EMAC_CHANNELNUMBER, (uint32)EMAC_CHANNELNUMBER);     
-#endif
+  //    EMACTxDisable(hdkif->emac_base);
+  //    EMACTxIntPulseDisable(hdkif->emac_base, hdkif->emac_ctrl_base, (uint32)EMAC_CHANNELNUMBER, (uint32)EMAC_CHANNELNUMBER);     
+//#endif
 
   /* Enable Receive and Receive Interrupt. Then start receiving by writing to the HDP register. */
   /*SAFETYMCUSW 139 S MR:13.7 <APPROVED> "Parameter is taken as input from GUI." */
-#if(EMAC_RX_ENABLE)
+//#if(EMAC_RX_ENABLE)
 //      EMACNumFreeBufSet(hdkif->emac_base,(uint32)EMAC_CHANNELNUMBER , (uint32)MAX_RX_PBUF_ALLOC);
       EMACRxEnable(hdkif->emac_base);
       EMACRxIntPulseEnable(hdkif->emac_base, hdkif->emac_ctrl_base, (uint32)EMAC_CHANNELNUMBER, (uint32)EMAC_CHANNELNUMBER);
@@ -1087,12 +1353,12 @@ tms_EMAC_hw_init(uint8 macaddr[6U])
       /* Write to the RX HDP for channel 0 */
       /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
       EMACRxHdrDescPtrWrite(hdkif->emac_base, (uint32)rxch->active_head, (uint32)EMAC_CHANNELNUMBER);
-#else
+//#else
       /*SAFETYMCUSW 1 J MR:14.1 <APPROVED> "If condition parameter is taken as input from GUI." */    
       /*SAFETYMCUSW 1 J MR:14.1 <APPROVED> "If condition parameter is taken as input from GUI." */  
-      EMACRxDisable(hdkif->emac_base);
-      EMACRxIntPulseDisable(hdkif->emac_base, hdkif->emac_ctrl_base, (uint32)EMAC_CHANNELNUMBER, (uint32)EMAC_CHANNELNUMBER);     
-#endif
+//      EMACRxDisable(hdkif->emac_base);
+//      EMACRxIntPulseDisable(hdkif->emac_base, hdkif->emac_ctrl_base, (uint32)EMAC_CHANNELNUMBER, (uint32)EMAC_CHANNELNUMBER);     
+//#endif
       *(uint32_t *)(0xFCF78100)|=0x00800000;//0x00A00000;
       //      *(uint32_t *)(0xFCF78100)&=0xFFFFDFFF;//0x00A00000;
 
@@ -1131,6 +1397,33 @@ tms_EMAC_hw_init(uint8 macaddr[6U])
 /*
  * Initialize and start the device
  */
+
+
+tms570_eth_process_irq(void *argument)
+{
+  struct netif *netif = (struct netif *)argument;
+  struct tms570_netif_state *nf_state;
+
+  nf_state = netif->state;
+  uint32_t macints;
+  while (1) {
+    macints = TMS570_EMACM.MACINVECTOR;
+    if ((macints & 0xffff) == 0) {
+      break;
+    }
+    if (macints & (0xff<<16)) { //TX interrupt
+      tms570_eth_process_irq_tx(netif);
+      EMACCoreIntAck(nf_state->emac_base, EMAC_INT_CORE0_TX);
+    }
+    if (macints & (0xff<<0)) { //RX interrupt
+      tms570_eth_process_irq_rx(netif);
+      EMACCoreIntAck(nf_state->emac_base, EMAC_INT_CORE0_RX);
+    }
+  }
+  sys_arch_unmask_interrupt_source(TMS570_IRQ_EMAC_RX);
+  sys_arch_unmask_interrupt_source(TMS570_IRQ_EMAC_TX);
+}
+
 static void
 tms_eth_init (void *arg)
 {
@@ -1149,8 +1442,10 @@ tms_eth_init (void *arg)
 		/*
 		 * Start driver tasks
 		 */
-                sc->txDaemonTid = rtems_bsdnet_newproc ("TMStx", 4096, tms_txDaemon, sc);
-		sc->rxDaemonTid = rtems_bsdnet_newproc ("TMSrx", 4096, tms_rxDaemon, sc);
+		sc->txDaemonTid = rtems_bsdnet_newproc ("TMStx", 2048, tms_txDaemon, sc);
+		sc->rxDaemonTid = rtems_bsdnet_newproc ("TMSrx", 2048, tms_rxDaemon, sc);
+//		sc->txDaemonTid = rtems_bsdnet_newproc ("TMStx", 1024, tms570_eth_process_irq_request, sc);
+//		sc->rxDaemonTid = rtems_bsdnet_newproc ("TMSrx", 1024, tms570_eth_process_irq_request, sc);
 
 	}
 
