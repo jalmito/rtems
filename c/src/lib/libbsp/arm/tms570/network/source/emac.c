@@ -1088,6 +1088,7 @@ void EMACRxIntStat(uint32 emacBase, uint32 channel, emac_rx_int_status_t *rxints
 /* SourceId : ETH_SourceId_049 */
 /* DesignId : ETH_DesignId_049*/
 /* Requirements : HL_ETH_SR6 */
+#ifndef SENDULAN
 uint32 EMACHWInit(uint8_t macaddr[6U])
 {
   uint32 temp, channel;
@@ -1249,6 +1250,7 @@ uint32 EMACHWInit(uint8_t macaddr[6U])
 
   return retVal;
 }
+
 
 
 /**
@@ -1466,6 +1468,7 @@ void EMACReceive(hdkif_t *hdkif)
       }
     }
 }
+#endif
 
 
 /** @fn void EMACGetConfigValue(emac_config_reg_t *config_reg, config_value_type_t type)

@@ -33,22 +33,35 @@
 
 //#define TMS_INTC0_TX_VECTOR 0xFFF821E0
 //#define TMS_INTC0_RX_VECTOR 0xFFF821E8
+#define PBUF_POOL_BUFSIZE 256
+#define SYS_ARCH_TIMEOUT 0xffffffffUL
 static uint8_t pbuf_array[MAX_RX_PBUF_ALLOC][MAX_TRANSFER_UNIT];
 //static uint8_t rxDataBuf[MAX_RX_PBUF_ALLOC][MAX_TRANSFER_UNIT];
 #define NTMSDRIVER	1
 #define CHANNEL		0
-uint32 EMACSwizzleData(uint32 word);
+static uint32 EMACSwizzleData(uint32 word);
 static void tms570_eth_init_buffer_descriptors(hdkif_t *hdkif);
-boolean tms570_eth_send_raw(hdkif_t *hdkif, struct mbuf *mbuf);
-u32_t sys_arch_sem_wait(rtems_id rtid, u32_t timeout);
-void static tms570_eth_process_irq_request(void *arg);
-tms570_eth_process_irq(void *arg);
-static void tms570_eth_rx_pbuf_refill( struct tms_softc *sc, int single_fl);
+static tms570_eth_hw_set_RX_HDP(hdkif_t *hdkif, volatile struct emac_rx_bd *new_head);
+static tms570_eth_hw_set_TX_HDP(hdkif_t *hdkif, volatile struct emac_tx_bd *new_head);
+static boolean tms570_eth_send_raw(hdkif_t *hdkif, struct mbuf *mbuf);
+static rtems_isr tms_tx_interrupt_handler (rtems_vector_number v);
 static void tms570_eth_process_irq_rx(void *arg);
 static void tms570_eth_process_irq_tx(void *arg);
-tms570_eth_hw_set_TX_HDP(hdkif_t *hdkif, volatile struct emac_tx_bd *new_head);
-tms570_eth_hw_set_RX_HDP(hdkif_t *hdkif, volatile struct emac_rx_bd *new_head);
-
+static rtems_isr tms_rx_interrupt_handler (rtems_vector_number v);
+//static void tms570_eth_rx_pbuf_refill( struct tms_softc *sc, int single_fl);
+static void sendpacket (struct ifnet *ifp, struct mbuf *m);
+static void tms_txDaemon (void *arg);
+static void tms_start (struct ifnet *ifp);
+static void tms_EMAC_hw_init(uint8 macaddr[6U]);
+static void tms570_eth_process_irq(void *arg);
+static void tms570_eth_process_irq_request(void *arg);
+u32_t sys_arch_sem_wait(rtems_id rtid, u32_t timeout);
+static void tms_eth_init (void *arg);
+//static void tms_eth_stop (struct tms_softc *sc);
+//static void tms_stats (struct tms_softc *sc);
+static int tms_cmd_ioctl (struct ifnet *ifp, ioctl_command_t command, caddr_t data);
+extern int rtems_tms_driver_attach (struct rtems_bsdnet_ifconfig *config, int attaching);
+static void configure_correct_pins(void);
 /*
  * Default number of buffer descriptors set aside for this driver.
  * The number of transmit buffer descriptors has to be quite large
@@ -601,8 +614,7 @@ boolean EMACTransmit(hdkif_t *hdkif, pbuf_t *pbuf)
 /*
  * SCC1 interrupt handler
  */
-static rtems_isr
-tms_tx_interrupt_handler (rtems_vector_number v)
+static rtems_isr tms_tx_interrupt_handler (rtems_vector_number v)
 {  hdkif_t *hdkif;
   hdkif=&hdkif_data[0];
   tms[0].txInterrupts++;
@@ -614,6 +626,96 @@ tms_tx_interrupt_handler (rtems_vector_number v)
   //  printf("f");           
 }
 
+static void tms570_eth_rx_pbuf_refill( struct tms_softc *sc, int single_fl)
+{
+  struct ifnet *ifp = &sc->arpcom.ac_if;
+  hdkif_t *hdkif;
+  hdkif=sc->hdkif;
+  struct rxch *rxch;
+  volatile struct emac_rx_bd *curr_bd;
+  volatile struct emac_rx_bd *curr_head;
+//  struct pbuf *new_pbuf;
+  struct mbuf *new_mbuf;
+  struct mbuf *m;
+//  struct pbuf *q;
+  uint32_t alloc_rq_bytes;
+  uint16_t rxBds=0;
+
+  //rxch = &(nf_state->rxch);
+  rxch = &(hdkif->rxch);
+  if (single_fl) {
+    alloc_rq_bytes = PBUF_POOL_BUFSIZE;
+  } else {
+    alloc_rq_bytes = rxch->freed_pbuf_len;
+  }
+
+  for (; (rxch->freed_pbuf_len > 0) && (rxch->inactive_head != NULL); ) {
+    //stats_display();
+
+    curr_bd = rxch->inactive_head;
+    curr_head = rxch->inactive_head;
+//    tms570_eth_debug_printf("attempt to allocate %d bytes from pbuf pool (RX)\n", alloc_rq_bytes);
+
+    MGETHDR (new_mbuf, M_WAIT, MT_DATA);
+    MCLGET (new_mbuf, M_WAIT);
+    new_mbuf->m_pkthdr.rcvif = ifp;
+    sc->rxMbuf[rxBds] = new_mbuf;
+
+//    new_pbuf = pbuf_alloc(PBUF_RAW,
+//                          alloc_rq_bytes,
+//                          PBUF_POOL);
+    if (new_mbuf == NULL) {
+      alloc_rq_bytes = (1 << (30-__builtin_clz(alloc_rq_bytes)));
+      if (alloc_rq_bytes <= PBUF_POOL_BUFSIZE) {
+        tms570_eth_debug_printf("not enough memory\n");
+        break;
+      }
+      alloc_rq_bytes = rxch->freed_pbuf_len > alloc_rq_bytes ?
+                       alloc_rq_bytes : rxch->freed_pbuf_len;
+      continue;
+    } else {
+      m = new_mbuf;
+      for (;; ) {
+        curr_bd->bufptr = (uint8_t *)m->m_data;
+        curr_bd->bufoff_len = m->m_len;
+        curr_bd->flags_pktlen = EMAC_BUF_DESC_OWNER;
+        curr_bd->mbuf = m;
+        rxch->freed_pbuf_len -= m->m_len;
+        m = m->m_next;
+        if (m == NULL)
+          break;
+        if (curr_bd->next == NULL) {
+          rxch->inactive_tail = NULL;
+          break;
+        }
+        curr_bd = curr_bd->next;
+      }
+
+      if (m != NULL)
+        m_freem((struct mbuf *)m);
+      /* Add the newly allocated BDs to the
+       * end of the list
+       */
+      rxch->inactive_head = curr_bd->next;
+
+      curr_bd->next = NULL;
+//      //sys_arch_data_sync_barier();
+
+      if (rxch->active_head == NULL) {
+        rxch->active_head = curr_head;
+        rxch->active_tail = curr_bd;
+        tms570_eth_hw_set_RX_HDP(hdkif, rxch->active_head);
+      } else {
+        rxch->active_tail->next = curr_head;
+        //sys_arch_data_sync_barier();
+        if ((rxch->active_tail->flags_pktlen & EMAC_BUF_DESC_EOQ) != 0)
+          tms570_eth_hw_set_RX_HDP(hdkif, rxch->active_head);
+        rxch->active_tail = curr_bd;
+      }
+    }
+  rxBds++;
+  }
+}
 static void
 tms570_eth_process_irq_rx(void *arg)
 {
@@ -816,8 +918,7 @@ tms570_eth_process_irq_tx(void *arg)
     curr_bd = txch->active_head;
   }
 }
-static rtems_isr
-tms_rx_interrupt_handler (rtems_vector_number v)
+static rtems_isr tms_rx_interrupt_handler (rtems_vector_number v)
 {
 	hdkif_t *hdkif;
 	  hdkif=&hdkif_data[0];
@@ -829,96 +930,6 @@ tms_rx_interrupt_handler (rtems_vector_number v)
 
 }
 
-static void tms570_eth_rx_pbuf_refill( struct tms_softc *sc, int single_fl)
-{
-  struct ifnet *ifp = &sc->arpcom.ac_if;
-  hdkif_t *hdkif;
-  hdkif=sc->hdkif;
-  struct rxch *rxch;
-  volatile struct emac_rx_bd *curr_bd;
-  volatile struct emac_rx_bd *curr_head;
-//  struct pbuf *new_pbuf;
-  struct mbuf *new_mbuf;
-  struct mbuf *m;
-//  struct pbuf *q;
-  uint32_t alloc_rq_bytes;
-  uint16_t rxBds=0;
-
-  //rxch = &(nf_state->rxch);
-  rxch = &(hdkif->rxch);
-  if (single_fl) {
-    alloc_rq_bytes = PBUF_POOL_BUFSIZE;
-  } else {
-    alloc_rq_bytes = rxch->freed_pbuf_len;
-  }
-
-  for (; (rxch->freed_pbuf_len > 0) && (rxch->inactive_head != NULL); ) {
-    //stats_display();
-
-    curr_bd = rxch->inactive_head;
-    curr_head = rxch->inactive_head;
-//    tms570_eth_debug_printf("attempt to allocate %d bytes from pbuf pool (RX)\n", alloc_rq_bytes);
-
-    MGETHDR (new_mbuf, M_WAIT, MT_DATA);
-    MCLGET (new_mbuf, M_WAIT);
-    new_mbuf->m_pkthdr.rcvif = ifp;
-    sc->rxMbuf[rxBds] = new_mbuf;
-
-//    new_pbuf = pbuf_alloc(PBUF_RAW,
-//                          alloc_rq_bytes,
-//                          PBUF_POOL);
-    if (new_mbuf == NULL) {
-      alloc_rq_bytes = (1 << (30-__builtin_clz(alloc_rq_bytes)));
-      if (alloc_rq_bytes <= PBUF_POOL_BUFSIZE) {
-        tms570_eth_debug_printf("not enough memory\n");
-        break;
-      }
-      alloc_rq_bytes = rxch->freed_pbuf_len > alloc_rq_bytes ?
-                       alloc_rq_bytes : rxch->freed_pbuf_len;
-      continue;
-    } else {
-      m = new_mbuf;
-      for (;; ) {
-        curr_bd->bufptr = (uint8_t *)m->m_data;
-        curr_bd->bufoff_len = m->m_len;
-        curr_bd->flags_pktlen = EMAC_BUF_DESC_OWNER;
-        curr_bd->mbuf = m;
-        rxch->freed_pbuf_len -= m->m_len;
-        m = m->m_next;
-        if (m == NULL)
-          break;
-        if (curr_bd->next == NULL) {
-          rxch->inactive_tail = NULL;
-          break;
-        }
-        curr_bd = curr_bd->next;
-      }
-
-      if (m != NULL)
-        m_freem((struct mbuf *)m);
-      /* Add the newly allocated BDs to the
-       * end of the list
-       */
-      rxch->inactive_head = curr_bd->next;
-
-      curr_bd->next = NULL;
-//      //sys_arch_data_sync_barier();
-
-      if (rxch->active_head == NULL) {
-        rxch->active_head = curr_head;
-        rxch->active_tail = curr_bd;
-        tms570_eth_hw_set_RX_HDP(hdkif, rxch->active_head);
-      } else {
-        rxch->active_tail->next = curr_head;
-        //sys_arch_data_sync_barier();
-        if ((rxch->active_tail->flags_pktlen & EMAC_BUF_DESC_EOQ) != 0)
-          tms570_eth_hw_set_RX_HDP(hdkif, rxch->active_head);
-        rxch->active_tail = curr_bd;
-      }
-    }
-  rxBds++;
-  }
-}
 
 
 /*
@@ -1108,8 +1119,7 @@ for (;;) {
 }
 #endif
 
-static void
-sendpacket (struct ifnet *ifp, struct mbuf *m)
+static void sendpacket (struct ifnet *ifp, struct mbuf *m)
 {
   uint8 *myframe;
   uint8 test[1514];
@@ -1160,8 +1170,7 @@ sendpacket (struct ifnet *ifp, struct mbuf *m)
 /*
  * Driver transmit daemon
  */
-void
-tms_txDaemon (void *arg)
+void tms_txDaemon (void *arg)
 {
 	struct tms_softc *sc = (struct tms_softc *)arg;
 	struct ifnet *ifp = &sc->arpcom.ac_if;
@@ -1194,8 +1203,7 @@ tms_txDaemon (void *arg)
 /*
  * Send packet (caller provides header).
  */
-static void
-tms_start (struct ifnet *ifp)
+static void tms_start (struct ifnet *ifp)
 {
 	struct tms_softc *sc = ifp->if_softc;
 
@@ -1204,8 +1212,7 @@ tms_start (struct ifnet *ifp)
 }
 
 
-static void
-tms_EMAC_hw_init(uint8 macaddr[6U])
+static void tms_EMAC_hw_init(uint8 macaddr[6U])
 {
   rtems_status_code status;
 
@@ -1389,7 +1396,7 @@ tms570_eth_init_buffer_descriptors(hdkif);
       status = rtems_interrupt_handler_install( TMS570_IRQ_EMAC_TX,
       "tms1",
       RTEMS_INTERRUPT_SHARED,
-      tms570_eth_process_irq,
+      tms_txDaemon,
       NULL
 						);
       if (status != RTEMS_SUCCESSFUL) 
@@ -1417,7 +1424,7 @@ tms570_eth_init_buffer_descriptors(hdkif);
  */
 
 
-tms570_eth_process_irq(void *arg)
+void static tms570_eth_process_irq(void *arg)
 {
 //  struct netif *netif = (struct netif *)argument;
 //  struct tms570_netif_state *nf_state;
@@ -1435,6 +1442,7 @@ tms570_eth_process_irq(void *arg)
     }
     if (macints & (0xff<<16)) { //TX interrupt
       tms570_eth_process_irq_tx(sc);
+  	rtems_bsdnet_event_send (tms[0].txDaemonTid, INTERRUPT_EVENT);
       EMACCoreIntAck(hdkif->emac_base, EMAC_INT_CORE0_TX);
     }
     if (macints & (0xff<<0)) { //RX interrupt
@@ -1447,8 +1455,7 @@ tms570_eth_process_irq(void *arg)
 }
 
 
-void static
-tms570_eth_process_irq_request(void *arg)
+void static tms570_eth_process_irq_request(void *arg)
 {
 //  struct netif *netif = (struct netif *)argument;
 //  struct tms570_netif_state *nf_state;
@@ -1465,8 +1472,7 @@ tms570_eth_process_irq_request(void *arg)
   }
 }
 
-u32_t
-sys_arch_sem_wait(rtems_id rtid, u32_t timeout)
+u32_t sys_arch_sem_wait(rtems_id rtid, u32_t timeout)
 {
   rtems_status_code status;
   rtems_interval tps = rtems_clock_get_ticks_per_second();
@@ -1490,8 +1496,7 @@ sys_arch_sem_wait(rtems_id rtid, u32_t timeout)
   wait_time = rtems_clock_get_uptime_nanoseconds() - start_time;
   return wait_time / (1000 * 1000);
 }
-static void
-tms_eth_init (void *arg)
+static void tms_eth_init (void *arg)
 {
 	struct tms_softc *sc = arg;
         hdkif_t *hdkif;
@@ -1525,8 +1530,7 @@ tms_eth_init (void *arg)
 /*
  * Stop the device
  */
-static void
-tms_eth_stop (struct tms_softc *sc)
+static void tms_eth_stop (struct tms_softc *sc)
 {
 	struct ifnet *ifp = &sc->arpcom.ac_if;
         hdkif_t *hdkif;
@@ -1543,8 +1547,7 @@ tms_eth_stop (struct tms_softc *sc)
 /*
  * Show interface statistics
  */
-static void
-tms_stats (struct tms_softc *sc)
+static void tms_stats (struct tms_softc *sc)
 {
 	printf ("      Rx Interrupts:%-8lu", sc->rxInterrupts);
 	//	printf ("       Failed Tx:%-8lu", sc->failedTX);
@@ -1573,8 +1576,7 @@ tms_stats (struct tms_softc *sc)
 /*
  * Driver ioctl handler
  */
-static int
-tms_cmd_ioctl (struct ifnet *ifp, ioctl_command_t command, caddr_t data)
+static int tms_cmd_ioctl (struct ifnet *ifp, ioctl_command_t command, caddr_t data)
 {
 	struct tms_softc *sc = ifp->if_softc;
 	int error = 0;
@@ -1622,8 +1624,7 @@ tms_cmd_ioctl (struct ifnet *ifp, ioctl_command_t command, caddr_t data)
 /*
  * Attach an SCC driver to the system
  */
-int
-rtems_tms_driver_attach (struct rtems_bsdnet_ifconfig *config, int attaching)
+int rtems_tms_driver_attach (struct rtems_bsdnet_ifconfig *config, int attaching)
 {
 	struct tms_softc *sc;
 	struct ifnet *ifp;

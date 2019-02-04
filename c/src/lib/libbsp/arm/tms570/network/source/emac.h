@@ -43,7 +43,7 @@
 
 #ifndef __EMAC_H__
 #define __EMAC_H__
-
+#define SENDULAN
 /* USER CODE BEGIN (0) */
 /* USER CODE END */
 
@@ -167,6 +167,13 @@ extern "C" {
 #define EMAC_MDIOCONTROL_CONFIGVALUE 0x4114001FU
 #define EMAC_C0RXEN_CONFIGVALUE 0x00000001U
 #define EMAC_C0TXEN_CONFIGVALUE 0x00000001U
+typedef uint8_t             u8_t;
+typedef int8_t              s8_t;
+typedef uint16_t            u16_t;
+typedef int16_t             s16_t;
+typedef uint32_t            u32_t;
+typedef int32_t             s32_t;
+typedef u32_t               mem_ptr_t;
 
 /* Structure to store pending status from the Tx Interrupt Status Registers. */
 typedef struct emac_tx_int_status{
@@ -194,6 +201,9 @@ typedef struct emac_tx_bd {
 #ifdef ULAN
     struct pbuf *pbuf;
 #endif
+#ifdef SENDULAN
+   struct mbuf *mbuf;
+#endif
 }emac_tx_bd_t;
 
 /* EMAC RX Buffer descriptor data structure - Refer TRM for details about the buffer descriptor structure. */
@@ -205,42 +215,50 @@ typedef struct emac_rx_bd {
 #ifdef ULAN
     struct pbuf *pbuf;
 #endif
+#ifdef SENDULAN
+   struct mbuf *mbuf;
+#endif
 }emac_rx_bd_t;
 
 /**
  * Helper struct to hold the data used to operate on a particular
  * receive channel
  */
+//#ifdef RECULAN
+struct rxch {
+	volatile struct emac_rx_bd *inactive_head;
+	volatile struct emac_rx_bd *inactive_tail;
+  	volatile struct emac_rx_bd *active_head; /*Used to point to the active descriptor in the chain which is receiving.*/
+	volatile struct emac_rx_bd *active_tail; /*Used to point to the last descriptor in the chain.*/
+  	s32_t freed_pbuf_len;
+};
+//#else
 typedef struct rxch_struct {
-#ifdef ULAN_RECV
-	  volatile struct emac_rx_bd_t *inactive_head;
-	  volatile struct emac_rx_bd_t *inactive_tail;
-#else
 	  volatile emac_rx_bd_t *free_head; /*Used to point to the free buffer descriptor which can receive new data.*/
-#endif
-  volatile emac_rx_bd_t *active_head; /*Used to point to the active descriptor in the chain which is receiving.*/
-  volatile emac_rx_bd_t *active_tail; /*Used to point to the last descriptor in the chain.*/
+	  volatile emac_rx_bd_t *active_tail; /*Used to point to the last descriptor in the chain.*/
+	  volatile emac_rx_bd_t *next_bd_to_process; /*Used to point to the next descriptor in the chain to be processed.*/
 }rxch_t;
+//#endif
 
 /**
  * Helper struct to hold the data used to operate on a particular
  * transmit channel
  */
 
-#ifdef ULAN
+//#ifdef SENDULAN
 struct txch {
   volatile struct emac_tx_bd *active_head;
   volatile struct emac_tx_bd *active_tail;
   volatile struct emac_tx_bd *inactive_head;
   volatile struct emac_tx_bd *inactive_tail;
 };
-#else
+//#else
 typedef struct txch_struct {
   volatile emac_tx_bd_t *free_head; /*Used to point to the free buffer descriptor which can transmit new data.*/
   volatile emac_tx_bd_t *active_tail; /*Used to point to the last descriptor in the chain.*/
   volatile emac_tx_bd_t *next_bd_to_process; /*Used to point to the next descriptor in the chain to be processed.*/
 }txch_t;
-#endif
+//#endif
 /**
  * Helper struct to hold private data used to operate the ethernet interface.
  */
@@ -264,12 +282,13 @@ typedef struct hdkif_struct {
   boolean (*phy_partnerability)(uint32 param4, uint32 param5, uint16* param6);
 
   /* The tx/rx channels for the interface */
-#ifdef ULAN
-  txch txchptr;
-#else
+//#ifdef SENDULAN
+  struct txch txch;
+  struct rxch rxch;
+//#else
   txch_t txchptr;
-#endif
   rxch_t rxchptr;
+//#endif
 }hdkif_t;
 
 /*Ethernet Frame Structure */
