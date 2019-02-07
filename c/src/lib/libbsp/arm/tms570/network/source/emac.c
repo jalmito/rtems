@@ -1266,6 +1266,117 @@ uint32 EMACHWInit(uint8_t macaddr[6U])
 /* DesignId : ETH_DesignId_050*/
 /* Requirements : HL_ETH_SR31 */
 
+//boolean EMACTransmit(hdkif_t *hdkif, pbuf_t *pbuf)
+//{
+//    
+//  txch_t *txch;
+//  pbuf_t *q;
+//  uint16 totLen;
+//  uint16 qLen;
+//  volatile emac_tx_bd_t *curr_bd,*active_head, *bd_end;
+//  boolean retValue = FALSE;
+//  if((pbuf != NULL) && (hdkif != NULL))
+//  {
+//  txch = &(hdkif->txchptr);
+//
+//  /* Get the buffer descriptor which is free to transmit */
+//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+//  curr_bd = txch->free_head;
+//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+//  bd_end = curr_bd;
+//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+//  active_head = curr_bd;
+//
+//  /* Update the total packet length */
+//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */       
+//  curr_bd->flags_pktlen &= (~((uint32)0xFFFFU));
+//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+//  totLen = pbuf->tot_len;
+//  curr_bd->flags_pktlen |= (uint32)(totLen);
+//
+//  /* Indicate the start of the packet */
+//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+//  curr_bd->flags_pktlen |= (EMAC_BUF_DESC_SOP | EMAC_BUF_DESC_OWNER);
+//
+//
+//  /* Copy pbuf information into TX buffer descriptors */
+//    q = pbuf;
+//    while(q != NULL)
+//    {
+//    /* Initialize the buffer pointer and length */
+//    /*SAFETYMCUSW 439 S MR:11.3 <APPROVED> "RHS is a pointer value required to be stored. - Advisory as per MISRA" */
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
+//    curr_bd->bufptr = (uint32)(q->payload);
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */
+//    qLen = q->len;
+//    curr_bd->bufoff_len = ((uint32)(qLen) & 0xFFFFU);
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */      
+//    bd_end = curr_bd;
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
+//    curr_bd = curr_bd->next;
+//    q = q->next;
+//    }
+//
+//
+//  /* Indicate the start and end of the packet */
+//  /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
+//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */       
+//  bd_end->next = NULL;
+//  /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
+//  bd_end->flags_pktlen |= EMAC_BUF_DESC_EOP;
+//
+//  /*SAFETYMCUSW 71 S MR:17.6 <APPROVED> "Assigned pointer value has required scope." */
+//  txch->free_head = curr_bd;
+//
+//  /* For the first time, write the HDP with the filled bd */
+//  if(txch->active_tail == NULL) {
+//    /*SAFETYMCUSW 439 S MR:11.3 <APPROVED> "Address stored in pointer is passed as as an int parameter. - Advisory as per MISRA" */
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */      
+//    EMACTxHdrDescPtrWrite(hdkif->emac_base, (uint32)(active_head), (uint32)EMAC_CHANNELNUMBER);
+//  }
+//
+//  /*
+//   * Chain the bd's. If the DMA engine, already reached the end of the chain,
+//   * the EOQ will be set. In that case, the HDP shall be written again.
+//   */
+//  else {
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
+//    curr_bd = txch->active_tail;
+//    /* Wait for the EOQ bit is set */
+//    /*SAFETYMCUSW 28 D MR:NA <APPROVED> "Hardware status bit read check" */
+//    /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
+//    while (EMAC_BUF_DESC_EOQ != (curr_bd->flags_pktlen & EMAC_BUF_DESC_EOQ))
+//    {
+//    }
+//    /* Don't write to TXHDP0 until it turns to zero */
+//    /*SAFETYMCUSW 28 D MR:NA <APPROVED> "Hardware status bit read check" */
+//    /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
+//    while (((uint32)0U != *((uint32 *)0xFCF78600U)))
+//    {
+//    }
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
+//    curr_bd->next = active_head;
+//    /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
+//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */      
+//    if (EMAC_BUF_DESC_EOQ == (curr_bd->flags_pktlen & EMAC_BUF_DESC_EOQ)) {
+//      /* Write the Header Descriptor Pointer and start DMA */
+//      /*SAFETYMCUSW 439 S MR:11.3 <APPROVED> "Address stored in pointer is passed as as an int parameter. - Advisory as per MISRA" */
+//      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
+//      EMACTxHdrDescPtrWrite(hdkif->emac_base, (uint32)(active_head), (uint32)EMAC_CHANNELNUMBER);
+//    }
+//  }
+//   
+//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+//  txch->active_tail = bd_end;
+//  retValue = TRUE;
+//  }
+//  else
+//  {
+//    retValue = FALSE;
+//  }
+//  return retValue;
+//}
 
 /**
  * Function for processing Tx buffer descriptors.

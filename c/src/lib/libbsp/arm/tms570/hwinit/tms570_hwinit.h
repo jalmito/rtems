@@ -12,6 +12,7 @@
 #define TMS570_SDRAM_WINDOW_END_PTR ( (void *) ( 0xA0000000U ) )
 
 /* Ti TMS570 core setup implemented in assembly */
+void _enable_interrupt_( void );	
 void _esmCcmErrorsClear_( void );
 void _coreEnableEventBusExport_( void );
 #ifdef TMS570_LC43X /* Code added to support the LC43X Family*/
