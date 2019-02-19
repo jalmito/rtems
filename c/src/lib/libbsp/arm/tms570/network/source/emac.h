@@ -71,7 +71,7 @@ extern "C" {
 /* Macros for enabling taken as inputs from HALCoGen GUI. */
 #define EMAC_TX_ENABLE					(1U)				
 #define EMAC_RX_ENABLE					(1U)
-#define EMAC_MII_ENABLE					(0U)
+#define EMAC_MII_ENABLE					(1U)
 #define EMAC_FULL_DUPLEX_ENABLE				(1U)
 #define EMAC_LOOPBACK_ENABLE				(1U)
 #define EMAC_BROADCAST_ENABLE				(1U)
@@ -390,6 +390,7 @@ uint32 C0TXEN; /*EMAC Control Module Transmit Interrupt Enable Register*/
 */
 extern uint32 EMACLinkSetup(hdkif_t *hdkif);
 extern void EMACInstConfig(hdkif_t *hdkif);
+uint32 EMACSwizzleData(uint32 word);
 extern void EMACTxIntPulseEnable(uint32 emacBase, uint32 emacCtrlBase,
                                  uint32 ctrlCore, uint32 channel);
 extern void EMACTxIntPulseDisable(uint32 emacBase, uint32 emacCtrlBase,

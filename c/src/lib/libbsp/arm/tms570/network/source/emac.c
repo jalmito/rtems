@@ -64,7 +64,22 @@ hdkif_t hdkif_data[MAX_EMAC_INSTANCE];
 #define EMAC_SOFT_RESET                (0x01U)
 #define EMAC_MAX_HEADER_DESC           (8U)
 #define EMAC_UNICAST_DISABLE           (0xFFU)
-
+/**SwizzleData**/
+#define TURNSWIZZLEON
+#ifdef TURNSWIZZLEON
+uint32 EMACSwizzleData(uint32 word) {
+		return
+			(((word << 24U) & 0xFF000000U) |
+	 		((word <<  8U) & 0x00FF0000U)  |
+			((word >>  8U) & 0x0000FF00U)  |
+			((word >> 24U) & 0x000000FFU));
+}
+#else
+uint32 EMACSwizzleData(uint32 word) {
+		return
+			word;
+}
+#endif
 /*******************************************************************************
 *                        API FUNCTION DEFINITIONS
 *******************************************************************************/
@@ -1403,28 +1418,28 @@ void EMACTxIntHandler(hdkif_t *hdkif)
   /* Check for correct start of packet */
   /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
   /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */        
-  while(((curr_bd->flags_pktlen) & EMAC_BUF_DESC_SOP) == EMAC_BUF_DESC_SOP) {
+  while(EMACSwizzleData(curr_bd->flags_pktlen) & EMAC_BUF_DESC_SOP) {
 
     /* Make sure that the transmission is over */
     /*SAFETYMCUSW 28 D MR:NA <APPROVED> "Hardware status bit read check" */
     /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
     /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
-    while(((curr_bd->flags_pktlen) & EMAC_BUF_DESC_OWNER) == EMAC_BUF_DESC_OWNER)
+    while((EMACSwizzleData(curr_bd->flags_pktlen) & EMAC_BUF_DESC_OWNER) == EMAC_BUF_DESC_OWNER) 
     {
     }
 
     /* Traverse till the end of packet is reached */
     /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
     /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
-    while(((curr_bd->flags_pktlen) & EMAC_BUF_DESC_EOP) != EMAC_BUF_DESC_EOP) {
-       curr_bd = curr_bd->next;
+    while((EMACSwizzleData(curr_bd->flags_pktlen) & EMAC_BUF_DESC_EOP) != EMAC_BUF_DESC_EOP) {
+       curr_bd = (emac_tx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);
     }
 
     /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
     /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
-    next_bd_to_process->flags_pktlen &= ~(EMAC_BUF_DESC_SOP);
+    next_bd_to_process->flags_pktlen &= EMACSwizzleData(~(EMAC_BUF_DESC_SOP));
     /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
-    curr_bd->flags_pktlen &= ~(EMAC_BUF_DESC_EOP);
+    curr_bd->flags_pktlen &= EMACSwizzleData(~(EMAC_BUF_DESC_EOP));
 
     /**
      * If there are no more data transmitted, the next interrupt
@@ -1438,7 +1453,7 @@ void EMACTxIntHandler(hdkif_t *hdkif)
 
     else {
       /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */        
-      txch_int->next_bd_to_process = curr_bd->next;
+      txch_int->next_bd_to_process = (emac_tx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);
     }
 
     /* Acknowledge the EMAC and free the corresponding pbuf */
