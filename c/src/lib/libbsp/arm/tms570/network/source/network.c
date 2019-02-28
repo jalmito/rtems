@@ -46,10 +46,8 @@ static uint8_t pbuf_array[MAX_RX_PBUF_ALLOC][MAX_TRANSFER_UNIT];
 #define TX_BUF_COUNT     4
 #define TX_BD_PER_BUF    4
 #define MIN_FRAME_LENGTH 64
-#define MAX_FRAME_LENGTH 1500
 #define pinMuxBaseReg ((long unsigned int) 0xFFFF1D10U) 
 #define RegEdit ((long unsigned int) 0xFFFFEA38U)
-#define SET_DRIVER_RMII 0
 /*
  * RTEMS event used by interrupt handler to signal driver tasks.
  * This must not be any of the events used by the network task synchronization.
@@ -490,6 +488,148 @@ tms570_eth_process_irq_rx(void *arg)
   }
 }
 #endif /*ULAN_RECV*/
+boolean EMACTransmit_mbuf(hdkif_t *hdkif, struct mbuf *m)
+{
+   
+  txch_t *txch;
+ // pbuf_t *q;
+  uint16 totLen;
+  uint16 qLen;
+  struct mbuf *aux,*aux_next;
+
+  volatile emac_tx_bd_t *curr_bd,*active_head, *bd_end;
+  boolean retValue = FALSE;
+  if((m != NULL) && (hdkif != NULL))
+  {
+  txch = &(hdkif->txchptr);
+
+  /* Get the buffer descriptor which is free to transmit */
+  curr_bd = txch->free_head;
+  bd_end = curr_bd;
+  active_head = curr_bd;
+
+  /* Update the total packet length */
+  uint16_t totlength=0;
+  uint32 flags_pktlen;
+//  if(( m->m_flags & M_EXT ) == M_EXT )
+//    flags_pktlen = aux->m_ext.ext_size - MAX_FRAME_LENGTH;
+//  else
+    flags_pktlen = 0;//m->m_len;
+
+  flags_pktlen |= (EMAC_BUF_DESC_SOP | EMAC_BUF_DESC_OWNER);
+
+  curr_bd->flags_pktlen = EMACSwizzleData(flags_pktlen);
+
+
+  /* Copy pbuf information into TX buffer descriptors */
+//    aux=m_pullup(m,m->m_len);
+    aux=m;
+    aux_next=m;
+    while(aux != NULL)
+    {
+    /* Initialize the buffer pointer and length */
+    /*SAFETYMCUSW 439 S MR:11.3 <APPROVED> "RHS is a pointer value required to be stored. - Advisory as per MISRA" */
+    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */
+
+        if(totlength > 0 )
+        {
+            bd_end->flags_pktlen &= 0x0000FFFFU;
+
+            bd_end->flags_pktlen |= EMACSwizzleData( (totlength + aux->m_len) & 0xFFFFU);
+        }
+        if(( aux->m_flags & M_EXT ) == M_EXT )
+        {
+            curr_bd->bufptr = EMACSwizzleData((uint32)(mtod(aux,uint8_t *)));
+
+            curr_bd->bufoff_len = EMACSwizzleData((aux->m_len) & 0xFFFFU);
+
+            curr_bd->flags_pktlen |= EMACSwizzleData(EMAC_BUF_DESC_EOP);
+            bd_end = curr_bd;
+            curr_bd = (emac_tx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);
+
+
+
+        
+//            flags_pktlen =  MAX_FRAME_LENGTH ;
+//            flags_pktlen |= (EMAC_BUF_DESC_SOP | EMAC_BUF_DESC_OWNER | EMAC_BUF_DESC_EOP );
+////            flags_pktlen |= (EMAC_BUF_DESC_SOP | EMAC_BUF_DESC_EOP );
+//            curr_bd->flags_pktlen = EMACSwizzleData(flags_pktlen);
+//
+////            curr_bd->bufptr = EMACSwizzleData((uint32)(aux->m_ext.ext_buf + MAX_FRAME_LENGTH - totlength));
+//            curr_bd->bufptr = EMACSwizzleData((uint32)(mtod(aux,uint8_t *)));
+////            curr_bd->bufptr = EMACSwizzleData((uint32)&vectest[0]);//EMACSwizzleData((uint32)(mtod(aux,uint8_t *)));
+//
+//            curr_bd->bufoff_len = EMACSwizzleData(MAX_FRAME_LENGTH & 0xFFFFU);// | (aux->m_ext.ext_size - MAX_FRAME_LENGTH) <<16);
+//            bd_end = curr_bd;
+//            curr_bd = (emac_tx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);
+            totlength = 0;
+        }
+        else
+        {
+            curr_bd->bufptr = EMACSwizzleData((uint32)(mtod(aux,uint8_t *)));
+            curr_bd->bufoff_len = EMACSwizzleData(aux->m_len & 0xFFFFU);
+            bd_end = curr_bd;
+            curr_bd = (emac_tx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);
+            totlength += aux->m_len;
+        }
+//    MFREE (aux, aux_next);
+//    aux=aux_next;
+    aux=aux->m_next;
+    }
+
+  /* Indicate the start and end of the packet */
+  /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
+  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */       
+  bd_end->next = NULL;
+  /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
+  bd_end->flags_pktlen |= EMACSwizzleData(EMAC_BUF_DESC_EOP);
+
+  /*SAFETYMCUSW 71 S MR:17.6 <APPROVED> "Assigned pointer value has required scope." */
+  txch->free_head = curr_bd;
+
+  /* For the first time, write the HDP with the filled bd */
+  if(txch->active_tail == NULL) {
+    EMACTxHdrDescPtrWrite(hdkif->emac_base, (uint32)(active_head), (uint32)EMAC_CHANNELNUMBER);
+  }
+
+       
+         /*
+          * Chain the bd's. If the DMA engine, already reached the end of the chain,
+          * the EOQ will be set. In that case, the HDP shall be written again.
+          */
+  else { 
+           curr_bd = txch->active_tail;
+           /* Wait for the EOQ bit is set */
+           while (EMAC_BUF_DESC_EOQ != (EMACSwizzleData(curr_bd->flags_pktlen) & EMAC_BUF_DESC_EOQ))
+           {
+           }
+           /* Don't write to TXHDP0 until it turns to zero */
+       //	rtems_event_set events;
+       //				rtems_bsdnet_event_receive (INTERRUPT_EVENT,
+       //						RTEMS_WAIT|RTEMS_EVENT_ANY,
+       //						RTEMS_NO_TIMEOUT,
+       //						&events);
+           while (((uint32)0U != *((uint32 *)0xFCF78600U)))
+           {
+           }
+           curr_bd->next = (emac_tx_bd_t *)EMACSwizzleData((uint32)active_head);
+           if (EMAC_BUF_DESC_EOQ == (EMACSwizzleData(curr_bd->flags_pktlen) & EMAC_BUF_DESC_EOQ)) {
+             /* Write the Header Descriptor Pointer and start DMA */
+             EMACTxHdrDescPtrWrite(hdkif->emac_base, (uint32)(active_head), (uint32)EMAC_CHANNELNUMBER);
+           }
+    }
+   
+  txch->active_tail = bd_end;
+  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
+  m_freem(aux_next);
+  retValue = TRUE;
+  }
+  else
+  {
+    retValue = FALSE;
+  }
+  return retValue;
+}
 #ifndef ULAN
 boolean EMACTransmit(hdkif_t *hdkif, pbuf_t *pbuf)
 {
@@ -787,7 +927,123 @@ for (;;) {
 	
 }
 }
+static void
+sendpacket (struct ifnet *ifp, struct mbuf *m)
+{
+  bool i=false;
+  struct tms_softc *sc = ifp->if_softc;
+  rtems_interrupt_level pval;
+  
 
+  rtems_interrupt_disable(pval);
+    i=EMACTransmit_mbuf(sc->hdkif, m);
+  rtems_interrupt_enable(pval);
+    
+}
+#if 0
+static void
+sendpacket (struct ifnet *ifp, struct mbuf *m)
+{
+  uint8 *myframe;
+  uint8 test[1514];
+  struct pbuf_struct ti_buffer[24];
+  struct mbuf *a,*b;
+  bool i=false;
+  int im=0,diff_min=0,acc=0;
+  struct tms_softc *sc = ifp->if_softc;
+    // 
+  a=m;
+  if(a->m_ext.ext_buf!=a->m_data && (a->m_flags&M_EXT)==M_EXT)
+     a->m_data=a->m_ext.ext_buf;
+  ti_buffer[im].tot_len=a->m_pkthdr.len;
+  while(a){ 
+    myframe=mtod(a,uint8 *);
+    if(a->m_len == 0)
+      {
+	// myframe=mtod(a,uint8 *);
+	//	memset(test,1,1514);
+       
+      }
+    else if(a->m_len<MIN_FRAME_LENGTH && acc<MIN_FRAME_LENGTH)
+      {
+	diff_min=MIN_FRAME_LENGTH-a->m_len;
+	memcpy(&test[0]+acc,myframe,a->m_len+diff_min);	
+	//		printf("%d\n",);
+	//	ti_buffer[im].payload=myframe;
+	//	ti_buffer[im].tot_len=a->m_pkthdr.len+acc ;
+	//	ti_buffer[im].len=MIN_FRAME_LENGTH;    	
+	acc+=a->m_len;
+      }
+    else if(a->m_len+acc > MAX_FRAME_LENGTH && acc>0)
+      {
+	ti_buffer[im].payload=&test[0];
+	ti_buffer[im].len=acc+diff_min;
+	ti_buffer[im].next=&ti_buffer[im+1];
+	ti_buffer[im].tot_len+=diff_min;
+	im++;
+	memcpy(&test[0],myframe,a->m_len);
+	ti_buffer[im].payload=&test[0];
+	ti_buffer[im].len=a->m_len;   
+	ti_buffer[im].next=&ti_buffer[im+1];   
+	im++;
+	diff_min=0;
+	acc=0;
+      }
+    else if(a->m_len > MAX_FRAME_LENGTH )
+      {
+	memcpy(&test[0],myframe,1500U);
+	ti_buffer[im].payload=&test[0];
+	ti_buffer[im].len=1500;   
+	ti_buffer[im].next=&ti_buffer[im+1];   
+	im++;
+	acc=0;
+	diff_min=0;
+      }
+    else{
+        memcpy(&test[0]+acc,myframe,a->m_len);
+	ti_buffer[im].payload=&test[0];
+	ti_buffer[im].len=a->m_len+acc;   
+	ti_buffer[im].next=&ti_buffer[im+1];   
+	im++;
+	acc=0;
+	diff_min=0;
+
+    }
+       MFREE (a, b);
+       a=b;
+       // a=a->m_next;
+    
+    //    a=a->m_next; //a se queda igual
+     // memcpy(&test[0],myframe,a->m_len);
+  }
+
+  if(diff_min!=0){
+    ti_buffer[im].payload=&test[0];
+    ti_buffer[im].len=acc+diff_min;
+    ti_buffer[im].next=NULL;
+    ti_buffer[im].tot_len+=diff_min;
+  }
+  else{
+    ti_buffer[im-1].next=NULL;
+  }
+  /*
+for(j=0;j<im;j++)
+  ti_buffer[j].tot_len=acc;
+  */
+
+ 
+
+
+    i=EMACTransmit(sc->hdkif, &ti_buffer[0]);
+    //    memset(test,0,1514);
+    //  if(i==false)
+    //  printf("Could not send frame!");
+    // else
+    //   printf("good");
+
+    
+}
+//#if  0
 static void
 sendpacket (struct ifnet *ifp, struct mbuf *m)
 {
@@ -801,7 +1057,6 @@ sendpacket (struct ifnet *ifp, struct mbuf *m)
   uint16_t totlength=0;
   struct tms_softc *sc = ifp->if_softc;
   rtems_interrupt_level pval;
-  rtems_interrupt_disable(pval);
   
  // a=m;
  // b=m;
@@ -809,9 +1064,7 @@ sendpacket (struct ifnet *ifp, struct mbuf *m)
 //  b=a;
 
   while(a){
-//      minimumSizeDifference=0;
-        if(a->m_len < MIN_FRAME_LENGTH)
-           minimumSizeDifference = MIN_FRAME_LENGTH - a->m_len;
+      minimumSizeDifference=0;
             /*
              * m_len is the length of the data in mbuf without any header
              * m_pkthdr is the length of de mbuf in bytes data included
@@ -833,18 +1086,11 @@ sendpacket (struct ifnet *ifp, struct mbuf *m)
     /*
      * Assign length of the single pbuf
      */
-/*#if 0
-            ti_buffer->payload=malloc(a->m_len*sizeof(uint8_t),M_DEVBUF,M_WAITOK);
-#endif */
       ti_buffer->next = NULL;
       /*
        * single pbuf means next is null 
        */
-/*#if 0
-      memcpy(ti_buffer->payload,mtod(a,uint8_t *),a->m_len*sizeof(uint8_t));
-#else*/
       ti_buffer->payload=mtod(a,uint8_t *);
-//#endif
       ti_buffer->tot_len = (uint16) (a->m_len+minimumSizeDifference);
       ti_buffer_current = ti_buffer;
       break;
@@ -885,51 +1131,60 @@ sendpacket (struct ifnet *ifp, struct mbuf *m)
          * the size can be read in the m_ext header struct available for these cases
          */
 
-//         a=m_pullup(a,a->m_ext.ext_size);
-        ti_buffer_aux->len = (uint16) (a->m_ext.ext_size-minimumSizeDifference); 
-/*#if 0 
-            ti_buffer_aux->payload=malloc(MAX_FRAME_LENGTH*sizeof(uint8_t),M_DEVBUF,M_WAITOK);
-            memcpy(ti_buffer_aux->payload,a->m_ext.ext_buf,MAX_FRAME_LENGTH*sizeof(uint8_t));
-#else*/
-            if(last_buffer != NULL && minimumSizeDifference > 0)
-                memcpy(last_buffer->payload + (MIN_FRAME_LENGTH - minimumSizeDifference),a->m_ext.ext_buf,minimumSizeDifference);
+        //a=m_pullup(a,a->m_ext.ext_size);
+        ti_buffer_aux->len = (uint16) (a->m_ext.ext_size); 
+//midif        ti_buffer_aux->len = (uint16) (a->m_ext.ext_size-minimumSizeDifference); 
+//midif           if(last_buffer != NULL && minimumSizeDifference > 0)
+//midif                memcpy(last_buffer->payload + (MIN_FRAME_LENGTH - minimumSizeDifference),a->m_ext.ext_buf,minimumSizeDifference);
 
-            ti_buffer_aux->payload=a->m_ext.ext_buf+minimumSizeDifference;
-//#endif
+//midif          ti_buffer_aux->payload=a->m_ext.ext_buf+minimumSizeDifference;
+             ti_buffer_aux->payload=a->m_ext.ext_buf;
          /*
           * the payload is referenced to the extern buf data pointer
           */
-      if (a->m_ext.ext_size > MAX_FRAME_LENGTH){
+         if( totlength + a->m_ext.ext_size > MAX_FRAME_LENGTH  )
+         {
 
-         ti_buffer_aux->next=malloc(sizeof( pbuf_t ),M_DEVBUF,M_WAITOK);
-         ti_buffer_aux->len = (uint16)(MAX_FRAME_LENGTH-minimumSizeDifference);
+//midif         ti_buffer_aux->len = (uint16)(a->m_ext.ext_size-MAX_FRAME_LENGTH-minimumSizeDifference);
+//         ti_buffer_aux->len = (uint16)(a->m_ext.ext_size-MAX_FRAME_LENGTH);
+         ti_buffer_aux->len = (uint16)(1024);
          /*
           * An external buffer can have a size of 2048 which exceds the 1500 bytes limited space in pbuf, thus if the size of the external buffer greater than MAX_FRAME_LENGTH (1500) then a new pbuf is allocated to ti_buffer_aux->next
           */
-/*#if 0    
-         ti_buffer_aux->next->payload=malloc((a->m_ext.ext_size-MAX_FRAME_LENGTH)*sizeof(uint8_t),M_DEVBUF,M_WAITOK);
-         memcpy(ti_buffer_aux->next->payload,a->m_ext.ext_buf+MAX_FRAME_LENGTH,(a->m_ext.ext_size-MAX_FRAME_LENGTH)*sizeof(uint8_t));
-#else*/   
-         ti_buffer_aux->next->payload=a->m_ext.ext_buf+MAX_FRAME_LENGTH;
+            ti_buffer_current->next=NULL;
+            ti_buffer->tot_len=totlength + ti_buffer_aux->len;
+            i=EMACTransmit(sc->hdkif, ti_buffer);
+            i = pbuf_free(ti_buffer);
+            ti_buffer=NULL;
+            minimumSizeDifference=ti_buffer->tot_len;
 
-//#endif
+//            ti_buffer_aux=malloc(sizeof( pbuf_t ),M_DEVBUF,M_WAITOK);
+//            ti_buffer_aux->len = (uint16) (545); 
+//            ti_buffer_aux->payload=mtod(a,uint8_t *)+1024;
+//            ti_buffer_aux->tot_len = ti_buffer_aux->len; 
+//            ti_buffer_current=ti_buffer_aux; 
+//            ti_buffer=ti_buffer_aux; 
+//            i=EMACTransmit(sc->hdkif, ti_buffer_aux);
+//            pbuf_free(ti_buffer_aux);
+         
+         
+//           ti_buffer_aux->next=malloc(sizeof( pbuf_t ),M_DEVBUF,M_WAITOK);
+  //         ti_buffer_aux->next->payload=a->m_ext.ext_buf+a->m_ext.ext_size-MAX_FRAME_LENGTH;
+
          /*
           * The payload buffer of the next pbuf is then referenced to the rest of the external data
           */
-         ti_buffer_aux->next->len = (uint16) (a->m_ext.ext_size-MAX_FRAME_LENGTH); 
+ //          ti_buffer_aux->next->len = (uint16) MAX_FRAME_LENGTH; 
          /*
           * The length is adjusted to the rest of the external data buffer size
           */
-         totlength += a->m_ext.ext_size-MAX_FRAME_LENGTH;
-         /*
-          * totlength accumulates the total length of the chain of pbufs that is collected
-          */
-         ti_buffer_current=ti_buffer_aux->next;
+//           ti_buffer_current=ti_buffer_aux->next;
          /*
           * Also the ti_buffer_current is updated since a new pbuf was allocated and populated
           */
+         
       }
-    minimumSizeDifference=0;
+//    minimumSizeDifference=0;
     }
     else
     {
@@ -937,27 +1192,32 @@ sendpacket (struct ifnet *ifp, struct mbuf *m)
         /*
          * The mbuf does not contain an external referenced buffer, thus all the data is contained in the mbuf structure
          */
-        ti_buffer_aux->len = (uint16) a->m_len + minimumSizeDifference; 
- /*#if 0 
-            ti_buffer_aux->payload=malloc(a->m_len*sizeof(uint8_t),M_DEVBUF,M_WAITOK);
-            memcpy(ti_buffer_aux->payload,mtod(a,uint8_t *),a->m_len*sizeof(uint8_t));
- #else*/    
-        if(minimumSizeDifference > 0){
-            ti_buffer_aux->payload = malloc((a->m_len + minimumSizeDifference)*sizeof(uint8_t),M_DEVBUF,M_WAITOK);
-            memcpy(ti_buffer_aux->payload,mtod(a,uint8_t *),a->m_len*sizeof(uint8_t));
-        }
-        else
+//midif       ti_buffer_aux->len = (uint16) a->m_len + minimumSizeDifference; 
+           ti_buffer_aux->len = (uint16) a->m_len; 
+ //midif       if(minimumSizeDifference > 0){
+//            ti_buffer_aux->payload = LWIP_MEM_ALIGN((void *)((uint8_t *)ti_buffer_aux + sizeof(struct pbuf_struct *)));
+ //midif           ti_buffer_aux->payload = malloc((a->m_len + minimumSizeDifference)*sizeof(uint8_t),M_DEVBUF,M_WAITOK);
+ //midif           memcpy(ti_buffer_aux->payload,mtod(a,uint8_t *),a->m_len*sizeof(uint8_t));
+ //midif       }
+ //midif       else
          ti_buffer_aux->payload=mtod(a,uint8_t *);
-// #endif   
     }
+         if( totlength + MLEN > MAX_FRAME_LENGTH )
+         {
+            ti_buffer_current->next=NULL;
+            ti_buffer->tot_len=totlength;
+            i=EMACTransmit(sc->hdkif, ti_buffer);
+            pbuf_free(ti_buffer);
+            totlength =0;
+         }
+         else
+            totlength += ti_buffer_aux->len;
 
-    totlength += ti_buffer_aux->len;
-
-//       MFREE (a, b);
-//       a=b;
+       MFREE (a, b);
+       a=b;
 //        a=m_pullup(a->m_next,a->m_next->m_len);
 //        b=a;
-        a=a->m_next; //a se queda igual
+//        a=a->m_next; //a se queda igual
      // memcpy(&test[0],myframe,a->m_len);
   }
 
@@ -970,21 +1230,20 @@ sendpacket (struct ifnet *ifp, struct mbuf *m)
 
     ti_buffer_current->next=NULL;
 
-/*#ifdef ULAN
-    i=tms570_eth_send_raw(sc->hdkif, &ti_buffer[0]);
-#else*/
+  rtems_interrupt_disable(pval);
     i=EMACTransmit(sc->hdkif, ti_buffer);
-//#endif
     //    memset(test,0,1514);
   rtems_interrupt_enable(pval);
-//    a=m;
-//        while(a){
-//            MFREE (a,b);
-//           a=b;
-//        }
-//
+  if(minimumSizeDifference > 0)
+  {
+      ti_buffer->payload+= minimumSizeDifference ;
+      ti_buffer->len=MAX_FRAME_LENGTH;
+      ti_buffer->tot_len=MAX_FRAME_LENGTH;
+        i=EMACTransmit(sc->hdkif, ti_buffer);
+  }
     
 }
+#endif
 
 /*
  * Driver transmit daemon
