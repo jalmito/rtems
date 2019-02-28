@@ -369,125 +369,6 @@ error_out_of_descriptors:
 //#endif
 //
 //#include <lwip/netifapi.h>
-#ifdef	ULAN_RECV 
-static void
-tms570_eth_process_irq_rx(void *arg)
-{
-  hdkif_t *hdkif;
-//  struct tms570_netif_state *nf_state;
-  struct rxch_t *rxch;
-//  struct netif *netif = (struct netif *)arg;
-  volatile struct emac_rx_bd_t *curr_bd;
-  struct pbuf *pbuf;
-  struct pbuf *q;
-
-//  nf_state = netif->state;
-//  rxch = &(nf_state->rxch);
-  rxch = &(hdkif->rxchptr);
-  /* Get the bd which contains the earliest filled data */
-  curr_bd = rxch->active_head;
-  if (curr_bd == NULL) {
-    tms570_eth_rx_pbuf_refill(nf_state, 0);
-    return;
-  }
-
-  /* For each valid frame */
-  while ((curr_bd->flags_pktlen & EMAC_DSC_FLAG_SOP) &&
-         !(curr_bd->flags_pktlen & EMAC_DSC_FLAG_OWNER)) {
-    unsigned int total_rx_len;
-    unsigned int processed_rx_len = 0;
-    int corrupt_fl = 0;
-
-    sys_arch_data_sync_barier();
-
-    pbuf = curr_bd->pbuf;
-    total_rx_len = curr_bd->flags_pktlen & 0xFFFF;
-    tms570_eth_debug_printf("recieve packet. L = %d ", total_rx_len);
-    /* The received frame might be fragmented into muliple
-     * pieces -- each one referenced by a separate BD.
-     * To further process the data, we need to 'make' a
-     * proper PBUF out of it -- that means linking each
-     * buffer together, copy the length information form
-     * the DB to PBUF, calculate the 'tot_len' etc.
-     */
-    for (;; ) {
-      q = curr_bd->pbuf;
-      /* Since this pbuf will be freed, we need to
-       * keep track of its size to be able to
-       * allocate it back again
-       */
-      rxch->freed_pbuf_len += q->len;
-      tms570_eth_debug_printf("bd - %d ", tms570_eth_debug_get_BD_num(curr_bd, nf_state));
-      tms570_eth_debug_printf("pbuf len - %d ", q->len);
-      tms570_eth_debug_printf("A - 0x%08x ", q);
-      /* This is the size of the "received data" not the PBUF */
-      q->tot_len = total_rx_len - processed_rx_len;
-      q->len = curr_bd->bufoff_len & 0xFFFF;
-
-      if (curr_bd->flags_pktlen & EMAC_DSC_FLAG_EOP)
-        break;
-      /*
-       * If we are executing here, it means this
-       * packet is being split over multiple BDs
-       */
-      tms570_eth_debug_printf("MB");
-      /* chain the pbufs since they belong
-       * to the same packet
-       */
-      if (curr_bd->next == NULL) {
-        corrupt_fl = 1;
-        break;
-      }
-      curr_bd = curr_bd->next;
-      q->next = curr_bd->pbuf;
-
-      processed_rx_len += q->len;
-    }
-    tms570_eth_debug_printf("\n");
-    /* Close the chain */
-    q->next = NULL;
-    if (rxch->inactive_tail == NULL) {
-      rxch->inactive_head = rxch->active_head;
-    } else {
-      rxch->inactive_tail->next = rxch->active_head;
-    }
-    rxch->inactive_tail = curr_bd;
-    rxch->active_head = curr_bd->next;
-    if (curr_bd->next == NULL)
-      rxch->active_tail = NULL;
-    rxch->inactive_tail->next = NULL;
-
-
-    LINK_STATS_INC(link.recv);
-
-    /* Process the packet */
-    /* ethernet_input((struct pbuf *)pbuf, netif) */
-    if (!corrupt_fl)
-      if (netif->input(pbuf, netif) != ERR_OK)
-        corrupt_fl = 1;
-    if (corrupt_fl) {
-      LINK_STATS_INC(link.memerr);
-      LINK_STATS_INC(link.drop);
-      pbuf_free(pbuf);
-    }
-
-    /* Acknowledge that this packet is processed */
-    EMACRxCPWrite(nf_state->emac_base, 0, (unsigned int)curr_bd);
-
-    /* The earlier PBUF chain is freed from the upper layer.
-     * So, we need to allocate a new pbuf chain and update
-     * the descriptors with the PBUF info.
-     * Care should be taken even if the allocation fails.
-     */
-    tms570_eth_rx_pbuf_refill(nf_state, 0);
-    //tms570_eth_debug_print_rxch();
-    curr_bd = rxch->active_head;
-    if (curr_bd == NULL) {
-      return;
-    }
-  }
-}
-#endif /*ULAN_RECV*/
 boolean EMACTransmit_mbuf(hdkif_t *hdkif, struct mbuf *m)
 {
    
@@ -537,31 +418,35 @@ boolean EMACTransmit_mbuf(hdkif_t *hdkif, struct mbuf *m)
 
             bd_end->flags_pktlen |= EMACSwizzleData( (totlength + aux->m_len) & 0xFFFFU);
         }
-        if(( aux->m_flags & M_EXT ) == M_EXT )
+        if(( aux->m_flags & M_EXT ) == M_EXT  && totlength + aux->m_len > MAX_FRAME_LENGTH)
         {
+            bd_end->flags_pktlen &= 0x0000FFFFU;
+
+            bd_end->flags_pktlen |= EMACSwizzleData( (MAX_FRAME_LENGTH - 64) & 0xFFFFU);
+
             curr_bd->bufptr = EMACSwizzleData((uint32)(mtod(aux,uint8_t *)));
 
-            curr_bd->bufoff_len = EMACSwizzleData((aux->m_len) & 0xFFFFU);
+            curr_bd->bufoff_len = EMACSwizzleData( (MAX_FRAME_LENGTH - 64) & 0xFFFFU);
 
-            curr_bd->flags_pktlen |= EMACSwizzleData(EMAC_BUF_DESC_EOP);
+//            curr_bd->flags_pktlen |= EMACSwizzleData(EMAC_BUF_DESC_EOP);
             bd_end = curr_bd;
             curr_bd = (emac_tx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);
 
 
 
         
-//            flags_pktlen =  MAX_FRAME_LENGTH ;
-//            flags_pktlen |= (EMAC_BUF_DESC_SOP | EMAC_BUF_DESC_OWNER | EMAC_BUF_DESC_EOP );
-////            flags_pktlen |= (EMAC_BUF_DESC_SOP | EMAC_BUF_DESC_EOP );
-//            curr_bd->flags_pktlen = EMACSwizzleData(flags_pktlen);
-//
-////            curr_bd->bufptr = EMACSwizzleData((uint32)(aux->m_ext.ext_buf + MAX_FRAME_LENGTH - totlength));
-//            curr_bd->bufptr = EMACSwizzleData((uint32)(mtod(aux,uint8_t *)));
-////            curr_bd->bufptr = EMACSwizzleData((uint32)&vectest[0]);//EMACSwizzleData((uint32)(mtod(aux,uint8_t *)));
-//
-//            curr_bd->bufoff_len = EMACSwizzleData(MAX_FRAME_LENGTH & 0xFFFFU);// | (aux->m_ext.ext_size - MAX_FRAME_LENGTH) <<16);
-//            bd_end = curr_bd;
-//            curr_bd = (emac_tx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);
+            flags_pktlen =  aux->m_len - MAX_FRAME_LENGTH - totlength + 64 ;
+            flags_pktlen |= (EMAC_BUF_DESC_SOP | EMAC_BUF_DESC_OWNER | EMAC_BUF_DESC_EOP );
+//            flags_pktlen |= (EMAC_BUF_DESC_SOP | EMAC_BUF_DESC_EOP );
+            curr_bd->flags_pktlen = EMACSwizzleData(flags_pktlen);
+
+//            curr_bd->bufptr = EMACSwizzleData((uint32)(aux->m_ext.ext_buf + MAX_FRAME_LENGTH - totlength));
+            curr_bd->bufptr = EMACSwizzleData((uint32)((uint8 *)(mtod(aux,uint8_t *) + totlength + MAX_FRAME_LENGTH - 64)));
+//            curr_bd->bufptr = EMACSwizzleData((uint32)&vectest[0]);//EMACSwizzleData((uint32)(mtod(aux,uint8_t *)));
+
+            curr_bd->bufoff_len = EMACSwizzleData((aux->m_len - MAX_FRAME_LENGTH - totlength + 64) & 0xFFFFU);// | (aux->m_ext.ext_size - MAX_FRAME_LENGTH) <<16);
+            bd_end = curr_bd;
+            curr_bd = (emac_tx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);
             totlength = 0;
         }
         else
