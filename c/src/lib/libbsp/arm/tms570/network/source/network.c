@@ -33,7 +33,7 @@
 //#define TMS_INTC0_TX_VECTOR 0xFFF821E0
 //#define TMS_INTC0_RX_VECTOR 0xFFF821E8
 static uint8_t pbuf_array[MAX_RX_PBUF_ALLOC][MAX_TRANSFER_UNIT];
-//static uint8_t rxDataBuf[MAX_RX_PBUF_ALLOC][MAX_TRANSFER_UNIT];
+static uint8_t rxDataBuf[MAX_RX_PBUF_ALLOC][MAX_TRANSFER_UNIT];
 #define NTMSDRIVER	1
 
 
@@ -175,7 +175,7 @@ void EMACDMAInit(hdkif_t *hdkif)
          /*SAFETYMCUSW 439 S MR:11.3 <APPROVED> "RHS is a pointer value required to be stored. - Advisory as per MISRA" */
          /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
          curr_bd->bufptr = EMACSwizzleData((uint32)p);
-//	 memset(curr_bd->bufptr,0xff,MAX_TRANSFER_UNIT);
+	 memset(EMACSwizzleData((uint32)curr_bd->bufptr),0xff,MAX_TRANSFER_UNIT);
          /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */  
          curr_bd->bufoff_len = EMACSwizzleData(MAX_TRANSFER_UNIT);
          /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
@@ -206,169 +206,7 @@ void EMACDMAInit(hdkif_t *hdkif)
       rxch_dma->active_tail = last_bd;
 }
 #endif
-#ifdef ULAN
-tms570_eth_hw_set_RX_HDP(hdkif_t *hdkif, volatile struct emac_rx_bd *new_head)
-{
-  /* Writes to RX HDP are allowed
-                                                 * only when it is 0
-                                                 */
-  while (hdkif->emac_base->RXHDP[EMAC_CHANNELNUMBER] != 0) {
-    printf("HW -RX- is slacking!!!\n");
-//    sys_arch_delay(10);
-  }
-  printf("setting RX HDP");
-  EMACRxHdrDescPtrWrite(
-    hdkif->emac_base,
-    (uint32)new_head,
-    EMAC_CHANNELNUMBER);
-}
-tms570_eth_hw_set_TX_HDP(hdkif_t *hdkif, volatile struct emac_tx_bd *new_head)
-{
-  /* Writes to RX HDP are allowed
-                                                 * only when it is 0
-                                                 */
-  while (hdkif->emac_base->TXHDP[EMAC_CHANNELNUMBER] != 0) {
-    printf("HW -TX- is slacking!!!\n");
-//    sys_arch_delay(10);
-  }
-  printf("setting TX HDP");
-  EMACTxHdrDescPtrWrite(
-    hdkif->emac_base,
-    (uint32)new_head,
-    EMAC_CHANNELNUMBER);
-}
 
-boolean tms570_eth_send_raw(hdkif_t *hdkif, struct pbuf *pbuf)
-{
-  struct pbuf *q;
-  struct txch *txch;
-  unsigned int pktlen;
-  unsigned int padlen = 0;
-  volatile struct emac_tx_bd *curr_bd;
-  volatile struct emac_tx_bd *packet_head;
-  volatile struct emac_tx_bd *packet_tail;
-
-//  nf_state = (struct tms570_netif_state *)netif->state;
-//  txch = &(nf_state->txch);
-  txch = &(hdkif->txchptr);
-
-  /* Get the first BD that is unused and will be used for TX */
-  curr_bd = txch->inactive_head;
-  if (curr_bd == NULL)
-    goto error_out_of_descriptors;
-
-  packet_head = curr_bd;
-  packet_tail = curr_bd;
-
-  /* adjust the packet length if less than minimum required */
-  pktlen = pbuf->tot_len;
-  if (pktlen < MIN_PKT_LEN) {
-    padlen = MIN_PKT_LEN - pktlen;
-    pktlen = MIN_PKT_LEN;
-  }
-
-  /* First 'part' of packet flags */
-  curr_bd->flags_pktlen = pktlen | EMAC_BUF_DESC_SOP |
-                          EMAC_BUF_DESC_OWNER;
-
-  /* Copy pbuf information into TX BDs --
-   * remember that the pbuf for a single packet might be chained!
-   */
-  for (q = pbuf; q != NULL; q = q->next) {
-    if (curr_bd == NULL)
-      goto error_out_of_descriptors;
-
-    curr_bd->bufptr = (uint8_t *)(q->payload);
-    curr_bd->bufoff_len = (q->len) & 0xFFFF;
-
-    /* This is an extra field that is not par of the in-HW BD.
-     * This is used when freeing the pbuf after the TX processing
-     * is done in EMAC
-     */
-    curr_bd->pbuf = pbuf;
-    packet_tail = curr_bd;
-    curr_bd = curr_bd->next;
-  }
-  if (padlen) {
-    if (curr_bd == NULL)
-      goto error_out_of_descriptors;
-
-    /* If the ETHERNET packet is smaller than 64 bytes, it has
-     * to be padded. We need some data and do not want to leak
-     * random memory. Reuse IP and possibly TCP/UDP header
-     * of given frame as padding
-     */
-    curr_bd->bufptr = packet_head->bufptr;
-    curr_bd->bufoff_len = padlen;
-    curr_bd->pbuf = pbuf;
-    packet_tail = curr_bd;
-    curr_bd = curr_bd->next;
-  }
-  /* Indicate the end of the packet */
-  packet_tail->next = NULL;
-  packet_tail->flags_pktlen |= EMAC_BUF_DESC_EOP;
-
-  txch->inactive_head = curr_bd;
-  if (curr_bd == NULL)
-    txch->inactive_tail = curr_bd;
-
-  sys_arch_data_sync_barier();
-
-  if (txch->active_tail == NULL) {
-    txch->active_head = packet_head;
-    tms570_eth_hw_set_TX_HDP(hdkif, packet_head);
-  } else {
-    /* Chain the bd's. If the DMA engine already reached the
-     * end of the chain, the EOQ will be set. In that case,
-     * the HDP shall be written again.
-     */
-    txch->active_tail->next = packet_head;
-    curr_bd = txch->active_tail;
-
-    /* We were too slow and the EMAC already read the
-     * 'pNext = NULL' of the former txch->active_tail. In this
-     * case the transmission stopped and we need to write the
-     * pointer to newly added BDs to the TX HDP
-     */
-    if (curr_bd->flags_pktlen & EMAC_BUF_DESC_EOQ) {
-      tms570_eth_hw_set_TX_HDP(hdkif, packet_head);
-    }
-  }
-  txch->active_tail = packet_tail;
-
-  return TRUE;
-
-error_out_of_descriptors:
-  //pbuf_free(pbuf);
-  return FALSE;
-}
-#endif /*ULAN*/
-/* EMAC Packet Buffer Sizes and Placement */
-//#ifdef CONFIG_EMAC_PKT_FRAG_SIZE
-//  #define EMAC_FRAG_SIZE    CONFIG_EMAC_PKT_FRAG_SIZE
-//#else
-//  #define EMAC_FRAG_SIZE      1536
-//#endif
-//
-//#ifdef CONFIG_EMAC_ETH_FRAME_SIZE
-//  #define EMAC_MAX_FLEN    CONFIG_EMAC_ETH_FRAME_SIZE
-//#else
-//  #define EMAC_MAX_FLEN       1536
-//#endif
-//
-//#ifdef CONFIG_EMAC_NUM_RX_FRAGS
-//  #define EMAC_NUM_RX_FRAG    CONFIG_EMAC_NUM_RX_FRAGS
-//#else
-//  #define EMAC_NUM_RX_FRAG    4
-//#endif
-//
-//#ifdef CONFIG_EMAC_NUM_TX_FRAGS
-//  #define EMAC_NUM_TX_FRAG    CONFIG_EMAC_NUM_TX_FRAGS
-//#else
-//  #define EMAC_NUM_TX_FRAG    2
-//#endif
-//
-//#include <lwip/netifapi.h>
 boolean EMACTransmit_mbuf(hdkif_t *hdkif, struct mbuf *m)
 {
    
@@ -461,6 +299,10 @@ boolean EMACTransmit_mbuf(hdkif_t *hdkif, struct mbuf *m)
 //    aux=aux_next;
     aux=aux->m_next;
     }
+   if( totlength > 0 && totlength < MIN_FRAME_LENGTH){
+            bd_end->bufoff_len = EMACSwizzleData((uint32)MIN_FRAME_LENGTH);
+            bd_end->flags_pktlen |= EMACSwizzleData((uint32)MIN_FRAME_LENGTH);
+   }
 
   /* Indicate the start and end of the packet */
   /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
@@ -653,13 +495,13 @@ for (rxBds = 0 ; ;) {
 	  MGETHDR (m, M_WAIT, MT_DATA);
    	  MCLGET (m, M_WAIT);
 	  m->m_pkthdr.rcvif = ifp;
+	  m->m_data=rxDataBuf[1]; // 1
 	  sc->rxMbuf[rxBds] = m;
 	  if (++rxBds == MAX_RX_PBUF_ALLOC-1) {
 	       break;
        }
-       
 }
-rxBds=0;
+rxBds=1;
  
 	//	sc->rxMbuf[rxBds]->m_data=rxch_int->active_head->bufptr;
 	/*
@@ -675,8 +517,8 @@ for (;;) {
 			while ((*(uint32_t *)(0xFCF780A4)) == 0x00000000 ) {
       	    	     	rtems_event_set events;
      	    		rtems_interrupt_level level;
-			/* 			rtems_interrupt_disable (level);
-						rtems_interrupt_enable (level);*/
+			rtems_interrupt_disable (level);
+			rtems_interrupt_enable (level);
 
 				/*
 				 * Unmask RXF (Full frame received) event
@@ -704,11 +546,11 @@ for (;;) {
    * when the DMA is receiving data, SOP flag will be set
   */
 
-  while((curr_bd->flags_pktlen & EMAC_BUF_DESC_SOP) == EMAC_BUF_DESC_SOP) {
+  while((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_SOP) == EMAC_BUF_DESC_SOP) {
 
     /* Start processing once the packet is loaded */
 
-	  if((curr_bd->flags_pktlen & EMAC_BUF_DESC_OWNER)
+	  if((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_OWNER)
        != EMAC_BUF_DESC_OWNER) {
 
       /* this bd chain will be freed after processing */
@@ -723,57 +565,64 @@ for (;;) {
        * The loop runs till it reaches the end of the packet.
        */
 	      
-     while((curr_bd->flags_pktlen & EMAC_BUF_DESC_EOP)!= EMAC_BUF_DESC_EOP)
-      {
-        curr_bd->flags_pktlen = (uint32)EMAC_BUF_DESC_OWNER;
-        curr_bd->bufoff_len = (uint32)MAX_TRANSFER_UNIT;
-        last_bd = curr_bd;
-        curr_bd = curr_bd->next;
-
-        m = sc->rxMbuf[rxBds];//------------------
-        m->m_data=last_bd->bufptr;
-       	eh = mtod (m, struct ether_header *);
-	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);
-	m->m_data+=sizeof(struct ether_header);
-	ether_input (ifp, eh, m);
-
-	MGETHDR (m, M_WAIT, MT_DATA);
-	MCLGET (m, M_WAIT);
-	m->m_pkthdr.rcvif = ifp;     
-      	sc->rxMbuf[rxBds] = m;	//---------------------------------------------------------
- 	if(++rxBds == MAX_RX_PBUF_ALLOC-1)
-	  rxBds=0;
-		      
-      }
+//     while((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_EOP)!= EMAC_BUF_DESC_EOP)
+//      {
+//        curr_bd->flags_pktlen = EMACSwizzleData((uint32)EMAC_BUF_DESC_OWNER);
+//        curr_bd->bufoff_len = EMACSwizzleData((uint32)MAX_TRANSFER_UNIT);
+//        last_bd = curr_bd;
+//        curr_bd = (emac_rx_bd_t *)EMACSwizzleData(curr_bd->next);
+//
+//        m = sc->rxMbuf[rxBds];//------------------
+//        m->m_data=last_bd->bufptr;
+//       	eh = mtod (m, struct ether_header *);
+//	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);
+//	m->m_data+=sizeof(struct ether_header);
+//	ether_input (ifp, eh, m);
+//
+//	MGETHDR (m, M_WAIT, MT_DATA);
+//	MCLGET (m, M_WAIT);
+//	m->m_pkthdr.rcvif = ifp;     
+//      	sc->rxMbuf[rxBds] = m;	//---------------------------------------------------------
+// 	if(++rxBds == MAX_RX_PBUF_ALLOC-1)
+//	  rxBds=0;
+//		      
+//      }
       
 
-      curr_bd->flags_pktlen = (uint32)EMAC_BUF_DESC_OWNER;
+      curr_bd->flags_pktlen = EMACSwizzleData((uint32)EMAC_BUF_DESC_OWNER);
 
-      curr_bd->bufoff_len = (uint32)MAX_TRANSFER_UNIT;
+      curr_bd->bufoff_len = EMACSwizzleData((uint32)MAX_TRANSFER_UNIT);
 
       last_bd = curr_bd;
 
-      curr_bd = curr_bd->next;
+      curr_bd = (emac_rx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);
      
       //    EMACRxCPWrite(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER, (uint32)last_bd);
 
       m = sc->rxMbuf[rxBds];
-            while(last_bd->flags_pktlen&EMAC_BUF_DESC_OWNER==EMAC_BUF_DESC_OWNER)
-      	{
-	  //wait for it to be ready
-      	}
-        m->m_data=last_bd->bufptr;
-	eh = mtod (m, struct ether_header *);
-	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);//last_bd->flags_pktlen&(0x0000FFFF)-sizeof(struct ether_header);//MAX_TRANSFER_UNIT-sizeof(struct ether_header);
-	m->m_data+=sizeof(struct ether_header);
-	ether_input (ifp, eh, m);
 
+//            while((EMACSwizzleData((uint32)last_bd->flags_pktlen) & EMAC_BUF_DESC_OWNER)==EMAC_BUF_DESC_OWNER)
+//      	{
+//	  //wait for it to be ready
+//      	}
+//        m->m_data=last_bd->bufptr;
+//	eh = mtod (m, struct ether_header *);
+//	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);//last_bd->flags_pktlen&(0x0000FFFF)-sizeof(struct ether_header);//MAX_TRANSFER_UNIT-sizeof(struct ether_header);
+//	m->m_data+=sizeof(struct ether_header);
+//	ether_input (ifp, eh, m);
+
+        memcpy(mtod(m,void *),(void *)EMACSwizzleData((uint32)last_bd->bufptr),MAX_TRANSFER_UNIT);
 	EMACRxCPWrite(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER, (uint32)last_bd);
 
+	eh = mtod (m, struct ether_header *);
+	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);
+	m->m_data+=sizeof(struct ether_header);
+
+	ether_input (ifp, eh, m);
 	MGETHDR (m, M_WAIT, MT_DATA);
 	MCLGET (m, M_WAIT);
 	m->m_pkthdr.rcvif = ifp;      
-	//	m->m_data=rxDataBuf[rxBds];
+	m->m_data=rxDataBuf[rxBds];
    	sc->rxMbuf[rxBds] = m;
 
    	if(++rxBds == MAX_RX_PBUF_ALLOC-1)
@@ -781,7 +630,7 @@ for (;;) {
 	    
       rxch_int->active_head = curr_bd;
       curr_tail = rxch_int->active_tail;
-      curr_tail->next = rxch_int->free_head;
+      curr_tail->next = (emac_rx_bd_t *)EMACSwizzleData((uint32)rxch_int->free_head);
       last_bd->next = NULL;
 
 
@@ -791,7 +640,7 @@ for (;;) {
          * with the next descriptor.
          */
 
-        if((curr_tail->flags_pktlen & EMAC_BUF_DESC_EOQ) == EMAC_BUF_DESC_EOQ) {
+        if((EMACSwizzleData((uint32)curr_tail->flags_pktlen) & EMAC_BUF_DESC_EOQ) == EMAC_BUF_DESC_EOQ) {
 
           EMACRxHdrDescPtrWrite(hdkif->emac_base, (uint32)(rxch_int->free_head), (uint32)EMAC_CHANNELNUMBER);
         }
@@ -928,208 +777,7 @@ for(j=0;j<im;j++)
 
     
 }
-//#if  0
-static void
-sendpacket (struct ifnet *ifp, struct mbuf *m)
-{
-//  uint8 *myframe;
-//  uint8 test[1514];
-  pbuf_t *ti_buffer=NULL, * ti_buffer_current;
-  struct mbuf *a,*b;
-  bool i=false;
-  int im=0,minimumSizeDifference;
-  size_t acc=0;
-  uint16_t totlength=0;
-  struct tms_softc *sc = ifp->if_softc;
-  rtems_interrupt_level pval;
-  
- // a=m;
- // b=m;
-  a=m_pullup(m,m->m_len);
-//  b=a;
-
-  while(a){
-      minimumSizeDifference=0;
-            /*
-             * m_len is the length of the data in mbuf without any header
-             * m_pkthdr is the length of de mbuf in bytes data included
-             * m->m_ext.ext_size length of the data if mbuf has external associated data
-             */
-    if (a->m_next == NULL && (a->m_flags & M_EXT)!=M_EXT ){
-      //a=m_pullup(b,m->m_len);
-        /*
-         * This is a single mbuf
-         */
-
-    ti_buffer=malloc(sizeof( pbuf_t ),M_DEVBUF,M_WAITOK);
-
-    /*
-     * Memory allocation for a single struct
-     */
-
-      ti_buffer->len = (uint16) a->m_len; 
-    /*
-     * Assign length of the single pbuf
-     */
-      ti_buffer->next = NULL;
-      /*
-       * single pbuf means next is null 
-       */
-      ti_buffer->payload=mtod(a,uint8_t *);
-      ti_buffer->tot_len = (uint16) (a->m_len+minimumSizeDifference);
-      ti_buffer_current = ti_buffer;
-      break;
-    }
-
-
-      /*
-       * If it's an mbuf with other chained mbufs we allocate a chain of pbufs
-       */
-      pbuf_t * ti_buffer_aux, *last_buffer;
-      ti_buffer_aux=malloc(sizeof( pbuf_t ),M_DEVBUF,M_WAITOK);
-      ti_buffer_aux->tot_len=0;
-      /*
-       * The auxiliary buffer is null evey time a new mbuf is taken, so it needs to be allocated
-       */
-
-      if(ti_buffer != NULL){
-          last_buffer=ti_buffer_current;
-          ti_buffer_current->next=ti_buffer_aux;
-        ti_buffer_current=ti_buffer_current->next;
-      }
-      /*
-       * If the buffer to be sent alread exists, it means there is also a pointer to the current chain being processed,
-       * so the newly allocated pbuf is assigned to the next-pointer of the current pbuf
-       */
-      else{
-          ti_buffer_current=ti_buffer_aux;
-          ti_buffer=ti_buffer_current;
-          ti_buffer->tot_len = 0;
-      }
-      /*
-       * No buffer to be sent exists, so the buffer to be sent is the recently allocated pbuf ti_buffer_aux, head of the chain
-       */
-    if((a->m_flags&M_EXT)==M_EXT )
-    {
-        /*
-         * Flags indicate that an external buffer is referenced
-         * the size can be read in the m_ext header struct available for these cases
-         */
-
-        //a=m_pullup(a,a->m_ext.ext_size);
-        ti_buffer_aux->len = (uint16) (a->m_ext.ext_size); 
-//midif        ti_buffer_aux->len = (uint16) (a->m_ext.ext_size-minimumSizeDifference); 
-//midif           if(last_buffer != NULL && minimumSizeDifference > 0)
-//midif                memcpy(last_buffer->payload + (MIN_FRAME_LENGTH - minimumSizeDifference),a->m_ext.ext_buf,minimumSizeDifference);
-
-//midif          ti_buffer_aux->payload=a->m_ext.ext_buf+minimumSizeDifference;
-             ti_buffer_aux->payload=a->m_ext.ext_buf;
-         /*
-          * the payload is referenced to the extern buf data pointer
-          */
-         if( totlength + a->m_ext.ext_size > MAX_FRAME_LENGTH  )
-         {
-
-//midif         ti_buffer_aux->len = (uint16)(a->m_ext.ext_size-MAX_FRAME_LENGTH-minimumSizeDifference);
-//         ti_buffer_aux->len = (uint16)(a->m_ext.ext_size-MAX_FRAME_LENGTH);
-         ti_buffer_aux->len = (uint16)(1024);
-         /*
-          * An external buffer can have a size of 2048 which exceds the 1500 bytes limited space in pbuf, thus if the size of the external buffer greater than MAX_FRAME_LENGTH (1500) then a new pbuf is allocated to ti_buffer_aux->next
-          */
-            ti_buffer_current->next=NULL;
-            ti_buffer->tot_len=totlength + ti_buffer_aux->len;
-            i=EMACTransmit(sc->hdkif, ti_buffer);
-            i = pbuf_free(ti_buffer);
-            ti_buffer=NULL;
-            minimumSizeDifference=ti_buffer->tot_len;
-
-//            ti_buffer_aux=malloc(sizeof( pbuf_t ),M_DEVBUF,M_WAITOK);
-//            ti_buffer_aux->len = (uint16) (545); 
-//            ti_buffer_aux->payload=mtod(a,uint8_t *)+1024;
-//            ti_buffer_aux->tot_len = ti_buffer_aux->len; 
-//            ti_buffer_current=ti_buffer_aux; 
-//            ti_buffer=ti_buffer_aux; 
-//            i=EMACTransmit(sc->hdkif, ti_buffer_aux);
-//            pbuf_free(ti_buffer_aux);
-         
-         
-//           ti_buffer_aux->next=malloc(sizeof( pbuf_t ),M_DEVBUF,M_WAITOK);
-  //         ti_buffer_aux->next->payload=a->m_ext.ext_buf+a->m_ext.ext_size-MAX_FRAME_LENGTH;
-
-         /*
-          * The payload buffer of the next pbuf is then referenced to the rest of the external data
-          */
- //          ti_buffer_aux->next->len = (uint16) MAX_FRAME_LENGTH; 
-         /*
-          * The length is adjusted to the rest of the external data buffer size
-          */
-//           ti_buffer_current=ti_buffer_aux->next;
-         /*
-          * Also the ti_buffer_current is updated since a new pbuf was allocated and populated
-          */
-         
-      }
-//    minimumSizeDifference=0;
-    }
-    else
-    {
-        // a=m_pullup(m,m->m_len);
-        /*
-         * The mbuf does not contain an external referenced buffer, thus all the data is contained in the mbuf structure
-         */
-//midif       ti_buffer_aux->len = (uint16) a->m_len + minimumSizeDifference; 
-           ti_buffer_aux->len = (uint16) a->m_len; 
- //midif       if(minimumSizeDifference > 0){
-//            ti_buffer_aux->payload = LWIP_MEM_ALIGN((void *)((uint8_t *)ti_buffer_aux + sizeof(struct pbuf_struct *)));
- //midif           ti_buffer_aux->payload = malloc((a->m_len + minimumSizeDifference)*sizeof(uint8_t),M_DEVBUF,M_WAITOK);
- //midif           memcpy(ti_buffer_aux->payload,mtod(a,uint8_t *),a->m_len*sizeof(uint8_t));
- //midif       }
- //midif       else
-         ti_buffer_aux->payload=mtod(a,uint8_t *);
-    }
-         if( totlength + MLEN > MAX_FRAME_LENGTH )
-         {
-            ti_buffer_current->next=NULL;
-            ti_buffer->tot_len=totlength;
-            i=EMACTransmit(sc->hdkif, ti_buffer);
-            pbuf_free(ti_buffer);
-            totlength =0;
-         }
-         else
-            totlength += ti_buffer_aux->len;
-
-       MFREE (a, b);
-       a=b;
-//        a=m_pullup(a->m_next,a->m_next->m_len);
-//        b=a;
-//        a=a->m_next; //a se queda igual
-     // memcpy(&test[0],myframe,a->m_len);
-  }
-
-    if( ti_buffer != NULL && ti_buffer->len < MIN_FRAME_LENGTH)
-          ti_buffer->len = MIN_FRAME_LENGTH;
-    if(ti_buffer !=NULL && totlength < ti_buffer->len)
-        totlength = ti_buffer->len;
-    if (ti_buffer != NULL && ti_buffer->len > ti_buffer->tot_len)
-      ti_buffer->tot_len = totlength;
-
-    ti_buffer_current->next=NULL;
-
-  rtems_interrupt_disable(pval);
-    i=EMACTransmit(sc->hdkif, ti_buffer);
-    //    memset(test,0,1514);
-  rtems_interrupt_enable(pval);
-  if(minimumSizeDifference > 0)
-  {
-      ti_buffer->payload+= minimumSizeDifference ;
-      ti_buffer->len=MAX_FRAME_LENGTH;
-      ti_buffer->tot_len=MAX_FRAME_LENGTH;
-        i=EMACTransmit(sc->hdkif, ti_buffer);
-  }
-    
-}
 #endif
-
 /*
  * Driver transmit daemon
  */
