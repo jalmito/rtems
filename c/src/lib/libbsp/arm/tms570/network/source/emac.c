@@ -1281,117 +1281,6 @@ uint32 EMACHWInit(uint8_t macaddr[6U])
 /* DesignId : ETH_DesignId_050*/
 /* Requirements : HL_ETH_SR31 */
 
-//boolean EMACTransmit(hdkif_t *hdkif, pbuf_t *pbuf)
-//{
-//    
-//  txch_t *txch;
-//  pbuf_t *q;
-//  uint16 totLen;
-//  uint16 qLen;
-//  volatile emac_tx_bd_t *curr_bd,*active_head, *bd_end;
-//  boolean retValue = FALSE;
-//  if((pbuf != NULL) && (hdkif != NULL))
-//  {
-//  txch = &(hdkif->txchptr);
-//
-//  /* Get the buffer descriptor which is free to transmit */
-//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-//  curr_bd = txch->free_head;
-//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-//  bd_end = curr_bd;
-//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-//  active_head = curr_bd;
-//
-//  /* Update the total packet length */
-//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */       
-//  curr_bd->flags_pktlen &= (~((uint32)0xFFFFU));
-//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-//  totLen = pbuf->tot_len;
-//  curr_bd->flags_pktlen |= (uint32)(totLen);
-//
-//  /* Indicate the start of the packet */
-//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-//  curr_bd->flags_pktlen |= (EMAC_BUF_DESC_SOP | EMAC_BUF_DESC_OWNER);
-//
-//
-//  /* Copy pbuf information into TX buffer descriptors */
-//    q = pbuf;
-//    while(q != NULL)
-//    {
-//    /* Initialize the buffer pointer and length */
-//    /*SAFETYMCUSW 439 S MR:11.3 <APPROVED> "RHS is a pointer value required to be stored. - Advisory as per MISRA" */
-//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
-//    curr_bd->bufptr = (uint32)(q->payload);
-//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */
-//    qLen = q->len;
-//    curr_bd->bufoff_len = ((uint32)(qLen) & 0xFFFFU);
-//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */      
-//    bd_end = curr_bd;
-//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
-//    curr_bd = curr_bd->next;
-//    q = q->next;
-//    }
-//
-//
-//  /* Indicate the start and end of the packet */
-//  /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
-//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */       
-//  bd_end->next = NULL;
-//  /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
-//  bd_end->flags_pktlen |= EMAC_BUF_DESC_EOP;
-//
-//  /*SAFETYMCUSW 71 S MR:17.6 <APPROVED> "Assigned pointer value has required scope." */
-//  txch->free_head = curr_bd;
-//
-//  /* For the first time, write the HDP with the filled bd */
-//  if(txch->active_tail == NULL) {
-//    /*SAFETYMCUSW 439 S MR:11.3 <APPROVED> "Address stored in pointer is passed as as an int parameter. - Advisory as per MISRA" */
-//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */      
-//    EMACTxHdrDescPtrWrite(hdkif->emac_base, (uint32)(active_head), (uint32)EMAC_CHANNELNUMBER);
-//  }
-//
-//  /*
-//   * Chain the bd's. If the DMA engine, already reached the end of the chain,
-//   * the EOQ will be set. In that case, the HDP shall be written again.
-//   */
-//  else {
-//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
-//    curr_bd = txch->active_tail;
-//    /* Wait for the EOQ bit is set */
-//    /*SAFETYMCUSW 28 D MR:NA <APPROVED> "Hardware status bit read check" */
-//    /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
-//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
-//    while (EMAC_BUF_DESC_EOQ != (curr_bd->flags_pktlen & EMAC_BUF_DESC_EOQ))
-//    {
-//    }
-//    /* Don't write to TXHDP0 until it turns to zero */
-//    /*SAFETYMCUSW 28 D MR:NA <APPROVED> "Hardware status bit read check" */
-//    /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
-//    while (((uint32)0U != *((uint32 *)0xFCF78600U)))
-//    {
-//    }
-//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */   
-//    curr_bd->next = active_head;
-//    /*SAFETYMCUSW 134 S MR:12.2 <APPROVED> "LDRA Tool issue" */
-//    /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */      
-//    if (EMAC_BUF_DESC_EOQ == (curr_bd->flags_pktlen & EMAC_BUF_DESC_EOQ)) {
-//      /* Write the Header Descriptor Pointer and start DMA */
-//      /*SAFETYMCUSW 439 S MR:11.3 <APPROVED> "Address stored in pointer is passed as as an int parameter. - Advisory as per MISRA" */
-//      /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */          
-//      EMACTxHdrDescPtrWrite(hdkif->emac_base, (uint32)(active_head), (uint32)EMAC_CHANNELNUMBER);
-//    }
-//  }
-//   
-//  /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-//  txch->active_tail = bd_end;
-//  retValue = TRUE;
-//  }
-//  else
-//  {
-//    retValue = FALSE;
-//  }
-//  return retValue;
-//}
 
 /**
  * Function for processing Tx buffer descriptors.
@@ -1648,6 +1537,204 @@ void EMACGetConfigValue(emac_config_reg_t *config_reg, config_value_type_t type)
 
 
 /* USER CODE BEGIN (2) */
+#ifdef EXTENDED_PBUF
+struct pbuf *
+pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
+{
+  struct pbuf *p, *q, *r;
+  u16_t offset;
+  s32_t rem_len; /* remaining length */
+//  LWIP_DEBUGF(PBUF_DEBUG | LWIP_DBG_TRACE, ("pbuf_alloc(length=%"U16_F")\n", length));
+
+  /* determine header offset */
+  switch (layer) {
+
+#ifdef PBUF_TRANSPORT
+  case PBUF_TRANSPORT:
+    /* add room for transport (often TCP) layer header */
+    offset = PBUF_LINK_HLEN + PBUF_IP_HLEN + PBUF_TRANSPORT_HLEN;
+    break;
+#endif
+#ifdef PBUF_IP
+  case PBUF_IP:
+    /* add room for IP layer header */
+    offset = PBUF_LINK_HLEN + PBUF_IP_HLEN;
+    break;
+#endif
+#ifdef PBUF_LINK
+  case PBUF_LINK:
+    /* add room for link layer header */
+    offset = PBUF_LINK_HLEN;
+    break;
+#endif
+#define PBUF_RAW_
+#ifdef PBUF_RAW_
+  case PBUF_RAW:
+    offset = 0;
+    break;
+#endif
+  default:
+//    LWIP_ASSERT("pbuf_alloc: bad pbuf layer", 0);
+    return NULL;
+  }
+
+  switch (type) {
+  case PBUF_POOL:
+    /* allocate head of pbuf chain into p */
+    p = (struct pbuf *)memp_malloc(MEMP_PBUF_POOL);
+//    LWIP_DEBUGF(PBUF_DEBUG | LWIP_DBG_TRACE, ("pbuf_alloc: allocated pbuf %p\n", (void *)p));
+    if (p == NULL) {
+      PBUF_POOL_IS_EMPTY();
+      return NULL;
+    }
+    p->type = type;
+    p->next = NULL;
+
+    /* make the payload pointer point 'offset' bytes into pbuf data memory */
+    p->payload = LWIP_MEM_ALIGN((void *)((u8_t *)p + (SIZEOF_STRUCT_PBUF + offset)));
+    LWIP_ASSERT("pbuf_alloc: pbuf p->payload properly aligned",
+            ((mem_ptr_t)p->payload % MEM_ALIGNMENT) == 0);
+    /* the total length of the pbuf chain is the requested size */
+    p->tot_len = length;
+    /* set the length of the first pbuf in the chain */
+    p->len = LWIP_MIN(length, PBUF_POOL_BUFSIZE_ALIGNED - LWIP_MEM_ALIGN_SIZE(offset));
+    LWIP_ASSERT("check p->payload + p->len does not overflow pbuf",
+                ((u8_t*)p->payload + p->len <=
+                 (u8_t*)p + SIZEOF_STRUCT_PBUF + PBUF_POOL_BUFSIZE_ALIGNED));
+    LWIP_ASSERT("PBUF_POOL_BUFSIZE must be bigger than MEM_ALIGNMENT",
+      (PBUF_POOL_BUFSIZE_ALIGNED - LWIP_MEM_ALIGN_SIZE(offset)) > 0 );
+    /* set reference count (needed here in case we fail) */
+    p->ref = 1;
+
+    /* now allocate the tail of the pbuf chain */
+
+    /* remember first pbuf for linkage in next iteration */
+    r = p;
+    /* remaining length to be allocated */
+    rem_len = length - p->len;
+    /* any remaining pbufs to be allocated? */
+    while (rem_len > 0) {
+      q = (struct pbuf *)memp_malloc(MEMP_PBUF_POOL);
+      if (q == NULL) {
+        PBUF_POOL_IS_EMPTY();
+        /* free chain so far allocated */
+        pbuf_free(p);
+        /* bail out unsuccesfully */
+        return NULL;
+      }
+      q->type = type;
+      q->flags = 0;
+      q->next = NULL;
+      /* make previous pbuf point to this pbuf */
+      r->next = q;
+      /* set total length of this pbuf and next in chain */
+      LWIP_ASSERT("rem_len < max_u16_t", rem_len < 0xffff);
+      q->tot_len = (u16_t)rem_len;
+      /* this pbuf length is pool size, unless smaller sized tail */
+      q->len = LWIP_MIN((u16_t)rem_len, PBUF_POOL_BUFSIZE_ALIGNED);
+      q->payload = (void *)((u8_t *)q + SIZEOF_STRUCT_PBUF);
+      LWIP_ASSERT("pbuf_alloc: pbuf q->payload properly aligned",
+              ((mem_ptr_t)q->payload % MEM_ALIGNMENT) == 0);
+      LWIP_ASSERT("check p->payload + p->len does not overflow pbuf",
+                  ((u8_t*)p->payload + p->len <=
+                   (u8_t*)p + SIZEOF_STRUCT_PBUF + PBUF_POOL_BUFSIZE_ALIGNED));
+      q->ref = 1;
+      /* calculate remaining length to be allocated */
+      rem_len -= q->len;
+      /* remember this pbuf for linkage in next iteration */
+      r = q;
+    }
+    /* end of chain */
+    /*r->next = NULL;*/
+
+    break;
+//  case PBUF_RAM:
+//    /* If pbuf is to be allocated in RAM, allocate memory for it. */
+//    p = (struct pbuf*)mem_malloc(LWIP_MEM_ALIGN_SIZE(SIZEOF_STRUCT_PBUF + offset) + LWIP_MEM_ALIGN_SIZE(length));
+//    if (p == NULL) {
+//      return NULL;
+//    }
+//    /* Set up internal structure of the pbuf. */
+//    p->payload = LWIP_MEM_ALIGN((void *)((u8_t *)p + SIZEOF_STRUCT_PBUF + offset));
+//    p->len = p->tot_len = length;
+//    p->next = NULL;
+//    p->type = type;
+//
+//    LWIP_ASSERT("pbuf_alloc: pbuf->payload properly aligned",
+//           ((mem_ptr_t)p->payload % MEM_ALIGNMENT) == 0);
+//    break;
+//  /* pbuf references existing (non-volatile static constant) ROM payload? */
+//  case PBUF_ROM:
+//  /* pbuf references existing (externally allocated) RAM payload? */
+//  case PBUF_REF:
+//    /* only allocate memory for the pbuf structure */
+//    p = (struct pbuf *)memp_malloc(MEMP_PBUF);
+//    if (p == NULL) {
+//      LWIP_DEBUGF(PBUF_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
+//                  ("pbuf_alloc: Could not allocate MEMP_PBUF for PBUF_%s.\n",
+//                  (type == PBUF_ROM) ? "ROM" : "REF"));
+//      return NULL;
+//    }
+//    /* caller must set this field properly, afterwards */
+//    p->payload = NULL;
+//    p->len = p->tot_len = length;
+//    p->next = NULL;
+//    p->type = type;
+//    break;
+  default:
+    LWIP_ASSERT("pbuf_alloc: erroneous type", 0);
+    return NULL;
+  }
+  /* set reference count */
+  p->ref = 1;
+  /* set flags */
+  p->flags = 0;
+//  LWIP_DEBUGF(PBUF_DEBUG | LWIP_DBG_TRACE, ("pbuf_alloc(length=%"U16_F") == %p\n", length, (void *)p));
+  return p;
+}
+#else
+uint8_t pbuf_free(pbuf_t *p)
+{
+  uint16_t type;
+  pbuf_t *q;
+  uint8_t count;
+
+  if (p == NULL) {
+    return 0;
+  }
+
+//  PERF_START;
+
+//  LWIP_ASSERT("pbuf_free: sane type",
+//    p->type == PBUF_RAM || p->type == PBUF_ROM ||
+//    p->type == PBUF_REF || p->type == PBUF_POOL);
+
+  count = 0;
+  /* de-allocate all consecutive pbufs from the head of the chain that
+   * obtain a zero reference count after decrementing*/
+  while (p != NULL) {
+/*    rtems_interrupt_level pval;
+    rtems_interrupt_disable(pval);*/
+      /* remember next pbuf in chain for next iteration */
+      q = p->next;
+          free(p,M_DEVBUF);
+      count++;
+      /* proceed to next pbuf */
+      p = q;
+    /* p->ref > 0, this pbuf is still referenced to */
+    /* (and so the remaining pbufs in chain as well) */
+    
+  }
+  /* return number of de-allocated pbufs */
+  return count;
+}
+
+#endif
+
+
+
+
+
 /* USER CODE END */
 
 /***************************** End Of File ***********************************/

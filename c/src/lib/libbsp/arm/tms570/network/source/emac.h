@@ -53,12 +53,86 @@
 #include "hw_emac_ctrl.h"
 #include "mdio.h"
 #include "phy_dp83640.h"
+#include <sys/mbuf.h>
+#include <sys/malloc.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* USER CODE BEGIN (1) */
+//#define EXTENDED_PBUF
+#define TEST
+#define MAX_FRAME_LENGTH 576 //1514
+#ifndef LWIP_MEM_ALIGN
+#define MEM_ALIGNMENT                   1
+typedef uintptr_t          mem_ptr_t; 
+#define LWIP_MEM_ALIGN(addr) ((void *)(((mem_ptr_t)(addr) + MEM_ALIGNMENT - 1) & ~(mem_ptr_t)(MEM_ALIGNMENT-1)))
+#endif
+#ifdef EXTENDED_PBUF
+  typedef uint8_t            u8_t; 
+  typedef int8_t             s8_t; 
+  typedef uint16_t           u16_t; 
+  typedef int16_t            s16_t; 
+  typedef uint32_t           u32_t; 
+  typedef int32_t            s32_t; 
+  typedef uintptr_t          mem_ptr_t; 
+
+#ifndef LWIP_MEM_ALIGN
+#define LWIP_MEM_ALIGN(addr) ((void *)(((mem_ptr_t)(addr) + MEM_ALIGNMENT - 1) & ~(mem_ptr_t)(MEM_ALIGNMENT-1)))
+#endif
+#define PBUF_TRANSPORT_HLEN 20
+#if LWIP_IPV6
+#define PBUF_IP_HLEN        40
+#else
+#define PBUF_IP_HLEN        20
+#endif
+
+typedef enum {
+  PBUF_TRANSPORT,
+  PBUF_IP,
+  PBUF_LINK,
+  PBUF_RAW_TX,
+  PBUF_RAW
+} pbuf_layer;
+
+typedef enum {
+  /** pbuf data is stored in RAM, used for TX mostly, struct pbuf and its payload
+      are allocated in one piece of contiguous memory (so the first payload byte
+      can be calculated from struct pbuf)
+      pbuf_alloc() allocates PBUF_RAM pbufs as unchained pbufs (although that might
+      change in future versions) */
+  PBUF_RAM,
+  /** pbuf data is stored in ROM, i.e. struct pbuf and its payload are located in
+      totally different memory areas. Since it points to ROM, payload does not
+      have to be copied when queued for transmission. */
+  PBUF_ROM,
+  /** pbuf comes from the pbuf pool. Much like PBUF_ROM but payload might change
+      so it has to be duplicated when queued before transmitting, depending on
+      who has a 'ref' to it. */
+  PBUF_REF,
+  /** pbuf payload refers to RAM. This one comes from a pool and should be used
+      for RX. Payload can be chained (scatter-gather RX) but like PBUF_RAM, struct
+      pbuf and its payload are allocated in one piece of contiguous memory (so
+      the first payload byte can be calculated from struct pbuf) */
+  PBUF_POOL
+} pbuf_type;
+
+
+/** indicates this packet's data should be immediately passed to the application */
+#define PBUF_FLAG_PUSH      0x01U
+/** indicates this is a custom pbuf: pbuf_free calls pbuf_custom->custom_free_function()
+    when the last reference is released (plus custom PBUF_RAM cannot be trimmed) */
+#define PBUF_FLAG_IS_CUSTOM 0x02U
+/** indicates this pbuf is UDP multicast to be looped back */
+#define PBUF_FLAG_MCASTLOOP 0x04U
+/** indicates this pbuf was received as link-level broadcast */
+#define PBUF_FLAG_LLBCAST   0x08U
+/** indicates this pbuf was received as link-level multicast */
+#define PBUF_FLAG_LLMCAST   0x10U
+/** indicates this pbuf includes a TCP FIN flag */
+#define PBUF_FLAG_TCP_FIN   0x20U
+#endif /*Extended pbuf*/
 /* USER CODE END */
 
 /*****************************************************************************/
@@ -307,7 +381,7 @@ typedef struct pbuf_struct {
   uint16 len;
 
 }pbuf_t;
-#ifdef ULAN
+#ifdef EXTENDED_PBUF
 struct pbuf {
 	  /** next pbuf in singly linked pbuf chain */
 	  struct pbuf *next;
@@ -430,6 +504,7 @@ extern void EMACNumFreeBufSet(uint32 emacBase, uint32 channel,
                               uint32 nBuf);
 extern uint32 EMACIntVectorGet(uint32 emacBase);
 uint32 EMACHWInit(uint8_t macaddr[6U]);
+boolean EMACTransmit_mbuf(hdkif_t *hdkif, struct mbuf *m);
 void EMACTxTeardown(uint32 emacBase, uint32 channel);
 void EMACRxTeardown(uint32 emacBase, uint32 channel);
 void EMACFrameSelect(uint32 emacBase, uint64 hashTable);
@@ -457,6 +532,7 @@ void EMACRxIntStat(uint32 emacBase, uint32 channel, emac_rx_int_status_t *rxints
 void EMACGetConfigValue(emac_config_reg_t *config_reg, config_value_type_t type);
 
 /* USER CODE BEGIN (2) */
+uint8_t pbuf_free(pbuf_t *p);
 /* USER CODE END */
 
 #ifdef __cplusplus

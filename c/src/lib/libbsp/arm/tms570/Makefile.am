@@ -180,7 +180,7 @@ libbsp_a_CPPFLAGS += -I$(srcdir)/../../../libcpu/arm/shared/include
 
 network_CPPFLAGS = -D__INSIDE_RTEMS_BSD_TCPIP_STACK__
 noinst_PROGRAMS = network.rel
-network_rel_SOURCES = network/include/emac.h
+network_rel_SOURCES = network/source/emac.h
 network_rel_SOURCES += network/source/network.c network/source/emac.c network/source/mdio.c  network/source/phy_dp83640.c
 network_rel_CPPFLAGS = $(AM_CPPFLAGS) $(network_CPPFLAGS)
 #network_rel_CPPFLAGS += -I network/include 
