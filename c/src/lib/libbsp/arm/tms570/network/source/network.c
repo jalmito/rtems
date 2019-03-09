@@ -45,7 +45,7 @@ static uint8_t rxDataBuf[MAX_RX_PBUF_ALLOC][MAX_TRANSFER_UNIT];
 #define RX_BUF_COUNT     15
 #define TX_BUF_COUNT     4
 #define TX_BD_PER_BUF    4
-#define MIN_FRAME_LENGTH 64
+#define MIN_FRAME_LENGTH 60U
 #define pinMuxBaseReg ((long unsigned int) 0xFFFF1D10U) 
 #define RegEdit ((long unsigned int) 0xFFFFEA38U)
 /*
@@ -230,10 +230,16 @@ boolean EMACTransmit_mbuf(hdkif_t *hdkif, struct mbuf *m)
   /* Update the total packet length */
   uint16_t totlength=0;
   uint32 flags_pktlen;
-//  if(( m->m_flags & M_EXT ) == M_EXT )
-//    flags_pktlen = aux->m_ext.ext_size - MAX_FRAME_LENGTH;
+//  flags_pktlen = 0;//m->m_len;
+
+  if(m->m_pkthdr.len < MIN_FRAME_LENGTH)
+     flags_pktlen = MIN_FRAME_LENGTH;
+  else
+     flags_pktlen = m->m_pkthdr.len;
+  if(( m->m_flags & M_EXT ) == M_EXT )
+    flags_pktlen = m->m_pkthdr.len;//m_ext.ext_size - MAX_FRAME_LENGTH;
+//    flags_pktlen = aux->m_pkthdr.len;//m_ext.ext_size - MAX_FRAME_LENGTH;
 //  else
-    flags_pktlen = 0;//m->m_len;
 
   flags_pktlen |= (EMAC_BUF_DESC_SOP | EMAC_BUF_DESC_OWNER);
 
@@ -243,7 +249,7 @@ boolean EMACTransmit_mbuf(hdkif_t *hdkif, struct mbuf *m)
   /* Copy pbuf information into TX buffer descriptors */
 //    aux=m_pullup(m,m->m_len);
     aux=m;
-    aux_next=m;
+//    aux_next=m;
     while(aux != NULL)
     {
     /* Initialize the buffer pointer and length */
@@ -260,32 +266,31 @@ boolean EMACTransmit_mbuf(hdkif_t *hdkif, struct mbuf *m)
         {
             bd_end->flags_pktlen &= 0x0000FFFFU;
 
-            bd_end->flags_pktlen |= EMACSwizzleData( (MAX_FRAME_LENGTH - 64) & 0xFFFFU);
+            bd_end->flags_pktlen |= EMACSwizzleData( (MAX_FRAME_LENGTH - MIN_FRAME_LENGTH) & 0xFFFFU);
 
             curr_bd->bufptr = EMACSwizzleData((uint32)(mtod(aux,uint8_t *)));
 
-            curr_bd->bufoff_len = EMACSwizzleData( (MAX_FRAME_LENGTH - 64) & 0xFFFFU);
+            curr_bd->bufoff_len = EMACSwizzleData( (MAX_FRAME_LENGTH - MIN_FRAME_LENGTH) & 0xFFFFU);
 
 //            curr_bd->flags_pktlen |= EMACSwizzleData(EMAC_BUF_DESC_EOP);
             bd_end = curr_bd;
             curr_bd = (emac_tx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);
 
 
-
         
-            flags_pktlen =  aux->m_len - MAX_FRAME_LENGTH - totlength + 64 ;
-            flags_pktlen |= (EMAC_BUF_DESC_SOP | EMAC_BUF_DESC_OWNER | EMAC_BUF_DESC_EOP );
+           flags_pktlen =  aux->m_len - MAX_FRAME_LENGTH - totlength + MIN_FRAME_LENGTH ;
+           flags_pktlen |= (EMAC_BUF_DESC_SOP | EMAC_BUF_DESC_OWNER | EMAC_BUF_DESC_EOP );
 //            flags_pktlen |= (EMAC_BUF_DESC_SOP | EMAC_BUF_DESC_EOP );
-            curr_bd->flags_pktlen = EMACSwizzleData(flags_pktlen);
+           curr_bd->flags_pktlen = EMACSwizzleData(flags_pktlen);
 
 //            curr_bd->bufptr = EMACSwizzleData((uint32)(aux->m_ext.ext_buf + MAX_FRAME_LENGTH - totlength));
-            curr_bd->bufptr = EMACSwizzleData((uint32)((uint8 *)(mtod(aux,uint8_t *) + totlength + MAX_FRAME_LENGTH - 64)));
+           curr_bd->bufptr = EMACSwizzleData((uint32)((uint8 *)(mtod(aux,uint8_t *) + totlength + MAX_FRAME_LENGTH - MIN_FRAME_LENGTH)));
 //            curr_bd->bufptr = EMACSwizzleData((uint32)&vectest[0]);//EMACSwizzleData((uint32)(mtod(aux,uint8_t *)));
 
-            curr_bd->bufoff_len = EMACSwizzleData((aux->m_len - MAX_FRAME_LENGTH - totlength + 64) & 0xFFFFU);// | (aux->m_ext.ext_size - MAX_FRAME_LENGTH) <<16);
-            bd_end = curr_bd;
-            curr_bd = (emac_tx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);
-            totlength = 0;
+           curr_bd->bufoff_len = EMACSwizzleData((aux->m_len - MAX_FRAME_LENGTH - totlength + MIN_FRAME_LENGTH) & 0xFFFFU);// | (aux->m_ext.ext_size - MAX_FRAME_LENGTH) <<16);
+           bd_end = curr_bd;
+           curr_bd = (emac_tx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);
+           totlength = 0;
         }
         else
         {
@@ -297,6 +302,8 @@ boolean EMACTransmit_mbuf(hdkif_t *hdkif, struct mbuf *m)
         }
 //    MFREE (aux, aux_next);
 //    aux=aux_next;
+//    if((aux->m_next->m_flags & M_EXT ) == M_EXT  )
+//    aux_next=m_pullup(aux->m_next,aux->m_next->m_len);
     aux=aux->m_next;
     }
    if( totlength > 0 && totlength < MIN_FRAME_LENGTH){
@@ -460,11 +467,114 @@ tms_tx_interrupt_handler (rtems_vector_number v)
 static rtems_isr
 tms_rx_interrupt_handler (rtems_vector_number v)
 {
- 
-
     tms[0].rxInterrupts++;
-    rtems_bsdnet_event_send (tms[0].rxDaemonTid, INTERRUPT_EVENT);
+//    rtems_bsdnet_event_send (tms[0].rxDaemonTid, INTERRUPT_EVENT);
+ 
+rxch_t *rxch_int;
+volatile emac_rx_bd_t *curr_bd, *curr_tail, *last_bd;
+int rxBds=1;
+struct mbuf *m=NULL;
+struct ifnet *ifp;
+rtems_interrupt_level pval;
+    hdkif_t *hdkif;
+    hdkif = tms[0].hdkif;
+    rxch_int = &(hdkif->rxchptr);
+    ifp = &tms[0].arpcom.ac_if;
+
+    rtems_interrupt_disable (pval);
+
+	  MGETHDR (m, M_NOWAIT, MT_DATA);
+            if(m == NULL)
+                return;
+//
+//   	  MCLGET (m, M_NOWAIT);
+//            if(!(m->m_flags & M_EXT))
+          m->m_flags |= M_EXT;
+	  m->m_pkthdr.rcvif = ifp;
+
+//          data_b = mtod(m,uint8 *);
+//          data_b = m->m_ext.ext_buf; 
+	  m->m_data=rxDataBuf[1]; // 1
+//
+//	  m->m_data =malloc(MAX_FRAME_LENGTH * sizeof (uint8 *), M_DEVBUF, M_NOWAIT);//rxDataBuf[1]; // 1
+//	  tms[0].rxMbuf[rxBds] = m;
+//	  if (++rxBds == MAX_RX_PBUF_ALLOC-1) {
+//	       break;
+//       }
+rxBds=1;
+
+			struct ether_header *eh;	
+  curr_bd = rxch_int->active_head;
+
+  last_bd = rxch_int->active_tail;
   
+  while((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_SOP) == EMAC_BUF_DESC_SOP) {
+
+    /* Start processing once the packet is loaded */
+
+	  if((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_OWNER)
+       != EMAC_BUF_DESC_OWNER) {
+
+      /* this bd chain will be freed after processing */
+
+		  rxch_int->free_head = curr_bd;
+      curr_bd->flags_pktlen = EMACSwizzleData((uint32)EMAC_BUF_DESC_OWNER);	//02032019
+
+      curr_bd->bufoff_len = EMACSwizzleData((uint32)MAX_TRANSFER_UNIT);	//02032019
+
+      last_bd = curr_bd;	//02032019
+
+      curr_bd = (emac_rx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);	//02032019
+     
+//      m = tms[0].rxMbuf[rxBds];	//02032019
+	m->m_len=EMACSwizzleData((uint32)last_bd->bufoff_len & 0xFFFF0000);//m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);		//02032019
+      memcpy(mtod(m,uint8 *),(uint8 *)EMACSwizzleData((uint32)last_bd->bufptr),m->m_len);	//02032019
+//      memcpy(data_b,(void *)EMACSwizzleData((uint32)last_bd->bufptr),MAX_TRANSFER_UNIT);	//02032019
+	EMACRxCPWrite(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER, (uint32)last_bd);             	//02032019
+
+	eh = mtod (m, struct ether_header *);						//02032019
+        m->m_len -= sizeof(struct ether_header);
+//	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);		//02032019
+	m->m_pkthdr.len=m->m_len;//,EMACSwizzleData((uint32)last_bd->flags_pktlen & 0xFFFF0000));		//02032019
+	m->m_data+=sizeof(struct ether_header);						//02032019
+
+	ether_input (ifp, eh, m);					//02032019
+//	MGETHDR (m, M_WAIT, MT_DATA);                                   //02032019
+//	MCLGET (m, M_WAIT);                                             //02032019
+//	m->m_pkthdr.rcvif = ifp;      //02032019
+//	m->m_data=rxDataBuf[rxBds];   //02032019
+//   	tms[0].rxMbuf[rxBds] = m;        //02032019
+
+//   	if(++rxBds == MAX_RX_PBUF_ALLOC-1)
+//			rxBds=0;
+	    
+      rxch_int->active_head = curr_bd;                                              	
+      curr_tail = rxch_int->active_tail;                                                
+      curr_tail->next = (emac_rx_bd_t *)EMACSwizzleData((uint32)rxch_int->free_head);   
+      last_bd->next = NULL;                                                             
+
+
+        /**
+         * Check if the reception has ended. If the EOQ flag is set, the NULL
+         * Pointer is taken by the DMA engine. So we need to write the RX HDP
+         * with the next descriptor.
+         */
+
+        if((EMACSwizzleData((uint32)curr_tail->flags_pktlen) & EMAC_BUF_DESC_EOQ) == EMAC_BUF_DESC_EOQ) {
+
+          EMACRxHdrDescPtrWrite(hdkif->emac_base, (uint32)(rxch_int->free_head), (uint32)EMAC_CHANNELNUMBER);
+        }
+
+  
+        rxch_int->free_head  = curr_bd;
+        rxch_int->active_tail = last_bd;
+		
+       
+    }
+  }
+    rtems_interrupt_enable (pval);
+        EMACCoreIntAck(EMAC_0_BASE, (uint32)EMAC_INT_CORE0_RX);
+        EMACCoreIntAck(EMAC_0_BASE, (uint32)EMAC_INT_CORE0_TX);
 
 }
 
@@ -484,6 +594,9 @@ struct tms_softc *sc = (struct tms_softc *)arg;
 struct ifnet *ifp = &sc->arpcom.ac_if;
 hdkif_t *hdkif;
 struct mbuf *m;
+
+  rtems_interrupt_level pval;
+  
 
 
 hdkif=sc->hdkif;
@@ -507,160 +620,196 @@ rxBds=1;
 	/*
 	 * Input packet handling loop
 	 */
-for (;;) {
-                
-		/*
-		 * Wait for packet if there's not one ready
-		 */
-
-		if ((*(uint32_t *)(0xFCF780A4))== 0x00000000) {
-			while ((*(uint32_t *)(0xFCF780A4)) == 0x00000000 ) {
-      	    	     	rtems_event_set events;
-     	    		rtems_interrupt_level level;
-			rtems_interrupt_disable (level);
-			rtems_interrupt_enable (level);
-
-				/*
-				 * Unmask RXF (Full frame received) event
-				 */
-			
-				rtems_bsdnet_event_receive (INTERRUPT_EVENT,
-						RTEMS_WAIT|RTEMS_EVENT_ANY,
-						RTEMS_NO_TIMEOUT,
-						&events);
-				
-			}
-		}
-
-			struct ether_header *eh;	
-
-
-  /* Get the buffer descriptors which contain the earliest filled data */
-
-  curr_bd = rxch_int->active_head;
-
-  last_bd = rxch_int->active_tail;
-
-  /**
-   * Process the descriptors as long as data is available
-   * when the DMA is receiving data, SOP flag will be set
-  */
-
-  while((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_SOP) == EMAC_BUF_DESC_SOP) {
-
-    /* Start processing once the packet is loaded */
-
-	  if((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_OWNER)
-       != EMAC_BUF_DESC_OWNER) {
-
-      /* this bd chain will be freed after processing */
-
-		  rxch_int->free_head = curr_bd;
-
-      /* Get the total length of the packet. curr_bd points to the start
-       * of the packet.
-       */
-
-      /* 
-       * The loop runs till it reaches the end of the packet.
-       */
-	      
-//     while((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_EOP)!= EMAC_BUF_DESC_EOP)
-//      {
-//        curr_bd->flags_pktlen = EMACSwizzleData((uint32)EMAC_BUF_DESC_OWNER);
-//        curr_bd->bufoff_len = EMACSwizzleData((uint32)MAX_TRANSFER_UNIT);
-//        last_bd = curr_bd;
-//        curr_bd = (emac_rx_bd_t *)EMACSwizzleData(curr_bd->next);
+//for (;;) {
+//                
+//		/*
+//		 * Wait for packet if there's not one ready
+//		 */
 //
-//        m = sc->rxMbuf[rxBds];//------------------
-//        m->m_data=last_bd->bufptr;
-//       	eh = mtod (m, struct ether_header *);
-//	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);
-//	m->m_data+=sizeof(struct ether_header);
-//	ether_input (ifp, eh, m);
+//		if ((*(uint32_t *)(0xFCF780A4))== 0x00000000) {
+//			while ((*(uint32_t *)(0xFCF780A4)) == 0x00000000 ) {
+//      	    	     	rtems_event_set events;
+//     //	    		rtems_interrupt_level level;
+//			rtems_interrupt_disable (pval);
+////			rtems_interrupt_enable (level);
 //
-//	MGETHDR (m, M_WAIT, MT_DATA);
-//	MCLGET (m, M_WAIT);
-//	m->m_pkthdr.rcvif = ifp;     
-//      	sc->rxMbuf[rxBds] = m;	//---------------------------------------------------------
-// 	if(++rxBds == MAX_RX_PBUF_ALLOC-1)
-//	  rxBds=0;
-//		      
-//      }
-      
-
-      curr_bd->flags_pktlen = EMACSwizzleData((uint32)EMAC_BUF_DESC_OWNER);
-
-      curr_bd->bufoff_len = EMACSwizzleData((uint32)MAX_TRANSFER_UNIT);
-
-      last_bd = curr_bd;
-
-      curr_bd = (emac_rx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);
-     
-      //    EMACRxCPWrite(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER, (uint32)last_bd);
-
-      m = sc->rxMbuf[rxBds];
-
-//            while((EMACSwizzleData((uint32)last_bd->flags_pktlen) & EMAC_BUF_DESC_OWNER)==EMAC_BUF_DESC_OWNER)
-//      	{
-//	  //wait for it to be ready
-//      	}
-//        m->m_data=last_bd->bufptr;
-//	eh = mtod (m, struct ether_header *);
-//	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);//last_bd->flags_pktlen&(0x0000FFFF)-sizeof(struct ether_header);//MAX_TRANSFER_UNIT-sizeof(struct ether_header);
-//	m->m_data+=sizeof(struct ether_header);
-//	ether_input (ifp, eh, m);
-
-        memcpy(mtod(m,void *),(void *)EMACSwizzleData((uint32)last_bd->bufptr),MAX_TRANSFER_UNIT);
-	EMACRxCPWrite(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER, (uint32)last_bd);
-
-	eh = mtod (m, struct ether_header *);
-	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);
-	m->m_data+=sizeof(struct ether_header);
-
-	ether_input (ifp, eh, m);
-	MGETHDR (m, M_WAIT, MT_DATA);
-	MCLGET (m, M_WAIT);
-	m->m_pkthdr.rcvif = ifp;      
-	m->m_data=rxDataBuf[rxBds];
-   	sc->rxMbuf[rxBds] = m;
-
-   	if(++rxBds == MAX_RX_PBUF_ALLOC-1)
-			rxBds=0;
-	    
-      rxch_int->active_head = curr_bd;
-      curr_tail = rxch_int->active_tail;
-      curr_tail->next = (emac_rx_bd_t *)EMACSwizzleData((uint32)rxch_int->free_head);
-      last_bd->next = NULL;
-
-
-        /**
-         * Check if the reception has ended. If the EOQ flag is set, the NULL
-         * Pointer is taken by the DMA engine. So we need to write the RX HDP
-         * with the next descriptor.
-         */
-
-        if((EMACSwizzleData((uint32)curr_tail->flags_pktlen) & EMAC_BUF_DESC_EOQ) == EMAC_BUF_DESC_EOQ) {
-
-          EMACRxHdrDescPtrWrite(hdkif->emac_base, (uint32)(rxch_int->free_head), (uint32)EMAC_CHANNELNUMBER);
-        }
-
-  
-        rxch_int->free_head  = curr_bd;
-        rxch_int->active_tail = last_bd;
-		
-	/*	if(curr_bd == 0xfc5210b0){
-	  rxch_int->active_head=0xfc521010;
-	   EMACRxHdrDescPtrWrite(hdkif->emac_base, (uint32)rxch_int->active_head, (uint32)EMAC_CHANNELNUMBER);
-	}
-	*/
-       
-    }
-  }
-        EMACCoreIntAck(EMAC_0_BASE, (uint32)EMAC_INT_CORE0_RX);
-	
+//				/*
+//				 * Unmask RXF (Full frame received) event
+//				 */
+//			
+//				rtems_bsdnet_event_receive (INTERRUPT_EVENT,
+//						RTEMS_WAIT|RTEMS_EVENT_ANY,
+//						RTEMS_NO_TIMEOUT,
+//						&events);
+//				
+//			}
+//		}
+//
+//			struct ether_header *eh;	
+//
+//
+//  /* Get the buffer descriptors which contain the earliest filled data */
+//
+// // rtems_interrupt_disable(pval);
+//  curr_bd = rxch_int->active_head;
+//
+//  last_bd = rxch_int->active_tail;
+//
+//  /**
+//   * Process the descriptors as long as data is available
+//   * when the DMA is receiving data, SOP flag will be set
+//  */
+//
+//  while((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_SOP) == EMAC_BUF_DESC_SOP) {
+//
+//    /* Start processing once the packet is loaded */
+//
+//	  if((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_OWNER)
+//       != EMAC_BUF_DESC_OWNER) {
+//
+//      /* this bd chain will be freed after processing */
+//
+//		  rxch_int->free_head = curr_bd;
+//
+//      /* Get the total length of the packet. curr_bd points to the start
+//       * of the packet.
+//       */
+//
+//      /* 
+//       * The loop runs till it reaches the end of the packet.
+//       */
+////02032019     curr_bd->flags_pktlen = EMACSwizzleData((uint32)EMAC_BUF_DESC_OWNER);	
+//
+////02032019     curr_bd->bufoff_len = EMACSwizzleData((uint32)MAX_TRANSFER_UNIT);	
+//
+////02032019     last_bd = curr_bd;	
+//
+////02032019     curr_bd = (emac_rx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);	
+//	      
+////02032019      m = sc->rxMbuf[rxBds];
+////
+////04032019      memcpy(mtod(m,void *),(void *)EMACSwizzleData((uint32)last_bd->bufptr),MAX_TRANSFER_UNIT);	
+////04032019	EMACRxCPWrite(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER, (uint32)last_bd);             	
+////04032019
+////04032019	eh = mtod (m, struct ether_header *);						
+////04032019	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);		
+////04032019	m->m_data+=sizeof(struct ether_header);						
+////04032019
+////04032019	ether_input (ifp, eh, m);					
+////04032019	MGETHDR (m, M_WAIT, MT_DATA);                                   
+////04032019	MCLGET (m, M_WAIT);                                             
+////04032019	m->m_pkthdr.rcvif = ifp;      
+////04032019	m->m_data=rxDataBuf[rxBds];   
+////04032019   	sc->rxMbuf[rxBds] = m;        
+////
+////02032019    while((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_EOP)!= EMAC_BUF_DESC_EOP)
+////02032019      {
+////02032019        curr_bd->flags_pktlen = EMACSwizzleData((uint32)EMAC_BUF_DESC_OWNER);
+////02032019        
+////02032019        curr_bd->bufoff_len = EMACSwizzleData((uint32)MAX_TRANSFER_UNIT);
+////02032019        
+////02032019        last_bd = curr_bd;
+////02032019        
+////02032019        curr_bd = (emac_rx_bd_t *)EMACSwizzleData(curr_bd->next);
+////
+////02032019	  m_append(m, len, cp)
+////02032019               /**Append len bytes of data cp to the mbuf chain.  Extend the mbuf
+////02032019               	   chain if the	new data does not fit in existing space.	**/
+////
+////02032019	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);
+////02032019	m->m_data+=sizeof(struct ether_header);
+////02032019	ether_input (ifp, eh, m);
+////
+////
+////        m = sc->rxMbuf[rxBds];//------------------
+////        m->m_data=last_bd->bufptr;
+////       	eh = mtod (m, struct ether_header *);
+////
+////	MGETHDR (m, M_WAIT, MT_DATA);
+////	MCLGET (m, M_WAIT);
+////	m->m_pkthdr.rcvif = ifp;     
+////      	sc->rxMbuf[rxBds] = m;	//---------------------------------------------------------
+//// 	if(++rxBds == MAX_RX_PBUF_ALLOC-1)
+////	  rxBds=0;
+////		      
+////02032019     }
+//      
+//
+//      curr_bd->flags_pktlen = EMACSwizzleData((uint32)EMAC_BUF_DESC_OWNER);	//02032019
+//
+//      curr_bd->bufoff_len = EMACSwizzleData((uint32)MAX_TRANSFER_UNIT);	//02032019
+//
+//      last_bd = curr_bd;	//02032019
+//
+//      curr_bd = (emac_rx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);	//02032019
+//     
+//      //    EMACRxCPWrite(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER, (uint32)last_bd);
+//
+//      m = sc->rxMbuf[rxBds];	//02032019
+//
+////            while((EMACSwizzleData((uint32)last_bd->flags_pktlen) & EMAC_BUF_DESC_OWNER)==EMAC_BUF_DESC_OWNER)
+////      	{
+////	  //wait for it to be ready
+////      	}
+////        m->m_data=last_bd->bufptr;
+////	eh = mtod (m, struct ether_header *);
+////	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);//last_bd->flags_pktlen&(0x0000FFFF)-sizeof(struct ether_header);//MAX_TRANSFER_UNIT-sizeof(struct ether_header);
+////	m->m_data+=sizeof(struct ether_header);
+////	ether_input (ifp, eh, m);
+//
+//        memcpy(mtod(m,void *),(void *)EMACSwizzleData((uint32)last_bd->bufptr),EMACSwizzleData((uint32)last_bd->len));//MAX_TRANSFER_UNIT);	//02032019
+//	EMACRxCPWrite(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER, (uint32)last_bd);             	//02032019
+//
+//	eh = mtod (m, struct ether_header *);						//02032019
+//	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);		//02032019
+//	m->m_data+=sizeof(struct ether_header);						//02032019
+//
+//	ether_input (ifp, eh, m);					//02032019
+//	MGETHDR (m, M_WAIT, MT_DATA);                                   //02032019
+//	MCLGET (m, M_WAIT);                                             //02032019
+//	m->m_pkthdr.rcvif = ifp;      //02032019
+//	m->m_data=rxDataBuf[rxBds];   //02032019
+//   	sc->rxMbuf[rxBds] = m;        //02032019
+//
+//   	if(++rxBds == MAX_RX_PBUF_ALLOC-1)
+//			rxBds=0;
+//	    
+//      rxch_int->active_head = curr_bd;                                              	
+//      curr_tail = rxch_int->active_tail;                                                
+//      curr_tail->next = (emac_rx_bd_t *)EMACSwizzleData((uint32)rxch_int->free_head);   
+//      last_bd->next = NULL;                                                             
+//
+//
+//        /**
+//         * Check if the reception has ended. If the EOQ flag is set, the NULL
+//         * Pointer is taken by the DMA engine. So we need to write the RX HDP
+//         * with the next descriptor.
+//         */
+//
+//        if((EMACSwizzleData((uint32)curr_tail->flags_pktlen) & EMAC_BUF_DESC_EOQ) == EMAC_BUF_DESC_EOQ) {
+//
+//          EMACRxHdrDescPtrWrite(hdkif->emac_base, (uint32)(rxch_int->free_head), (uint32)EMAC_CHANNELNUMBER);
+//        }
+//
+//  
+//        rxch_int->free_head  = curr_bd;
+//        rxch_int->active_tail = last_bd;
+//		
+//	/*	if(curr_bd == 0xfc5210b0){
+//	  rxch_int->active_head=0xfc521010;
+//	   EMACRxHdrDescPtrWrite(hdkif->emac_base, (uint32)rxch_int->active_head, (uint32)EMAC_CHANNELNUMBER);
+//	}
+//	*/
+//       
+//    }
+//  }
+//        EMACCoreIntAck(EMAC_0_BASE, (uint32)EMAC_INT_CORE0_RX);
+//
+//  rtems_interrupt_enable(pval);
+//	
+//}
 }
-}
+//#if 0
 static void
 sendpacket (struct ifnet *ifp, struct mbuf *m)
 {
@@ -674,10 +823,48 @@ sendpacket (struct ifnet *ifp, struct mbuf *m)
   rtems_interrupt_enable(pval);
     
 }
+//#endif
 #if 0
 static void
 sendpacket (struct ifnet *ifp, struct mbuf *m)
 {
+  uint8 *myframe;
+  uint8 test[1514];
+  struct pbuf_struct ti_buffer[24];
+  struct mbuf *a,*b;
+  bool i=false;
+  int im=0,diff_min=0,acc=0;
+  struct tms_softc *sc = ifp->if_softc;
+   // 
+  a=m;
+  /*  if(a->m_ext.ext_buf!=a->m_data && (a->m_flags&M_EXT)==M_EXT)
+     a->m_data=a->m_ext.ext_buf;
+     ti_buffer[im].tot_len=a->m_pkthdr.len;*/
+  while(a){   
+        myframe=mtod(a,uint8 *);
+        if (a->m_len) {
+	  memcpy(&test[0]+acc,myframe,a->m_len);
+	  acc+=a->m_len;
+	}
+       MFREE (a, b);
+       a=b;
+  }
+  ti_buffer[im].payload=&test[0];
+  ti_buffer[im].next=NULL;
+  if(acc<MIN_FRAME_LENGTH)
+    ti_buffer[im].tot_len=ti_buffer[im].len=65;
+  else
+    ti_buffer[im].tot_len=ti_buffer[im].len=acc;
+
+
+    i=EMACTransmit(sc->hdkif, &ti_buffer[0]);
+    //    memset(test,0,1514);
+    //  if(i==false)
+    //  printf("Could not send frame!");
+    // else
+    //   printf("good");
+    //
+    //
   uint8 *myframe;
   uint8 test[1514];
   struct pbuf_struct ti_buffer[24];
@@ -775,7 +962,6 @@ for(j=0;j<im;j++)
     // else
     //   printf("good");
 
-    
 }
 #endif
 /*
@@ -1018,7 +1204,7 @@ tms_EMAC_hw_init(uint8 macaddr[6U])
       NULL
 						);
 
- if (status != RTEMS_SUCCESSFUL) 
+if (status != RTEMS_SUCCESSFUL) 
       printf ("Can't install int rx handler: `%s'\n", rtems_status_text (status));
 
  tms[0].rxMbuf = malloc (tms[0].rxBdCount * sizeof *tms[0].rxMbuf, M_MBUF, M_NOWAIT);
@@ -1045,7 +1231,7 @@ tms_eth_init (void *arg)
 		 * Start driver tasks
 		 */
                 sc->txDaemonTid = rtems_bsdnet_newproc ("TMStx", 4096, tms_txDaemon, sc);
-		sc->rxDaemonTid = rtems_bsdnet_newproc ("TMSrx", 4096, tms_rxDaemon, sc);
+//		sc->rxDaemonTid = rtems_bsdnet_newproc ("TMSrx", 4096, tms_rxDaemon, sc);
 
 	}
 
@@ -1289,70 +1475,4 @@ rtems_tms_driver_attach (struct rtems_bsdnet_ifconfig *config, int attaching)
 	ether_ifattach (ifp);
 	return 1;
 }
-/*
-void configure_correct_pins(void)
-{
- uint TXD0,TXD1,TXEN,CRS,CLK,RXD0,RXD1,RXER,SEL;
-  TXD0 =0x34; //OFF0 44
-  TXD1 =0x34;  //OFF8 44
-  TXEN =0x34; //OFF16 44
-  CRS  =0x44U;//OFF16 54
-  CLK  =0x38;//OFF8 48
-  RXD0 =0x2CU;//OFF24 3C
-  RXD1 =0x30U;//OFF0 40
-  RXER =0x28U;// OFF0 38
-  SEL  =0x74;
 
- *((uint32_t *)RegEdit) = 0x83E70B13U;
-  *((uint32_t *)RegEdit+1) = 0x95A4F1E0U;
- 
-  
-  if(SET_DRIVER_RMII==0){
-
-	*(int *) 0xFFFFEB38  &= 0xFFFFFF00; 
-	*(int *) 0xFFFFEB38  |= (1 << 1);   
-	
-	*(int *) 0xFFFFEB3C  &= 0x00FFFFFF; 
-	*(int *) 0xFFFFEB3C  |= (1 << 26);  
-
-	*(int *) 0xFFFFEB40  &= 0x0000FF00;
-	*(int *) 0xFFFFEB40  |= ((1<<26) | (1<<18) | (1<<1));
-
-	*(int *) 0xFFFFEB44  &= 0x00000000;
-	*(int *) 0xFFFFEB44  |= ((1<<26)|(1<<18)|(1<<10)|(1<<2)); 
-
-	*(int *) 0xFFFFEB48  &= 0xFFFF0000; 
-	*(int *) 0xFFFFEB48  |= ((1<<9)|(1<<2));    
-
-	*(int *) 0xFFFFEB54  &= 0xFF00FF00      ;
-	*(int *) 0xFFFFEB54  |= ((1<<17)|(1<<1));        
-
-	*(int *) 0xFFFFEB5C  &= 0xFFFF00FF;  
-	*(int *) 0xFFFFEB5C  |= (1<<9);      
-
-	*(int *) 0xFFFFEB60  &= 0xFF00FFFF;  
-	*(int *) 0xFFFFEB60  |= (1<<18);     
-
-	*(int *) 0xFFFFEB84  &= 0x00FFFFFF;
-	*(int *) 0xFFFFEB84  |= (0<<24);   
-  }else {
-
-     *((uint32_t *)pinMuxBaseReg+(TXEN/4))=0x1080808;
-     *((uint32_t *)pinMuxBaseReg+(CRS/4))=0x2040200;
-     *((uint32_t *)pinMuxBaseReg+(CLK/4))=0x1010401;
-     *((uint32_t *)pinMuxBaseReg+(RXD0/4))=0x8020101;
-     *((uint32_t *)pinMuxBaseReg+(RXD1/4))=0x1010204;
-     *((uint32_t *)pinMuxBaseReg+(RXER/4))=0x2010204;
-    *((uint32_t *)pinMuxBaseReg+(SEL/4))=  0x1000001;
-}
-  
-
- 
-  *((uint32_t *)RegEdit) = 0x00000000U;
-  *((uint32_t *)RegEdit+1) = 0x00000000U;
-
-
-
-
-}
-*/
