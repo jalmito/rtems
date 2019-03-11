@@ -463,7 +463,29 @@ tms_tx_interrupt_handler (rtems_vector_number v)
   // tries=2;
   //  printf("f");           
 }
+static rtems_isr
+tms_misc_interrupt_handler (rtems_vector_number v)
+{
+  rtems_interrupt_level pval;
+  rtems_interrupt_disable (pval);
 
+
+  EMACCoreIntAck(EMAC_0_BASE, (uint32)TMS570_IRQ_EMAC_MISC); 
+
+  rtems_interrupt_enable (pval);
+
+}
+static rtems_isr
+tms_thr_interrupt_handler (rtems_vector_number v)
+{
+  rtems_interrupt_level pval;
+  rtems_interrupt_disable (pval);
+
+  EMACCoreIntAck(EMAC_0_BASE, (uint32)TMS570_IRQ_EMAC_THRESH); 
+
+
+  rtems_interrupt_enable (pval);
+}
 static rtems_isr
 tms_rx_interrupt_handler (rtems_vector_number v)
 {
@@ -472,7 +494,7 @@ tms_rx_interrupt_handler (rtems_vector_number v)
  
 rxch_t *rxch_int;
 volatile emac_rx_bd_t *curr_bd, *curr_tail, *last_bd;
-int rxBds=1;
+int rxBds=1,mlen;
 struct mbuf *m=NULL;
 struct ifnet *ifp;
 rtems_interrupt_level pval;
@@ -491,19 +513,19 @@ rtems_interrupt_level pval;
 //            if(!(m->m_flags & M_EXT))
           m->m_flags |= M_EXT;
 	  m->m_pkthdr.rcvif = ifp;
+rxBds=1;
 
 //          data_b = mtod(m,uint8 *);
 //          data_b = m->m_ext.ext_buf; 
-	  m->m_data=rxDataBuf[1]; // 1
+	  m->m_data=rxDataBuf[rxBds]; // 1
 //
 //	  m->m_data =malloc(MAX_FRAME_LENGTH * sizeof (uint8 *), M_DEVBUF, M_NOWAIT);//rxDataBuf[1]; // 1
 //	  tms[0].rxMbuf[rxBds] = m;
 //	  if (++rxBds == MAX_RX_PBUF_ALLOC-1) {
 //	       break;
 //       }
-rxBds=1;
 
-			struct ether_header *eh;	
+  struct ether_header *eh;	
   curr_bd = rxch_int->active_head;
 
   last_bd = rxch_int->active_tail;
@@ -530,7 +552,6 @@ rxBds=1;
 	m->m_len=EMACSwizzleData((uint32)last_bd->bufoff_len & 0xFFFF0000);//m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);		//02032019
       memcpy(mtod(m,uint8 *),(uint8 *)EMACSwizzleData((uint32)last_bd->bufptr),m->m_len);	//02032019
 //      memcpy(data_b,(void *)EMACSwizzleData((uint32)last_bd->bufptr),MAX_TRANSFER_UNIT);	//02032019
-	EMACRxCPWrite(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER, (uint32)last_bd);             	//02032019
 
 	eh = mtod (m, struct ether_header *);						//02032019
         m->m_len -= sizeof(struct ether_header);
@@ -539,19 +560,51 @@ rxBds=1;
 	m->m_data+=sizeof(struct ether_header);						//02032019
 
 	ether_input (ifp, eh, m);					//02032019
-//	MGETHDR (m, M_WAIT, MT_DATA);                                   //02032019
-//	MCLGET (m, M_WAIT);                                             //02032019
-//	m->m_pkthdr.rcvif = ifp;      //02032019
-//	m->m_data=rxDataBuf[rxBds];   //02032019
-//   	tms[0].rxMbuf[rxBds] = m;        //02032019
 
-//   	if(++rxBds == MAX_RX_PBUF_ALLOC-1)
-//			rxBds=0;
+	EMACRxCPWrite(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER, (uint32)last_bd);             	//02032019
 	    
       rxch_int->active_head = curr_bd;                                              	
       curr_tail = rxch_int->active_tail;                                                
       curr_tail->next = (emac_rx_bd_t *)EMACSwizzleData((uint32)rxch_int->free_head);   
       last_bd->next = NULL;                                                             
+
+        rxch_int->free_head  = curr_bd;
+        rxch_int->active_tail = last_bd;
+
+
+        if((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_EOP)== EMAC_BUF_DESC_EOP)
+            break;
+//        else {
+            while((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_EOP)!= EMAC_BUF_DESC_EOP)
+            {
+                MGETHDR (m, M_NOWAIT, MT_DATA);
+                if(m == NULL)
+                  return;
+                m->m_flags |= M_EXT;
+                m->m_pkthdr.rcvif = ifp;
+                m->m_data=rxDataBuf[++rxBds]; // 1
+                curr_bd->flags_pktlen = EMACSwizzleData((uint32)EMAC_BUF_DESC_OWNER);
+            
+                curr_bd->bufoff_len = EMACSwizzleData((uint32)MAX_TRANSFER_UNIT);
+            
+                last_bd = curr_bd;
+            
+                curr_bd = (emac_rx_bd_t *)EMACSwizzleData(curr_bd->next);
+    
+    	    m->m_len=EMACSwizzleData((uint32)last_bd->bufoff_len & 0xFFFF0000);
+  
+  //	    m_append(m, mlen, cp);
+              /**Append len bytes of data cp to the mbuf chain.  Extend the mbuf
+                 	   chain if the	new data does not fit in existing space.	**/
+  
+                memcpy(mtod(m,uint8 *),(uint8 *)EMACSwizzleData((uint32)last_bd->bufptr),m->m_len);	//02032019
+    	    eh = mtod (m, struct ether_header *);						//02032019
+                m->m_len -= sizeof(struct ether_header);
+    	    m->m_data+=sizeof(struct ether_header);
+    	    ether_input (ifp, eh, m);
+            }
+//        }
+          /* Acknowledge that this packet is processed */
 
 
         /**
@@ -566,15 +619,16 @@ rxBds=1;
         }
 
   
-        rxch_int->free_head  = curr_bd;
-        rxch_int->active_tail = last_bd;
 		
        
     }
+
+
+
   }
-    rtems_interrupt_enable (pval);
         EMACCoreIntAck(EMAC_0_BASE, (uint32)EMAC_INT_CORE0_RX);
         EMACCoreIntAck(EMAC_0_BASE, (uint32)EMAC_INT_CORE0_TX);
+    rtems_interrupt_enable (pval);
 
 }
 
@@ -1206,6 +1260,37 @@ tms_EMAC_hw_init(uint8 macaddr[6U])
 
 if (status != RTEMS_SUCCESSFUL) 
       printf ("Can't install int rx handler: `%s'\n", rtems_status_text (status));
+
+      status = bsp_interrupt_vector_enable(
+					 TMS570_IRQ_EMAC_MISC 
+					   );
+
+      status = rtems_interrupt_handler_install( TMS570_IRQ_EMAC_MISC,
+      "tms1",
+      RTEMS_INTERRUPT_SHARED,
+      tms_misc_interrupt_handler,
+      NULL
+						);
+
+if (status != RTEMS_SUCCESSFUL) 
+      printf ("Can't install int misc handler: `%s'\n", rtems_status_text (status));
+
+
+
+      status = bsp_interrupt_vector_enable(
+					 TMS570_IRQ_EMAC_THRESH 
+					   );
+
+      status = rtems_interrupt_handler_install( TMS570_IRQ_EMAC_THRESH,
+      "tms1",
+      RTEMS_INTERRUPT_SHARED,
+      tms_thr_interrupt_handler,
+      NULL
+						);
+
+if (status != RTEMS_SUCCESSFUL) 
+      printf ("Can't install int threshold handler: `%s'\n", rtems_status_text (status));
+
 
  tms[0].rxMbuf = malloc (tms[0].rxBdCount * sizeof *tms[0].rxMbuf, M_MBUF, M_NOWAIT);
 }

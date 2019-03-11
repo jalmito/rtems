@@ -63,7 +63,7 @@ extern "C" {
 /* USER CODE BEGIN (1) */
 //#define EXTENDED_PBUF
 #define TEST
-#define MAX_FRAME_LENGTH 576 //1514
+#define MAX_FRAME_LENGTH 1514
 #ifndef LWIP_MEM_ALIGN
 #define MEM_ALIGNMENT                   1
 typedef uintptr_t          mem_ptr_t; 
