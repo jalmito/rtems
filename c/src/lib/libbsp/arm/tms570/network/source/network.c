@@ -536,6 +536,8 @@ rxBds=1;
 
 	  if((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_OWNER)
        != EMAC_BUF_DESC_OWNER) {
+        if((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_EOP)== EMAC_BUF_DESC_EOP)
+        {
 
       /* this bd chain will be freed after processing */
 
@@ -563,18 +565,11 @@ rxBds=1;
 
 	EMACRxCPWrite(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER, (uint32)last_bd);             	//02032019
 	    
-      rxch_int->active_head = curr_bd;                                              	
-      curr_tail = rxch_int->active_tail;                                                
-      curr_tail->next = (emac_rx_bd_t *)EMACSwizzleData((uint32)rxch_int->free_head);   
-      last_bd->next = NULL;                                                             
 
-        rxch_int->free_head  = curr_bd;
-        rxch_int->active_tail = last_bd;
+    }
 
-
-        if((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_EOP)== EMAC_BUF_DESC_EOP)
-            break;
-//        else {
+       
+        else {
             while((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_EOP)!= EMAC_BUF_DESC_EOP)
             {
                 MGETHDR (m, M_NOWAIT, MT_DATA);
@@ -603,8 +598,14 @@ rxBds=1;
     	    m->m_data+=sizeof(struct ether_header);
     	    ether_input (ifp, eh, m);
             }
-//        }
           /* Acknowledge that this packet is processed */
+	EMACRxCPWrite(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER, (uint32)last_bd);             	//02032019
+        }
+      rxch_int->active_head = curr_bd;                                              	
+      curr_tail = rxch_int->active_tail;                                                
+      curr_tail->next = (emac_rx_bd_t *)EMACSwizzleData((uint32)rxch_int->free_head);   
+      last_bd->next = NULL;                                                             
+
 
 
         /**
@@ -619,6 +620,8 @@ rxBds=1;
         }
 
   
+        rxch_int->free_head  = curr_bd;
+        rxch_int->active_tail = last_bd;
 		
        
     }
