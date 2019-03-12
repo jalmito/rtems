@@ -59,6 +59,7 @@ static uint8_t rxDataBuf[MAX_RX_PBUF_ALLOC][MAX_TRANSFER_UNIT];
  * This must not be the same as INTERRUPT_EVENT.
  */
 #define START_TRANSMIT_EVENT	RTEMS_EVENT_2
+#define FINISHED_TRANSMIT_EVENT	RTEMS_EVENT_3
 /*
  * Receive buffer size -- Allow for a full ethernet packet including CRC
  */
@@ -459,7 +460,8 @@ tms_tx_interrupt_handler (rtems_vector_number v)
   tms[0].txInterrupts++;
   EMACTxIntHandler(hdkif);
   EMACCoreIntAck(EMAC_0_BASE, (uint32)EMAC_INT_CORE0_TX); 
-  rtems_bsdnet_event_send (tms[0].txDaemonTid, INTERRUPT_EVENT);
+//  rtems_bsdnet_event_send (tms[0].txDaemonTid, FINISHED_INTERRUPT_EVENT);
+  rtems_bsdnet_event_send (tms[0].txDaemonTid, FINISHED_TRANSMIT_EVENT);
   // tries=2;
   //  printf("f");           
 }
@@ -489,12 +491,12 @@ tms_thr_interrupt_handler (rtems_vector_number v)
 static rtems_isr
 tms_rx_interrupt_handler (rtems_vector_number v)
 {
-    tms[0].rxInterrupts++;
 //    rtems_bsdnet_event_send (tms[0].rxDaemonTid, INTERRUPT_EVENT);
  
 rxch_t *rxch_int;
 volatile emac_rx_bd_t *curr_bd, *curr_tail, *last_bd;
-int rxBds=1,mlen;
+int rxBds=1;
+uint32_t processed = tms[0].rxInterrupts;
 struct mbuf *m=NULL;
 struct ifnet *ifp;
 rtems_interrupt_level pval;
@@ -503,17 +505,17 @@ rtems_interrupt_level pval;
     rxch_int = &(hdkif->rxchptr);
     ifp = &tms[0].arpcom.ac_if;
 
-    rtems_interrupt_disable (pval);
+    tms[0].rxInterrupts++;
 
 	  MGETHDR (m, M_NOWAIT, MT_DATA);
-            if(m == NULL)
+            if(m == NULL || (m->m_flags & M_PKTHDR) == 0)
                 return;
 //
 //   	  MCLGET (m, M_NOWAIT);
 //            if(!(m->m_flags & M_EXT))
           m->m_flags |= M_EXT;
 	  m->m_pkthdr.rcvif = ifp;
-rxBds=1;
+          rxBds=1;
 
 //          data_b = mtod(m,uint8 *);
 //          data_b = m->m_ext.ext_buf; 
@@ -531,39 +533,40 @@ rxBds=1;
   last_bd = rxch_int->active_tail;
   
   while((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_SOP) == EMAC_BUF_DESC_SOP) {
+      rtems_interrupt_disable (pval);
 
     /* Start processing once the packet is loaded */
 
-	  if((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_OWNER)
+     if((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_OWNER)
        != EMAC_BUF_DESC_OWNER) {
         if((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_EOP)== EMAC_BUF_DESC_EOP)
         {
 
       /* this bd chain will be freed after processing */
 
-		  rxch_int->free_head = curr_bd;
-      curr_bd->flags_pktlen = EMACSwizzleData((uint32)EMAC_BUF_DESC_OWNER);	//02032019
+            rxch_int->free_head = curr_bd;
+            curr_bd->flags_pktlen = EMACSwizzleData((uint32)EMAC_BUF_DESC_OWNER);	//02032019
 
-      curr_bd->bufoff_len = EMACSwizzleData((uint32)MAX_TRANSFER_UNIT);	//02032019
+            curr_bd->bufoff_len = EMACSwizzleData((uint32)MAX_TRANSFER_UNIT);	//02032019
 
-      last_bd = curr_bd;	//02032019
+            last_bd = curr_bd;	//02032019
 
-      curr_bd = (emac_rx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);	//02032019
+            curr_bd = (emac_rx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);	//02032019
      
 //      m = tms[0].rxMbuf[rxBds];	//02032019
-	m->m_len=EMACSwizzleData((uint32)last_bd->bufoff_len & 0xFFFF0000);//m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);		//02032019
-      memcpy(mtod(m,uint8 *),(uint8 *)EMACSwizzleData((uint32)last_bd->bufptr),m->m_len);	//02032019
+	    m->m_len=EMACSwizzleData((uint32)last_bd->bufoff_len & 0xFFFF0000);//m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);		//02032019
+            memcpy(mtod(m,uint8 *),(uint8 *)EMACSwizzleData((uint32)last_bd->bufptr),m->m_len);	//02032019
 //      memcpy(data_b,(void *)EMACSwizzleData((uint32)last_bd->bufptr),MAX_TRANSFER_UNIT);	//02032019
 
-	eh = mtod (m, struct ether_header *);						//02032019
-        m->m_len -= sizeof(struct ether_header);
+	    eh = mtod (m, struct ether_header *);						//02032019
+            m->m_len -= sizeof(struct ether_header);
 //	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);		//02032019
-	m->m_pkthdr.len=m->m_len;//,EMACSwizzleData((uint32)last_bd->flags_pktlen & 0xFFFF0000));		//02032019
-	m->m_data+=sizeof(struct ether_header);						//02032019
+            m->m_pkthdr.len=m->m_len;//,EMACSwizzleData((uint32)last_bd->flags_pktlen & 0xFFFF0000));		//02032019
+            m->m_data+=sizeof(struct ether_header);						//02032019
 
-	ether_input (ifp, eh, m);					//02032019
+	    ether_input (ifp, eh, m);					//02032019
 
-	EMACRxCPWrite(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER, (uint32)last_bd);             	//02032019
+	    EMACRxCPWrite(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER, (uint32)last_bd);             	//02032019
 	    
 
     }
@@ -623,6 +626,7 @@ rxBds=1;
         rxch_int->free_head  = curr_bd;
         rxch_int->active_tail = last_bd;
 		
+        rtems_interrupt_enable (pval);
        
     }
 
@@ -631,7 +635,6 @@ rxBds=1;
   }
         EMACCoreIntAck(EMAC_0_BASE, (uint32)EMAC_INT_CORE0_RX);
         EMACCoreIntAck(EMAC_0_BASE, (uint32)EMAC_INT_CORE0_TX);
-    rtems_interrupt_enable (pval);
 
 }
 
@@ -1037,6 +1040,7 @@ tms_txDaemon (void *arg)
 		/*
 		 * Wait for packet
 		 */
+                i=1;
 	  		rtems_bsdnet_event_receive (START_TRANSMIT_EVENT, RTEMS_EVENT_ANY | RTEMS_WAIT, RTEMS_NO_TIMEOUT, &events);
 
 		/*
@@ -1047,11 +1051,13 @@ tms_txDaemon (void *arg)
 			 * Get the next mbuf chain to transmit.
 			 */
 			IF_DEQUEUE(&ifp->if_snd, m);
-			if (!m)
+			if (!m){
+		                ifp->if_flags &= ~IFF_OACTIVE;
 				break;
+                        }
 			sendpacket (ifp, m);
 		}
-		ifp->if_flags &= ~IFF_OACTIVE;
+	  		rtems_bsdnet_event_receive (FINISHED_TRANSMIT_EVENT, RTEMS_EVENT_ANY | RTEMS_WAIT, RTEMS_NO_TIMEOUT, &events);
 	}
 }
 
@@ -1210,29 +1216,8 @@ tms_EMAC_hw_init(uint8 macaddr[6U])
 
 
   
-//#if (EMAC_FULL_DUPLEX_ENABLE)
-//        EMACDuplexSet(EMAC_0_BASE, (uint32)EMAC_DUPLEX_FULL);
-//#else
-//        /*SAFETYMCUSW 1 J MR:14.1 <APPROVED> "If condition arameter is taken as input from GUI." */
-//        EMACDuplexSet(EMAC_0_BASE, (uint32)EMAC_DUPLEX_HALF);
-//#endif
-//
-//  /* Enable Loopback based on GUI Input */ 
-//  /*SAFETYMCUSW 139 S MR:13.7 <APPROVED> "Parameter is taken as input from GUI." */
-//#if(EMAC_LOOPBACK_ENABLE)
-//      EMACEnableLoopback(hdkif->emac_base);
-//#else
-//      /*SAFETYMCUSW 1 J MR:14.1 <APPROVED> "If condition parameter is taken as input from GUI." */  
-//      EMACDisableLoopback(hdkif->emac_base);
-//#endif
-
-  /*SAFETYMCUSW 139 S MR:13.7 <APPROVED> "Parameter is taken as input from GUI." */
-//      *(uint32_t *)(0xFCF78100)|=0x00800000;//0x00A00000;
-      //      *(uint32_t *)(0xFCF78100)&=0xFFFFDFFF;//0x00A00000;
-      //
-//	_enable_interrupt_();	
-//	asm volatile (" cpsie	if");
-//	asm volatile (	"bx	lr");
+/* Enable receiving undersized packets */
+      *(uint32_t *)(0xFCF78100)|=0x00800000;//0x00A00000;
 
       if(retVal==EMAC_ERR_CONNECT)
 	printf("emachwinit failed...");  
@@ -1318,7 +1303,7 @@ tms_eth_init (void *arg)
 		/*
 		 * Start driver tasks
 		 */
-                sc->txDaemonTid = rtems_bsdnet_newproc ("TMStx", 4096, tms_txDaemon, sc);
+                sc->txDaemonTid = rtems_bsdnet_newproc ("TMStx", 1024, tms_txDaemon, sc);
 //		sc->rxDaemonTid = rtems_bsdnet_newproc ("TMSrx", 4096, tms_rxDaemon, sc);
 
 	}

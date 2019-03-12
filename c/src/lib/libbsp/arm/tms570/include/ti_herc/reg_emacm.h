@@ -38,6 +38,7 @@
 */
 #ifndef LIBBSP_ARM_TMS570_EMACM
 #define LIBBSP_ARM_TMS570_EMACM
+#define tmsdiag
 
 #include <bsp/utility.h>
 
@@ -90,7 +91,47 @@ typedef struct{
   uint32_t TPACETEST;         /*Transmit Pacing Algorithm Test Register*/
   uint32_t RXPAUSE;           /*Receive Pause Timer Register*/
   uint32_t TXPAUSE;           /*Transmit Pause Timer Register*/
+#ifdef tmsdiag
+  uint32_t RXGOODFRAMES;// (0x200U)
+  uint32_t RXBCASTFRAMES;// (0x204U)
+  uint32_t RXMCASTFRAMES	   ;// (0x208U)
+  uint32_t RXPAUSEFRAMES	   ;// (0x20CU)
+  uint32_t RXCRCERRORS	   ;// (0x210U)
+  uint32_t RXALIGNCODEERRORS  ;// (0x214U)
+  uint32_t RXOVERSIZED	   ;// (0x218U)
+  uint32_t RXJABBER	   ;// (0x21CU)
+  uint32_t RXUNDERSIZED	   ;// (0x220U)
+  uint32_t RXFRAGMENTS	   ;// (0x224U)
+  uint32_t RXFILTERED	   ;// (0x228U)
+  uint32_t RXQOSFILTERED	   ;// (0x22CU)
+  uint32_t RXOCTETS	   ;// (0x230U)
+  uint32_t TXGOODFRAMES	   ;// (0x234U)
+  uint32_t TXBCASTFRAMES	   ;// (0x238U)
+  uint32_t TXMCASTFRAMES	   ;// (0x23CU)
+  uint32_t TXPAUSEFRAMES	   ;// (0x240U)
+  uint32_t TXDEFERRED	   ;// (0x244U)
+  uint32_t TXCOLLISION	   ;// (0x248U)
+  uint32_t TXSINGLECOLL	   ;// (0x24CU)
+  uint32_t TXMULTICOLL	   ;// (0x250U)
+  uint32_t TXEXCESSIVECOLL	   ;// (0x254U)
+  uint32_t TXLATECOLL	   ;// (0x258U)
+  uint32_t TXUNDERRUN	   ;// (0x25CU)
+  uint32_t TXCARRIERSENSE     ;// (0x260U)
+  uint32_t TXOCTETS	   ;// (0x264U)
+  uint32_t FRAME64		   ;// (0x268U)
+  uint32_t FRAME65T127	   ;// (0x26CU)
+  uint32_t FRAME128T255	   ;// (0x270U)
+  uint32_t FRAME256T511	   ;// (0x274U)
+  uint32_t FRAME512T1023	   ;// (0x278U)
+  uint32_t FRAME1024TUP	   ;// (0x27CU)
+  uint32_t NETOCTETS	   ;// (0x208U)
+  uint32_t RXSOFOVERRUNS	   ;// (0x284U)
+  uint32_t RXMOFOVERRUNS	   ;// (0x288U)
+  uint32_t RXDMAOVERRUNS	   ;// (0x28CU)
+  uint8_t reserved7 [640];
+#else
   uint8_t reserved7 [784];
+#endif
   uint32_t MACADDRLO;         /*MAC Address Low Bytes Register*/
   uint32_t MACADDRHI;         /*MAC Address High Bytes Register*/
   uint32_t MACINDEX;          /*MAC Index Register*/
