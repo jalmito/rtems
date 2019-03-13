@@ -507,19 +507,11 @@ rtems_interrupt_level pval;
 
     tms[0].rxInterrupts++;
 
-	  MGETHDR (m, M_NOWAIT, MT_DATA);
-            if(m == NULL || (m->m_flags & M_PKTHDR) == 0)
-                return;
-//
-//   	  MCLGET (m, M_NOWAIT);
-//            if(!(m->m_flags & M_EXT))
-          m->m_flags |= M_EXT;
-	  m->m_pkthdr.rcvif = ifp;
-          rxBds=1;
+//          rxBds=1;
 
 //          data_b = mtod(m,uint8 *);
 //          data_b = m->m_ext.ext_buf; 
-	  m->m_data=rxDataBuf[rxBds]; // 1
+//	  m->m_data=rxDataBuf[rxBds]; // 1
 //
 //	  m->m_data =malloc(MAX_FRAME_LENGTH * sizeof (uint8 *), M_DEVBUF, M_NOWAIT);//rxDataBuf[1]; // 1
 //	  tms[0].rxMbuf[rxBds] = m;
@@ -542,8 +534,18 @@ rtems_interrupt_level pval;
         if((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_EOP)== EMAC_BUF_DESC_EOP)
         {
 
+	  MGETHDR (m, M_WAIT, MT_DATA);
+            if(m == NULL || (m->m_flags & M_PKTHDR) == 0)
+                return;
+//
+   	  MCLGET (m, M_WAIT);
+            if(!(m->m_flags & M_EXT))
+                return;
+//          m->m_flags |= M_EXT;
+	  m->m_pkthdr.rcvif = ifp;
+	    m->m_len=EMACSwizzleData((uint32)curr_bd->bufoff_len & 0xFFFF0000);//m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);		//02032019
+       //     MH_ALIGN(m, m->m_len);
       /* this bd chain will be freed after processing */
-
             rxch_int->free_head = curr_bd;
             curr_bd->flags_pktlen = EMACSwizzleData((uint32)EMAC_BUF_DESC_OWNER);	//02032019
 
@@ -554,15 +556,18 @@ rtems_interrupt_level pval;
             curr_bd = (emac_rx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);	//02032019
      
 //      m = tms[0].rxMbuf[rxBds];	//02032019
-	    m->m_len=EMACSwizzleData((uint32)last_bd->bufoff_len & 0xFFFF0000);//m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);		//02032019
-            memcpy(mtod(m,uint8 *),(uint8 *)EMACSwizzleData((uint32)last_bd->bufptr),m->m_len);	//02032019
+//	    m->m_len=EMACSwizzleData((uint32)last_bd->bufoff_len & 0xFFFF0000);//m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);		//02032019
+            memcpy(rxDataBuf[rxBds],(void *)EMACSwizzleData((uint32)last_bd->bufptr),m->m_len);	//02032019
 //      memcpy(data_b,(void *)EMACSwizzleData((uint32)last_bd->bufptr),MAX_TRANSFER_UNIT);	//02032019
-
-	    eh = mtod (m, struct ether_header *);						//02032019
+            memcpy(mtod(m,void *),rxDataBuf[rxBds]+sizeof (struct ether_header),m->m_len-sizeof (struct ether_header));	//02032019
+            
+//	    eh = mtod (m, struct ether_header *);						//02032019
+	    eh = (struct ether_header *) rxDataBuf[rxBds];						//02032019
             m->m_len -= sizeof(struct ether_header);
 //	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);		//02032019
             m->m_pkthdr.len=m->m_len;//,EMACSwizzleData((uint32)last_bd->flags_pktlen & 0xFFFF0000));		//02032019
-            m->m_data+=sizeof(struct ether_header);						//02032019
+//            m->m_data+=sizeof(struct ether_header);						//02032019
+//            m->m_ext.ext_buf = m->m_data;
 
 	    ether_input (ifp, eh, m);					//02032019
 
