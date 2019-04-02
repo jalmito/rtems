@@ -126,6 +126,10 @@ $(PROJECT_INCLUDE)/bsp/tms570lc4357-pins.h: include/tms570lc4357-pins.h $(PROJEC
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/bsp/tms570lc4357-pins.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/bsp/tms570lc4357-pins.h
 
+$(PROJECT_INCLUDE)/bsp/tms570-i2c.h: include/tms570-i2c.h $(PROJECT_INCLUDE)/bsp/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/bsp/tms570-i2c.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/bsp/tms570-i2c.h
+
 $(PROJECT_INCLUDE)/bsp/ti_herc/reg_adc.h: include/ti_herc/reg_adc.h $(PROJECT_INCLUDE)/bsp/ti_herc/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/bsp/ti_herc/reg_adc.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/bsp/ti_herc/reg_adc.h

@@ -29,6 +29,9 @@ RTEMS_BSPOPTS_SET([CONSOLE_USE_INTERRUPTS],[*],[1])
 RTEMS_BSPOPTS_HELP([CONSOLE_USE_INTERRUPTS],
 [The tms570 console driver can operate in either polled or interrupt mode.])
 
+RTEMS_BSPOPTS_SET([TMS570_CONFIG_I2C_1],[*],[1])
+RTEMS_BSPOPTS_HELP([TMS570_CONFIG_I2C_1],[configuration for I2C 1])
+
 RTEMS_BSPOPTS_SET([ARM_TMS570LS3137],[*],[0])
 RTEMS_BSPOPTS_HELP([ARM_TMS570LS3137],[target used for identify TMS570LS3137 board])
 

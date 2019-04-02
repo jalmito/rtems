@@ -44,6 +44,7 @@ include_bsp_HEADERS += include/system-clocks.h
 include_bsp_HEADERS += include/tms570-pinmux.h
 include_bsp_HEADERS += include/tms570-pins.h
 include_bsp_HEADERS += include/tms570lc4357-pins.h
+include_bsp_HEADERS += include/tms570-i2c.h
 
 include_bsp_ti_hercules_HEADERS = include/ti_herc/reg_adc.h
 include_bsp_ti_hercules_HEADERS += include/ti_herc/reg_ccmsr.h
@@ -146,6 +147,10 @@ libbsp_a_SOURCES += irq/irq.c
 libbsp_a_SOURCES += ../../shared/console-termios.c
 libbsp_a_SOURCES += console/printk-support.c
 libbsp_a_SOURCES += console/tms570-sci.c
+
+# i2c
+libbsp_a_SOURCES += i2c/tms570-i2cconfig.c
+libbsp_a_SOURCES += i2c/tms570-i2c.c
 
 # Clock
 libbsp_a_SOURCES += ../../shared/clockdrv_shell.h
