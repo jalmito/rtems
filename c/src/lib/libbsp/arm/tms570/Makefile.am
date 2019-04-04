@@ -101,6 +101,10 @@ EXTRA_DIST += startup/linkcmds.tms570ls3137_hdk
 EXTRA_DIST += startup/linkcmds.tms570ls3137_hdk_with_loader
 EXTRA_DIST += startup/linkcmds.tms570ls3137_hdk_sdram
 EXTRA_DIST += startup/linkcmds.tms570ls3137_hdk_intram
+EXTRA_DIST += startup/linkcmds.tms570lc4357_ftlmc
+EXTRA_DIST += startup/linkcmds.tms570lc4357_ftlmc_with_loader
+EXTRA_DIST += startup/linkcmds.tms570lc4357_ftlmc_sdram
+EXTRA_DIST += startup/linkcmds.tms570lc4357_ftlmc_intram
 
 # ----------------------------
 # ------  LibBSP
