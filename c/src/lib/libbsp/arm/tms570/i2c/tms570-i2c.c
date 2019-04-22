@@ -24,23 +24,29 @@ static void tms570_i2c_handler(void *arg)
     case 0x6:
 //      regs->STR |= TMS570_I2C_STR_SCD * 1 ;
 //      regs->MDR |=TMS570_I2C_MDR_MST * 1;
-    break;
+//        notify = false;
+        break;
     case 0x5:
       /* Data has been transmitted successfully */
-      if (e->data <= e->end) {
-        regs->DXR = *(e->data);
-        e->data ++;
+      if (data < end) {
+        notify = false;
+        regs->DXR = *(data);
+        data ++;
+        e->data = data;
       }
+      else
+         regs->DXR = *(data);// auxData = e->end;
       break;
     case 0x4:
       /* Data has been received */
-      if (data != end) {
+      if (data < end) {
+        notify = false;
         *data = ((uint8_t)regs->DRR);
-         ++data;
+         data++;
 //         e->data = data;
 //        data = data+1;
           e->data = data;
-        if (data < end) {
+//        if (data < end) {
 //            notify = false;
 //          if (data + 1 != end) {
 //            regs->conset = tms570_I2C_AA;
@@ -49,17 +55,16 @@ static void tms570_i2c_handler(void *arg)
 //          }
 //          regs->conclr = tms570_I2C_SI;
 //          notify = false
-        } else{
-            tms570_i2c_handler(arg);
-
-
-          /* This is an error and should never happen */
-        }
+//        }  
       }
+      else
+         auxData = regs->DRR;
+
       break;
     case 0x1:
       /* Arbitration has been lost */
     errno=1;
+//    notify = false;
       break;
     case 0x3:
       /* ARDY */
@@ -191,13 +196,14 @@ static rtems_status_code  tms570_i2c_init(rtems_libi2c_bus_t *bus)
                  | TMS570_I2C_PSEL_SCLPSEL * 1;     /* scl pin */
 
     /** - set interrupt enable */
+    regs->IMR    &= 0;     /* Address as slave interrupt      */
     regs->IMR    = TMS570_I2C_IMR_AASEN * 1     /* Address as slave interrupt      */
                     | TMS570_I2C_IMR_SCDEN * 1     /* Stop Condition detect interrupt */
                     | TMS570_I2C_IMR_TXRDYEN * 1     /* Transmit data ready interrupt   */
                     | TMS570_I2C_IMR_RXRDYEN * 1     /* Receive data ready interrupt    */
                     | TMS570_I2C_IMR_ARDYEN * 1    /* Register Access ready interrupt */
                     | TMS570_I2C_IMR_NACKEN * 1     /* No Acknowledgment interrupt    */
-                    | TMS570_I2C_IMR_ALEN *1 ;     /* Arbitration Lost interrupt      */
+                    | TMS570_I2C_IMR_ALEN * 1 ;     /* Arbitration Lost interrupt      */
 
     regs->MDR |= TMS570_I2C_MDR_nIRS * 1; /* i2c out of reset */
   sc = rtems_semaphore_create (
@@ -230,11 +236,16 @@ static rtems_status_code tms570_i2c_send_start(rtems_libi2c_bus_t *bus)
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   tms570_i2c_bus_entry *e = (tms570_i2c_bus_entry *) bus;
   volatile tms570_i2c_t *regs = e->regs;
-//  regs->MDR |= TMS570_I2C_MDR_STP * 1;
-//  regs->MDR |= TMS570_I2C_MDR_STT * 1; /* set start condition */
-    regs->MDR |=TMS570_I2C_MDR_MST * 1;
+  uint32_t debug_reg = regs->STR & TMS570_I2C_STR_BB;
 
-   return RTEMS_SUCCESSFUL;
+//  if(debug_regregs->STR & TMS570_I2C_STR_ARDY == 0)
+  if(debug_reg == 0)
+  {
+    regs->MDR |=TMS570_I2C_MDR_MST * 1;
+  }
+  else
+        sc = tms570_i2c_wait(e);
+    return sc;
 }
 
 static rtems_status_code tms570_i2c_send_stop(rtems_libi2c_bus_t *bus)
@@ -243,8 +254,20 @@ static rtems_status_code tms570_i2c_send_stop(rtems_libi2c_bus_t *bus)
   tms570_i2c_bus_entry *e = (tms570_i2c_bus_entry *) bus;
   volatile tms570_i2c_t *regs = e->regs;
 //  regs->MDR |= TMS570_I2C_MDR_STP * 1; /* set stop condition */
+  uint32_t debug_reg = regs->STR & TMS570_I2C_STR_ARDY;
 
-   return RTEMS_SUCCESSFUL;
+//  if(debug_regregs->STR & TMS570_I2C_STR_ARDY == 0)
+  if(debug_reg == 0)
+  {
+    sc = tms570_i2c_wait(e);
+  }
+  debug_reg = regs->STR & TMS570_I2C_STR_BB;
+  if(debug_reg != 0)
+  {
+    sc = tms570_i2c_wait(e);
+  }
+    return sc;
+
 }
 
 static rtems_status_code tms570_i2c_send_addr(rtems_libi2c_bus_t *bus, uint32_t addr, int rw)
@@ -325,7 +348,8 @@ static int tms570_i2c_write(
   regs->MDR |= TMS570_I2C_MDR_STT * 1; /* set start condition */
 //  regs->MDR |= TMS570_I2C_MDR_TRX * 1U; /*Set Transmit/Receive Mode*/
   if((regs->STR & TMS570_I2C_STR_TXRDY) == 0)
-    return -RTEMS_IO_ERROR;
+    sc = tms570_i2c_wait(e);
+    //return -RTEMS_IO_ERROR;
 
   /* Setup transmit buffer */
   e->data = out + 1;
@@ -351,8 +375,10 @@ static int tms570_i2c_set_transfer_mode(
 
 static int tms570_i2c_ioctl(rtems_libi2c_bus_t *bus, int cmd, void *arg)
 {
+  rtems_status_code sc = RTEMS_SUCCESSFUL;
   tms570_i2c_bus_entry *e = (tms570_i2c_bus_entry *) bus;
   volatile tms570_i2c_t *regs = e->regs;
+  uint32_t debug_reg; 
   int rv = -1;
   const rtems_libi2c_tfr_mode_t *tm = (const rtems_libi2c_tfr_mode_t *) arg;
 
@@ -364,6 +390,17 @@ static int tms570_i2c_ioctl(rtems_libi2c_bus_t *bus, int cmd, void *arg)
             regs->MDR &= (0xFFFFFFFF & (~TMS570_I2C_MDR_XA));
         rv=0;
         break;
+    case I2C_READ_BROADCAST:
+        debug_reg = (regs->STR  & TMS570_I2C_STR_AD0);
+        if(debug_reg != 0){ 
+           e->data = rv;
+           e->end = rv+1;
+           sc = tms570_i2c_wait(e);
+           return (0x00000000 | rv);
+        }
+        else 
+           return rv;
+            break;
     case I2C_RDWR:
             regs->MDR |= TMS570_I2C_MDR_RM * 1;
             rv=0;

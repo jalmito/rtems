@@ -7,6 +7,7 @@
 
 //#include <bsp/io.h>
 #include <bsp/tms570.h>
+#define I2C_READ_BROADCAST 0xF4
 
 #ifdef __cplusplus
 extern "C" {
