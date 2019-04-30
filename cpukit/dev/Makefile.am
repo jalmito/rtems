@@ -10,6 +10,9 @@ include_dev_i2c_HEADERS += include/dev/i2c/eeprom.h
 include_dev_i2c_HEADERS += include/dev/i2c/gpio-nxp-pca9535.h
 include_dev_i2c_HEADERS += include/dev/i2c/i2c.h
 include_dev_i2c_HEADERS += include/dev/i2c/switch-nxp-pca9548a.h
+include_dev_i2c_HEADERS += include/dev/i2c/bmDriver.h
+include_dev_i2c_HEADERS += include/dev/i2c/bme680.h
+include_dev_i2c_HEADERS += include/dev/i2c/bme680_defs.h
 
 include_linuxdir = $(includedir)/linux
 include_linux_HEADERS =
@@ -24,6 +27,8 @@ libdev_a_SOURCES += i2c/gpio-nxp-pca9535.c
 libdev_a_SOURCES += i2c/i2c-bus.c
 libdev_a_SOURCES += i2c/i2c-dev.c
 libdev_a_SOURCES += i2c/switch-nxp-pca9548a.c
+libdev_a_SOURCES += i2c/bme680.c
+libdev_a_SOURCES += i2c/bmDriver.c
 
 include $(srcdir)/preinstall.am
 include $(top_srcdir)/automake/local.am

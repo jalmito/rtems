@@ -39,6 +39,18 @@ $(PROJECT_INCLUDE)/dev/i2c/switch-nxp-pca9548a.h: include/dev/i2c/switch-nxp-pca
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/dev/i2c/switch-nxp-pca9548a.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/dev/i2c/switch-nxp-pca9548a.h
 
+$(PROJECT_INCLUDE)/dev/i2c/bmDriver.h: include/dev/i2c/bmDriver.h $(PROJECT_INCLUDE)/dev/i2c/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/dev/i2c/bmDriver.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/dev/i2c/bmDriver.h
+
+$(PROJECT_INCLUDE)/dev/i2c/bme680.h: include/dev/i2c/bme680.h $(PROJECT_INCLUDE)/dev/i2c/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/dev/i2c/bme680.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/dev/i2c/bme680.h
+
+$(PROJECT_INCLUDE)/dev/i2c/bme680_defs.h: include/dev/i2c/bme680_defs.h $(PROJECT_INCLUDE)/dev/i2c/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/dev/i2c/bme680_defs.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/dev/i2c/bme680_defs.h
+
 $(PROJECT_INCLUDE)/linux/$(dirstamp):
 	@$(MKDIR_P) $(PROJECT_INCLUDE)/linux
 	@: > $(PROJECT_INCLUDE)/linux/$(dirstamp)
