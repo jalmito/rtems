@@ -80,6 +80,7 @@ struct tms_softc {
         rtems_id        rxDaemonTid;
         rtems_id        txDaemonTid;
 	struct mbuf	**rxMbuf;
+        uint32		rxBdIx;
         uint32		rxBdCount;
         uint32		txBdCount;
         uint32             rxInterrupts;
@@ -493,7 +494,7 @@ tms_rx_interrupt_handler (rtems_vector_number v)
 {
 //    rtems_bsdnet_event_send (tms[0].rxDaemonTid, INTERRUPT_EVENT);
  
-rxch_t *rxch_int;
+rxch_t *rxch_int; //memory leak
 volatile emac_rx_bd_t *curr_bd, *curr_tail, *last_bd;
 int rxBds=1;
 uint32_t processed = tms[0].rxInterrupts;
@@ -533,14 +534,28 @@ rtems_interrupt_level pval;
        != EMAC_BUF_DESC_OWNER) {
         if((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_EOP)== EMAC_BUF_DESC_EOP)
         {
-
-	  MGETHDR (m, M_WAIT, MT_DATA);
-            if(m == NULL || (m->m_flags & M_PKTHDR) == 0)
-                return;
+          m = tms[0].rxMbuf[tms[0].rxBdIx];
+//          if(m == NULL)
+//          {
+	     MGETHDR (m, M_NOWAIT, MT_DATA);
+               if(m == NULL || (m->m_flags & M_PKTHDR) == 0){
+                   m_free(m);
+                   return;}
 //
-   	  MCLGET (m, M_WAIT);
-            if(!(m->m_flags & M_EXT))
-                return;
+   	     MCLGET (m, M_NOWAIT);
+               if(!(m->m_flags & M_EXT)){
+                   m_free(m);
+                   return;
+               }
+//          }
+            tms[0].rxMbuf[tms[0].rxBdIx]=m;
+          
+          if(tms[0].rxBdIx >= tms[0].rxBdCount-1)
+                tms[0].rxBdIx = 0;
+          else
+                tms[0].rxBdIx++;
+
+//          m_freem(tms[0].rxMbuf[tms[0].rxBdFreeIx]);
 //          m->m_flags |= M_EXT;
 	  m->m_pkthdr.rcvif = ifp;
 	    m->m_len=EMACSwizzleData((uint32)curr_bd->bufoff_len & 0xFFFF0000);//m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);		//02032019
@@ -557,12 +572,12 @@ rtems_interrupt_level pval;
      
 //      m = tms[0].rxMbuf[rxBds];	//02032019
 //	    m->m_len=EMACSwizzleData((uint32)last_bd->bufoff_len & 0xFFFF0000);//m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);		//02032019
-            memcpy(rxDataBuf[rxBds],(void *)EMACSwizzleData((uint32)last_bd->bufptr),m->m_len);	//02032019
+            memcpy(rxDataBuf[0],(void *)EMACSwizzleData((uint32)last_bd->bufptr),m->m_len);	//02032019
 //      memcpy(data_b,(void *)EMACSwizzleData((uint32)last_bd->bufptr),MAX_TRANSFER_UNIT);	//02032019
-            memcpy(mtod(m,void *),rxDataBuf[rxBds]+sizeof (struct ether_header),m->m_len-sizeof (struct ether_header));	//02032019
+            memcpy(mtod(m,void *),rxDataBuf[0]+sizeof (struct ether_header),m->m_len-sizeof (struct ether_header));	//02032019
             
 //	    eh = mtod (m, struct ether_header *);						//02032019
-	    eh = (struct ether_header *) rxDataBuf[rxBds];						//02032019
+	    eh = (struct ether_header *) rxDataBuf[0];						//02032019
             m->m_len -= sizeof(struct ether_header);
 //	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);		//02032019
             m->m_pkthdr.len=m->m_len;//,EMACSwizzleData((uint32)last_bd->flags_pktlen & 0xFFFF0000));		//02032019
@@ -633,6 +648,7 @@ rtems_interrupt_level pval;
 		
         rtems_interrupt_enable (pval);
        
+//            m_freem(m);
     }
 
 
@@ -1061,6 +1077,8 @@ tms_txDaemon (void *arg)
 				break;
                         }
 			sendpacket (ifp, m);
+
+                   m_freem(m);
 		}
 	  		rtems_bsdnet_event_receive (FINISHED_TRANSMIT_EVENT, RTEMS_EVENT_ANY | RTEMS_WAIT, RTEMS_NO_TIMEOUT, &events);
 	}
@@ -1083,7 +1101,6 @@ static void
 tms_EMAC_hw_init(uint8 macaddr[6U])
 {
   rtems_status_code status;
-
   uint32 temp, channel;
   volatile uint32 phyID=0U;
   volatile uint32 delay = 0xFFFU;
@@ -1285,7 +1302,25 @@ if (status != RTEMS_SUCCESSFUL)
       printf ("Can't install int threshold handler: `%s'\n", rtems_status_text (status));
 
 
- tms[0].rxMbuf = malloc (tms[0].rxBdCount * sizeof *tms[0].rxMbuf, M_MBUF, M_NOWAIT);
+ tms[0].rxMbuf = malloc (tms[0].rxBdCount * sizeof *tms[0].rxMbuf, M_MBUF, M_WAIT);
+//   tms[0].rxMbuf = malloc ( sizeof tms[0].rxMbuf, M_MBUF, M_WAIT);
+   for(temp=0;temp < tms[0].rxBdCount;temp++)
+    {
+        struct mbuf *m;
+	  MGETHDR (m, M_WAIT, MT_DATA);
+            if(m == NULL || (m->m_flags & M_PKTHDR) == 0){
+                m_free(m);
+                break;}
+//
+   	  MCLGET (m, M_WAIT);
+            if(!(m->m_flags & M_EXT)){
+                m_free(m);
+                break;
+            }
+
+            tms[0].rxMbuf[temp] = m;
+    }
+   tms[0].rxBdIx=0;
 }
 /*
  * Initialize and start the device
@@ -1308,7 +1343,7 @@ tms_eth_init (void *arg)
 		/*
 		 * Start driver tasks
 		 */
-                sc->txDaemonTid = rtems_bsdnet_newproc ("TMStx", 1024, tms_txDaemon, sc);
+                sc->txDaemonTid = rtems_bsdnet_newproc ("TMStx", 4096, tms_txDaemon, sc);
 //		sc->rxDaemonTid = rtems_bsdnet_newproc ("TMSrx", 4096, tms_rxDaemon, sc);
 
 	}

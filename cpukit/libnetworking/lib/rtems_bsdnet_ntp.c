@@ -112,11 +112,11 @@ tryServer (int i, int s, rtems_bsdnet_ntp_callback_t callback, void *usr_data)
 		return -1;
 	}
 	if (i >= 0) {
-		memset (&farAddr, 0, sizeof farAddr);
+		memset (&farAddr, 0, sizeof (struct sockaddr_in));/*causes fatal source exception memset (&farAddr, 0, sizeof farAddr);*/   
 		farAddr.sin_family = AF_INET;
 		farAddr.sin_port = htons (123);
 		farAddr.sin_addr = rtems_bsdnet_ntpserver[i];
-		memset (&packet, 0, sizeof packet);
+		memset (&packet, 0, sizeof (struct ntpPacketSmall));// see above memset (&packet, 0, sizeof packet);
 		packet.li_vn_mode = (3 << 3) | 3; /* NTP version 3, client */
 		if ( callback( &packet, 1, usr_data ) )
 			return -1;

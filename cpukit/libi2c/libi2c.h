@@ -311,7 +311,7 @@ typedef struct rtems_libi2c_drv_t_
  * RETURNS minor number (FYI) or -1 on failure
  */
 extern int
-rtems_libi2c_register_drv (const char *name, rtems_libi2c_drv_t * drvtbl,
+rtems_libi2c_register_drv (const char *name, const rtems_libi2c_drv_t * drvtbl,
                            unsigned bus, unsigned i2caddr);
 
 /* Operations available to high level drivers */
@@ -438,7 +438,8 @@ rtems_libi2c_ioctl (rtems_device_minor_number minor,
  * including its private data appended to it during creation of the entry
  *
  */
-
+/*delete mutex*/
+#define RTEMS_LIBI2C_IOCTL_RENEW_MUTEX 6
 /**
  * @brief IO control command for asynchronous read and write.
  *

@@ -87,21 +87,20 @@ rtems_status_code bme_init (rtems_device_major_number major, rtems_device_minor_
   gas_sensor.write = bme_write;
   gas_sensor.delay_ms = bmi2_delay;
 
-  gas_sensor.amb_temp = 25;
+//  gas_sensor.amb_temp = 25;
 
   bme_result = bme680_init(&gas_sensor);
 
 
 
     /* Set the temperature, pressure and humidity settings */
-    gas_sensor.tph_sett.os_hum = BME680_OS_2X;
-    gas_sensor.tph_sett.os_pres = BME680_OS_4X;
-    gas_sensor.tph_sett.os_temp = BME680_OS_8X;
+    gas_sensor.tph_sett.os_hum = BME680_OS_1X;
+    gas_sensor.tph_sett.os_pres = BME680_OS_2X;
+    gas_sensor.tph_sett.os_temp = BME680_OS_16X;
     gas_sensor.tph_sett.filter = BME680_FILTER_SIZE_3;
-
-    /* Set the remaining gas sensor settings and link the heating profile */
+  /* Set the remaining gas sensor settings and link the heating profile */
     gas_sensor.gas_sett.run_gas = BME680_ENABLE_GAS_MEAS;
-    /* Create a ramp heat waveform in 3 steps */
+  /* Create a ramp heat waveform in 3 steps */
     gas_sensor.gas_sett.heatr_temp = 320; /* degree Celsius */
     gas_sensor.gas_sett.heatr_dur = 150; /* milliseconds */
 
@@ -110,8 +109,10 @@ rtems_status_code bme_init (rtems_device_major_number major, rtems_device_minor_
     gas_sensor.power_mode = BME680_FORCED_MODE; 
 
     /* Set the required sensor settings needed */
-    set_required_settings = BME680_OST_SEL | BME680_OSP_SEL | BME680_OSH_SEL | BME680_FILTER_SEL 
-        | BME680_GAS_SENSOR_SEL;
+    set_required_settings = BME680_OST_SEL | BME680_OSP_SEL | BME680_OSH_SEL |
+        BME680_GAS_SENSOR_SEL |
+        BME680_FILTER_SEL;
+        
 
     /* Set the desired sensor configuration */
     bme_result= bme680_set_sensor_settings(set_required_settings,&gas_sensor);
@@ -141,13 +142,15 @@ rtems_status_code bme_close (void *arg)
 {
   int8_t bme_result;
 
+
   return RTEMS_SUCCESSFUL;
 
 }
 
+
 rtems_status_code bme_read_data (rtems_device_major_number major, rtems_device_minor_number minor,
           void *arg)
-{   
+{
   int8_t result;
   struct bme680_field_data data;
 
@@ -155,10 +158,36 @@ rtems_status_code bme_read_data (rtems_device_major_number major, rtems_device_m
   float *tpData = (float *)rwargs->buffer;
 
     result = bme680_get_sensor_data(&data, &gas_sensor);
+
+
+    result = bme680_set_sensor_mode(&gas_sensor);
+    if (result == BME680_W_NO_NEW_DATA)
+    {
+        return RTEMS_NOT_DEFINED;
+    }
+    if(result == BME680_OK)
+    {
     tpData[0] = data.temperature;
     tpData[1] = data.pressure;
+    tpData[2] = data.humidity;
+    tpData[3] = data.gas_resistance;
+      return RTEMS_SUCCESSFUL;
+    }
+        return RTEMS_NOT_DEFINED;
 
-    return result;
+#if 0
+  int result;
+  
+  rtems_libio_rw_args_t *rwargs = arg;
+  
+  result = rtems_libi2c_start_read_bytes (minor, (unsigned char *)rwargs->buffer, rwargs->count); 
+  if(result < 0)
+      return RTEMS_NOT_DEFINED;
+  else
+      return RTEMS_SUCCESSFUL;
+
+#endif
+
 }
 rtems_status_code bme_write_data (rtems_device_major_number major, rtems_device_minor_number minor,
           void *arg)
@@ -169,6 +198,10 @@ rtems_status_code bme_write_data (rtems_device_major_number major, rtems_device_
 
   result = rtems_libi2c_start_write_bytes (minor, (unsigned char *)rwargs->buffer, rwargs->count); 
 
+  if(result < 0)
+      return RTEMS_NOT_DEFINED;
+  else
+      return RTEMS_SUCCESSFUL;
 }
 
 

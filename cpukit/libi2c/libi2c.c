@@ -640,6 +640,20 @@ rtems_libi2c_ioctl (rtems_device_minor_number minor,
       rtems_libi2c_send_stop (minor);
     }
     break;
+  case RTEMS_LIBI2C_IOCTL_RENEW_MUTEX:
+    /*
+     * provide MUTEX
+     */
+//    *(rtems_libi2c_drv_t **)args = (drvs[MINOR2DRV(minor)-1].drv);
+    
+    
+     if(busses[MINOR2BUS(minor)].started == true)
+     {
+         unlock_bus (MINOR2BUS(minor));
+         rtems_semaphore_delete (busses[MINOR2BUS(minor)].mutex);
+     }
+     busses[MINOR2BUS(minor)].mutex = RTEMS_ID_NONE ;
+    break;
   default:
     sc = bush->ops->ioctl (bush, cmd, args);
     break;
@@ -697,7 +711,7 @@ rtems_libi2c_start_write_bytes (rtems_device_minor_number minor,
 }
 
 int
-rtems_libi2c_register_drv (const char *name, rtems_libi2c_drv_t * drvtbl,
+rtems_libi2c_register_drv (const char *name, const rtems_libi2c_drv_t * drvtbl,
                            unsigned busno, unsigned i2caddr)
 {
   int i;

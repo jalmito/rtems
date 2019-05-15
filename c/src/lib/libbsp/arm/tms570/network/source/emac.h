@@ -210,7 +210,7 @@ typedef enum {
 #define MAX_EMAC_INSTANCE 	      1U
 #define SIZE_EMAC_CTRL_RAM        0x2000U
 #define MAX_TRANSFER_UNIT         1514U
-#define MAX_RX_PBUF_ALLOC 		  (20U)
+#define MAX_RX_PBUF_ALLOC 		  (40U)
 #define MIN_PKT_LEN               60U
 #define MIN_PACKET_SIZE          (46U)
 
