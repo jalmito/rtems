@@ -498,7 +498,7 @@ rxch_t *rxch_int; //memory leak
 volatile emac_rx_bd_t *curr_bd, *curr_tail, *last_bd;
 int rxBds=1;
 uint32_t processed = tms[0].rxInterrupts;
-struct mbuf *m=NULL;
+struct mbuf *m=NULL,*k;
 struct ifnet *ifp;
 rtems_interrupt_level pval;
     hdkif_t *hdkif;
@@ -537,18 +537,19 @@ rtems_interrupt_level pval;
           m = tms[0].rxMbuf[tms[0].rxBdIx];
 //          if(m == NULL)
 //          {
-	     MGETHDR (m, M_NOWAIT, MT_DATA);
-               if(m == NULL || (m->m_flags & M_PKTHDR) == 0){
-                   m_free(m);
+
+	     MGETHDR (k, M_NOWAIT, MT_DATA);
+               if(k == NULL || (k->m_flags & M_PKTHDR) == 0){
+//                   m_free(m);
                    return;}
 //
-   	     MCLGET (m, M_NOWAIT);
-               if(!(m->m_flags & M_EXT)){
-                   m_free(m);
+   	     MCLGET (k, M_NOWAIT);
+               if(!(k->m_flags & M_EXT)){
+  //                 m_free(m);
                    return;
                }
+            tms[0].rxMbuf[tms[0].rxBdIx]=k;
 //          }
-            tms[0].rxMbuf[tms[0].rxBdIx]=m;
           
           if(tms[0].rxBdIx >= tms[0].rxBdCount-1)
                 tms[0].rxBdIx = 0;
@@ -1078,7 +1079,7 @@ tms_txDaemon (void *arg)
                         }
 			sendpacket (ifp, m);
 
-                   m_freem(m);
+                        m_freem(m);
 		}
 	  		rtems_bsdnet_event_receive (FINISHED_TRANSMIT_EVENT, RTEMS_EVENT_ANY | RTEMS_WAIT, RTEMS_NO_TIMEOUT, &events);
 	}
