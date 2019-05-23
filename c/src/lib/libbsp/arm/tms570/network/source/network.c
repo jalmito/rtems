@@ -357,7 +357,7 @@ boolean EMACTransmit_mbuf(hdkif_t *hdkif, struct mbuf *m)
    
   txch->active_tail = bd_end;
   /*SAFETYMCUSW 45 D MR:21.1 <APPROVED> "Valid non NULL input parameters are assigned in this driver" */     
-  m_freem(aux_next);
+//  m_freem(aux_next);
   retValue = TRUE;
   }
   else
@@ -496,9 +496,8 @@ tms_rx_interrupt_handler (rtems_vector_number v)
  
 rxch_t *rxch_int; //memory leak
 volatile emac_rx_bd_t *curr_bd, *curr_tail, *last_bd;
-int rxBds=1;
-uint32_t processed = tms[0].rxInterrupts;
-struct mbuf *m=NULL,*k;
+uint32_t rxBds,processed = tms[0].rxInterrupts;
+struct mbuf *m=NULL,*k,*n;
 struct ifnet *ifp;
 rtems_interrupt_level pval;
     hdkif_t *hdkif;
@@ -540,21 +539,19 @@ rtems_interrupt_level pval;
 
 	     MGETHDR (k, M_NOWAIT, MT_DATA);
                if(k == NULL || (k->m_flags & M_PKTHDR) == 0){
-//                   m_free(m);
                    return;}
 //
    	     MCLGET (k, M_NOWAIT);
                if(!(k->m_flags & M_EXT)){
-  //                 m_free(m);
                    return;
                }
             tms[0].rxMbuf[tms[0].rxBdIx]=k;
 //          }
-          
           if(tms[0].rxBdIx >= tms[0].rxBdCount-1)
                 tms[0].rxBdIx = 0;
           else
                 tms[0].rxBdIx++;
+
 
 //          m_freem(tms[0].rxMbuf[tms[0].rxBdFreeIx]);
 //          m->m_flags |= M_EXT;
@@ -666,231 +663,7 @@ rtems_interrupt_level pval;
  * SCC reader task
  */
 static void
-tms_rxDaemon (void *arg)
-{
-
-rxch_t *rxch_int;
-volatile emac_rx_bd_t *curr_bd, *curr_tail, *last_bd;
-int rxBds;
-struct tms_softc *sc = (struct tms_softc *)arg;
-struct ifnet *ifp = &sc->arpcom.ac_if;
-hdkif_t *hdkif;
-struct mbuf *m;
-
-  rtems_interrupt_level pval;
-  
-
-
-hdkif=sc->hdkif;
-rxch_int = &(sc->hdkif->rxchptr);
-/*
-	 * Allocate space for incoming packets and start reception
-*/
-for (rxBds = 0 ; ;) {
-	  MGETHDR (m, M_WAIT, MT_DATA);
-   	  MCLGET (m, M_WAIT);
-	  m->m_pkthdr.rcvif = ifp;
-	  m->m_data=rxDataBuf[1]; // 1
-	  sc->rxMbuf[rxBds] = m;
-	  if (++rxBds == MAX_RX_PBUF_ALLOC-1) {
-	       break;
-       }
-}
-rxBds=1;
- 
-	//	sc->rxMbuf[rxBds]->m_data=rxch_int->active_head->bufptr;
-	/*
-	 * Input packet handling loop
-	 */
-//for (;;) {
-//                
-//		/*
-//		 * Wait for packet if there's not one ready
-//		 */
-//
-//		if ((*(uint32_t *)(0xFCF780A4))== 0x00000000) {
-//			while ((*(uint32_t *)(0xFCF780A4)) == 0x00000000 ) {
-//      	    	     	rtems_event_set events;
-//     //	    		rtems_interrupt_level level;
-//			rtems_interrupt_disable (pval);
-////			rtems_interrupt_enable (level);
-//
-//				/*
-//				 * Unmask RXF (Full frame received) event
-//				 */
-//			
-//				rtems_bsdnet_event_receive (INTERRUPT_EVENT,
-//						RTEMS_WAIT|RTEMS_EVENT_ANY,
-//						RTEMS_NO_TIMEOUT,
-//						&events);
-//				
-//			}
-//		}
-//
-//			struct ether_header *eh;	
-//
-//
-//  /* Get the buffer descriptors which contain the earliest filled data */
-//
-// // rtems_interrupt_disable(pval);
-//  curr_bd = rxch_int->active_head;
-//
-//  last_bd = rxch_int->active_tail;
-//
-//  /**
-//   * Process the descriptors as long as data is available
-//   * when the DMA is receiving data, SOP flag will be set
-//  */
-//
-//  while((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_SOP) == EMAC_BUF_DESC_SOP) {
-//
-//    /* Start processing once the packet is loaded */
-//
-//	  if((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_OWNER)
-//       != EMAC_BUF_DESC_OWNER) {
-//
-//      /* this bd chain will be freed after processing */
-//
-//		  rxch_int->free_head = curr_bd;
-//
-//      /* Get the total length of the packet. curr_bd points to the start
-//       * of the packet.
-//       */
-//
-//      /* 
-//       * The loop runs till it reaches the end of the packet.
-//       */
-////02032019     curr_bd->flags_pktlen = EMACSwizzleData((uint32)EMAC_BUF_DESC_OWNER);	
-//
-////02032019     curr_bd->bufoff_len = EMACSwizzleData((uint32)MAX_TRANSFER_UNIT);	
-//
-////02032019     last_bd = curr_bd;	
-//
-////02032019     curr_bd = (emac_rx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);	
-//	      
-////02032019      m = sc->rxMbuf[rxBds];
-////
-////04032019      memcpy(mtod(m,void *),(void *)EMACSwizzleData((uint32)last_bd->bufptr),MAX_TRANSFER_UNIT);	
-////04032019	EMACRxCPWrite(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER, (uint32)last_bd);             	
-////04032019
-////04032019	eh = mtod (m, struct ether_header *);						
-////04032019	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);		
-////04032019	m->m_data+=sizeof(struct ether_header);						
-////04032019
-////04032019	ether_input (ifp, eh, m);					
-////04032019	MGETHDR (m, M_WAIT, MT_DATA);                                   
-////04032019	MCLGET (m, M_WAIT);                                             
-////04032019	m->m_pkthdr.rcvif = ifp;      
-////04032019	m->m_data=rxDataBuf[rxBds];   
-////04032019   	sc->rxMbuf[rxBds] = m;        
-////
-////02032019    while((EMACSwizzleData((uint32)curr_bd->flags_pktlen) & EMAC_BUF_DESC_EOP)!= EMAC_BUF_DESC_EOP)
-////02032019      {
-////02032019        curr_bd->flags_pktlen = EMACSwizzleData((uint32)EMAC_BUF_DESC_OWNER);
-////02032019        
-////02032019        curr_bd->bufoff_len = EMACSwizzleData((uint32)MAX_TRANSFER_UNIT);
-////02032019        
-////02032019        last_bd = curr_bd;
-////02032019        
-////02032019        curr_bd = (emac_rx_bd_t *)EMACSwizzleData(curr_bd->next);
-////
-////02032019	  m_append(m, len, cp)
-////02032019               /**Append len bytes of data cp to the mbuf chain.  Extend the mbuf
-////02032019               	   chain if the	new data does not fit in existing space.	**/
-////
-////02032019	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);
-////02032019	m->m_data+=sizeof(struct ether_header);
-////02032019	ether_input (ifp, eh, m);
-////
-////
-////        m = sc->rxMbuf[rxBds];//------------------
-////        m->m_data=last_bd->bufptr;
-////       	eh = mtod (m, struct ether_header *);
-////
-////	MGETHDR (m, M_WAIT, MT_DATA);
-////	MCLGET (m, M_WAIT);
-////	m->m_pkthdr.rcvif = ifp;     
-////      	sc->rxMbuf[rxBds] = m;	//---------------------------------------------------------
-//// 	if(++rxBds == MAX_RX_PBUF_ALLOC-1)
-////	  rxBds=0;
-////		      
-////02032019     }
-//      
-//
-//      curr_bd->flags_pktlen = EMACSwizzleData((uint32)EMAC_BUF_DESC_OWNER);	//02032019
-//
-//      curr_bd->bufoff_len = EMACSwizzleData((uint32)MAX_TRANSFER_UNIT);	//02032019
-//
-//      last_bd = curr_bd;	//02032019
-//
-//      curr_bd = (emac_rx_bd_t *)EMACSwizzleData((uint32)curr_bd->next);	//02032019
-//     
-//      //    EMACRxCPWrite(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER, (uint32)last_bd);
-//
-//      m = sc->rxMbuf[rxBds];	//02032019
-//
-////            while((EMACSwizzleData((uint32)last_bd->flags_pktlen) & EMAC_BUF_DESC_OWNER)==EMAC_BUF_DESC_OWNER)
-////      	{
-////	  //wait for it to be ready
-////      	}
-////        m->m_data=last_bd->bufptr;
-////	eh = mtod (m, struct ether_header *);
-////	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);//last_bd->flags_pktlen&(0x0000FFFF)-sizeof(struct ether_header);//MAX_TRANSFER_UNIT-sizeof(struct ether_header);
-////	m->m_data+=sizeof(struct ether_header);
-////	ether_input (ifp, eh, m);
-//
-//        memcpy(mtod(m,void *),(void *)EMACSwizzleData((uint32)last_bd->bufptr),EMACSwizzleData((uint32)last_bd->len));//MAX_TRANSFER_UNIT);	//02032019
-//	EMACRxCPWrite(hdkif->emac_base, (uint32)EMAC_CHANNELNUMBER, (uint32)last_bd);             	//02032019
-//
-//	eh = mtod (m, struct ether_header *);						//02032019
-//	m->m_len=m->m_pkthdr.len=MAX_TRANSFER_UNIT-sizeof(struct ether_header);		//02032019
-//	m->m_data+=sizeof(struct ether_header);						//02032019
-//
-//	ether_input (ifp, eh, m);					//02032019
-//	MGETHDR (m, M_WAIT, MT_DATA);                                   //02032019
-//	MCLGET (m, M_WAIT);                                             //02032019
-//	m->m_pkthdr.rcvif = ifp;      //02032019
-//	m->m_data=rxDataBuf[rxBds];   //02032019
-//   	sc->rxMbuf[rxBds] = m;        //02032019
-//
-//   	if(++rxBds == MAX_RX_PBUF_ALLOC-1)
-//			rxBds=0;
-//	    
-//      rxch_int->active_head = curr_bd;                                              	
-//      curr_tail = rxch_int->active_tail;                                                
-//      curr_tail->next = (emac_rx_bd_t *)EMACSwizzleData((uint32)rxch_int->free_head);   
-//      last_bd->next = NULL;                                                             
-//
-//
-//        /**
-//         * Check if the reception has ended. If the EOQ flag is set, the NULL
-//         * Pointer is taken by the DMA engine. So we need to write the RX HDP
-//         * with the next descriptor.
-//         */
-//
-//        if((EMACSwizzleData((uint32)curr_tail->flags_pktlen) & EMAC_BUF_DESC_EOQ) == EMAC_BUF_DESC_EOQ) {
-//
-//          EMACRxHdrDescPtrWrite(hdkif->emac_base, (uint32)(rxch_int->free_head), (uint32)EMAC_CHANNELNUMBER);
-//        }
-//
-//  
-//        rxch_int->free_head  = curr_bd;
-//        rxch_int->active_tail = last_bd;
-//		
-//	/*	if(curr_bd == 0xfc5210b0){
-//	  rxch_int->active_head=0xfc521010;
-//	   EMACRxHdrDescPtrWrite(hdkif->emac_base, (uint32)rxch_int->active_head, (uint32)EMAC_CHANNELNUMBER);
-//	}
-//	*/
-//       
-//    }
-//  }
-//        EMACCoreIntAck(EMAC_0_BASE, (uint32)EMAC_INT_CORE0_RX);
-//
-//  rtems_interrupt_enable(pval);
-//	
-//}
-}
+tms_rxDaemon (void *arg){}
 //#if 0
 static void
 sendpacket (struct ifnet *ifp, struct mbuf *m)
@@ -906,146 +679,6 @@ sendpacket (struct ifnet *ifp, struct mbuf *m)
     
 }
 //#endif
-#if 0
-static void
-sendpacket (struct ifnet *ifp, struct mbuf *m)
-{
-  uint8 *myframe;
-  uint8 test[1514];
-  struct pbuf_struct ti_buffer[24];
-  struct mbuf *a,*b;
-  bool i=false;
-  int im=0,diff_min=0,acc=0;
-  struct tms_softc *sc = ifp->if_softc;
-   // 
-  a=m;
-  /*  if(a->m_ext.ext_buf!=a->m_data && (a->m_flags&M_EXT)==M_EXT)
-     a->m_data=a->m_ext.ext_buf;
-     ti_buffer[im].tot_len=a->m_pkthdr.len;*/
-  while(a){   
-        myframe=mtod(a,uint8 *);
-        if (a->m_len) {
-	  memcpy(&test[0]+acc,myframe,a->m_len);
-	  acc+=a->m_len;
-	}
-       MFREE (a, b);
-       a=b;
-  }
-  ti_buffer[im].payload=&test[0];
-  ti_buffer[im].next=NULL;
-  if(acc<MIN_FRAME_LENGTH)
-    ti_buffer[im].tot_len=ti_buffer[im].len=65;
-  else
-    ti_buffer[im].tot_len=ti_buffer[im].len=acc;
-
-
-    i=EMACTransmit(sc->hdkif, &ti_buffer[0]);
-    //    memset(test,0,1514);
-    //  if(i==false)
-    //  printf("Could not send frame!");
-    // else
-    //   printf("good");
-    //
-    //
-  uint8 *myframe;
-  uint8 test[1514];
-  struct pbuf_struct ti_buffer[24];
-  struct mbuf *a,*b;
-  bool i=false;
-  int im=0,diff_min=0,acc=0;
-  struct tms_softc *sc = ifp->if_softc;
-    // 
-  a=m;
-  if(a->m_ext.ext_buf!=a->m_data && (a->m_flags&M_EXT)==M_EXT)
-     a->m_data=a->m_ext.ext_buf;
-  ti_buffer[im].tot_len=a->m_pkthdr.len;
-  while(a){ 
-    myframe=mtod(a,uint8 *);
-    if(a->m_len == 0)
-      {
-	// myframe=mtod(a,uint8 *);
-	//	memset(test,1,1514);
-       
-      }
-    else if(a->m_len<MIN_FRAME_LENGTH && acc<MIN_FRAME_LENGTH)
-      {
-	diff_min=MIN_FRAME_LENGTH-a->m_len;
-	memcpy(&test[0]+acc,myframe,a->m_len+diff_min);	
-	//		printf("%d\n",);
-	//	ti_buffer[im].payload=myframe;
-	//	ti_buffer[im].tot_len=a->m_pkthdr.len+acc ;
-	//	ti_buffer[im].len=MIN_FRAME_LENGTH;    	
-	acc+=a->m_len;
-      }
-    else if(a->m_len+acc > MAX_FRAME_LENGTH && acc>0)
-      {
-	ti_buffer[im].payload=&test[0];
-	ti_buffer[im].len=acc+diff_min;
-	ti_buffer[im].next=&ti_buffer[im+1];
-	ti_buffer[im].tot_len+=diff_min;
-	im++;
-	memcpy(&test[0],myframe,a->m_len);
-	ti_buffer[im].payload=&test[0];
-	ti_buffer[im].len=a->m_len;   
-	ti_buffer[im].next=&ti_buffer[im+1];   
-	im++;
-	diff_min=0;
-	acc=0;
-      }
-    else if(a->m_len > MAX_FRAME_LENGTH )
-      {
-	memcpy(&test[0],myframe,1500U);
-	ti_buffer[im].payload=&test[0];
-	ti_buffer[im].len=1500;   
-	ti_buffer[im].next=&ti_buffer[im+1];   
-	im++;
-	acc=0;
-	diff_min=0;
-      }
-    else{
-        memcpy(&test[0]+acc,myframe,a->m_len);
-	ti_buffer[im].payload=&test[0];
-	ti_buffer[im].len=a->m_len+acc;   
-	ti_buffer[im].next=&ti_buffer[im+1];   
-	im++;
-	acc=0;
-	diff_min=0;
-
-    }
-       MFREE (a, b);
-       a=b;
-       // a=a->m_next;
-    
-    //    a=a->m_next; //a se queda igual
-     // memcpy(&test[0],myframe,a->m_len);
-  }
-
-  if(diff_min!=0){
-    ti_buffer[im].payload=&test[0];
-    ti_buffer[im].len=acc+diff_min;
-    ti_buffer[im].next=NULL;
-    ti_buffer[im].tot_len+=diff_min;
-  }
-  else{
-    ti_buffer[im-1].next=NULL;
-  }
-  /*
-for(j=0;j<im;j++)
-  ti_buffer[j].tot_len=acc;
-  */
-
- 
-
-
-    i=EMACTransmit(sc->hdkif, &ti_buffer[0]);
-    //    memset(test,0,1514);
-    //  if(i==false)
-    //  printf("Could not send frame!");
-    // else
-    //   printf("good");
-
-}
-#endif
 /*
  * Driver transmit daemon
  */
@@ -1054,7 +687,7 @@ tms_txDaemon (void *arg)
 {
 	struct tms_softc *sc = (struct tms_softc *)arg;
 	struct ifnet *ifp = &sc->arpcom.ac_if;
-	struct mbuf *m;
+	struct mbuf *m,*n;
 	rtems_event_set events;
 	int i;
 	char *mo;
@@ -1078,8 +711,10 @@ tms_txDaemon (void *arg)
 				break;
                         }
 			sendpacket (ifp, m);
-
-                        m_freem(m);
+                        while(m!=NULL){
+                            MFREE(m,n);
+                            m=n;
+                        }
 		}
 	  		rtems_bsdnet_event_receive (FINISHED_TRANSMIT_EVENT, RTEMS_EVENT_ANY | RTEMS_WAIT, RTEMS_NO_TIMEOUT, &events);
 	}
