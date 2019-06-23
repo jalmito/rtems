@@ -342,72 +342,72 @@ void tms570_system_hw_init( void )
    * This initialization sequence performs all the tasks that are not
    * required to be done at full application speed while the PLL locks.
    */
-  tms570_pll_init();
+//  tms570_pll_init();
 
   /* Run eFuse controller start-up checks and start eFuse controller ECC self-test.
    * This includes a check for the eFuse controller error outputs to be stuck-at-zero.
    */
-  efc_check_status = tms570_efc_check();
+//  efc_check_status = tms570_efc_check();
 
   /* Enable clocks to peripherals and release peripheral reset */
-  tms570_periph_init();
+//  tms570_periph_init();
 
   /* Configure device-level multiplexing and I/O multiplexing */
-  tms570_pinmux_init();
+//  tms570_pinmux_init();
 
   /* Enable external memory interface */
-  TMS570_SYS1.GPREG1 |= TMS570_SYS1_GPREG1_EMIF_FUNC;
+//  TMS570_SYS1.GPREG1 |= TMS570_SYS1_GPREG1_EMIF_FUNC;
 
-  if ( efc_check_status == 0U ) {
-    /* Wait for eFuse controller self-test to complete and check results */
-    if ( tms570_efc_check_self_test() == false ) { /* eFuse controller ECC logic self-test failed */
-      bsp_selftest_fail_notification( EFCCHECK_FAIL1 );           /* device operation is not reliable */
-    }
-  } else if ( efc_check_status == 2U ) {
-    /* Wait for eFuse controller self-test to complete and check results */
-    if ( tms570_efc_check_self_test() == false ) { /* eFuse controller ECC logic self-test failed */
-      bsp_selftest_fail_notification( EFCCHECK_FAIL1 );           /* device operation is not reliable */
-    } else {
-      bsp_selftest_fail_notification( EFCCHECK_FAIL2 );
-    }
-  } else {
-    /* Empty */
-  }
+//  if ( efc_check_status == 0U ) {
+//    /* Wait for eFuse controller self-test to complete and check results */
+//    if ( tms570_efc_check_self_test() == false ) { /* eFuse controller ECC logic self-test failed */
+//      bsp_selftest_fail_notification( EFCCHECK_FAIL1 );           /* device operation is not reliable */
+//    }
+//  } else if ( efc_check_status == 2U ) {
+//    /* Wait for eFuse controller self-test to complete and check results */
+//    if ( tms570_efc_check_self_test() == false ) { /* eFuse controller ECC logic self-test failed */
+//      bsp_selftest_fail_notification( EFCCHECK_FAIL1 );           /* device operation is not reliable */
+//    } else {
+//      bsp_selftest_fail_notification( EFCCHECK_FAIL2 );
+//    }
+//  } else {
+//    /* Empty */
+//  }
 
   /** - Set up flash address and data wait states based on the target CPU clock frequency
    * The number of address and data wait states for the target CPU clock frequency are specified
    * in the specific part's datasheet.
    */
-  tms570_flash_init();
+//  tms570_flash_init();
 
   /** - Configure the LPO such that HF LPO is as close to 10MHz as possible */
-  tms570_trim_lpo_init();
+//  tms570_trim_lpo_init();
 
   /** - Wait for PLLs to start up and map clock domains to desired clock sources */
-  tms570_map_clock_init();
+//  tms570_map_clock_init();
 
   /** - set ECLK pins functional mode */
-  TMS570_SYS1.SYSPC1 = 0U;
+//  TMS570_SYS1.SYSPC1 = 0U;
 
   /** - set ECLK pins default output value */
-  TMS570_SYS1.SYSPC4 = 0U;
+//  TMS570_SYS1.SYSPC4 = 0U;
 
   /** - set ECLK pins output direction */
-  TMS570_SYS1.SYSPC2 = 1U;
+//  TMS570_SYS1.SYSPC2 = 1U;
 
   /** - set ECLK pins open drain enable */
-  TMS570_SYS1.SYSPC7 = 0U;
+//  TMS570_SYS1.SYSPC7 = 0U;
 
   /** - set ECLK pins pullup/pulldown enable */
-  TMS570_SYS1.SYSPC8 = 0U;
+//  TMS570_SYS1.SYSPC8 = 0U;
 
   /** - set ECLK pins pullup/pulldown select */
-  TMS570_SYS1.SYSPC9 = 1U;
+//  TMS570_SYS1.SYSPC9 = 1U;
 
   /** - Setup ECLK */
-  TMS570_SYS1.ECPCNTL = TMS570_SYS1_ECPCNTL_ECPSSEL * 0 |
-                        TMS570_SYS1_ECPCNTL_ECPCOS * 0 |
-                        TMS570_SYS1_ECPCNTL_ECPDIV( 8 - 1 );
+//  TMS570_SYS1.ECPCNTL = TMS570_SYS1_ECPCNTL_ECPSSEL * 0 |
+//                        TMS570_SYS1_ECPCNTL_ECPCOS * 0 |
+//                        TMS570_SYS1_ECPCNTL_ECPDIV( 8 - 1 );
 }
 
 #if 0

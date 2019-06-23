@@ -1,5 +1,5 @@
 #
-# Config file for TMS570LS3137 board.
+# Config file for TMS570LC4357 board.
 #
 
 include $(RTEMS_ROOT)/make/custom/default.cfg

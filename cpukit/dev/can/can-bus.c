@@ -93,9 +93,9 @@ static ssize_t can_bus_read(
   };
   int err;
 
-  if (bus->ten_bit_address) {
-    msg.flags |= CAN_M_TEN;
-  }
+//  if (bus->ten_bit_address) {
+//    msg.flags |= CAN_M_TEN;
+//  }
 
   err = can_bus_transfer(bus, &msg, 1);
   if (err == 0) {
